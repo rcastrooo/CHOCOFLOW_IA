@@ -1,0 +1,175 @@
+{% extends 'layouts/modulos.html' %}
+{% load static %}
+
+{% block title %}Gestión de Asignaciones{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/asignaciones.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    <h2 class="text-center section-title mb-4">
+        📋 Gestión de Asignaciones
+    </h2>
+
+    <!-- MENSAJES -->
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+                {{ msg }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- CABECERA -->
+    <div class="cabecera-asignaciones">
+
+        <button class="btn btn-caramel"
+            data-bs-toggle="modal"
+            data-bs-target="#modalAsignacion">
+            + Nueva Asignación
+        </button>
+
+        <form method="GET" class="form-filtros">
+            <input type="text" name="q" class="form-control"
+                placeholder="Buscar tarea o empleado..."
+                value="{{ request.GET.q }}">
+            <button class="btn btn-choco">Filtrar</button>
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive mt-3">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Tarea</th>
+                <th>Empleado</th>
+                <th>Turno</th>
+                <th>Fecha Asignación</th>
+                <th>Asignado por</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        {% for a in asignaciones %}
+        <tr>
+            <td>{{ a.tarea }}</td>
+            <td>{{ a.empleado.nombre }}</td>
+            <td>{{ a.turno.horario }}</td>
+            <td>{{ a.fecha_asignacion }}</td>
+            <td>{{ a.asignado_por.nombre }}</td>
+            <td>
+                <button class="btn btn-sm btn-primary"
+                    onclick="editarAsignacion(
+                        '{{ a.id }}',
+                        '{{ a.tarea }}',
+                        '{{ a.fecha_asignacion }}',
+                        '{{ a.empleado.id }}',
+                        '{{ a.turno.id }}'
+                    )">✏️
+                </button>
+
+                <a href="{% url 'eliminar_asignacion' a.id %}"
+                   class="btn btn-sm btn-danger"
+                   onclick="return confirm('¿Eliminar esta asignación?')">
+                   🗑️
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center">
+                No hay asignaciones registradas
+            </td>
+        </tr>
+        {% endfor %}
+
+        </tbody>
+    </table>
+    </div>
+
+    <!-- BOTONES INFERIORES -->
+    <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+        <a href="{% url 'reporte_asignaciones' %}"
+           class="btn btn-reporte custom-bottom-btn">
+            📄 Generar Reporte
+        </a>
+    </div>
+
+</div>
+</section>
+
+
+<!-- MODAL -->
+<div class="modal fade" id="modalAsignacion">
+<div class="modal-dialog">
+<div class="modal-content">
+
+    <form method="POST" action="{% url 'guardar_asignacion' %}">
+    {% csrf_token %}
+
+    <div class="modal-header">
+        <h5>Asignación</h5>
+    </div>
+
+    <div class="modal-body">
+
+        <input type="hidden" name="id" id="id">
+
+        <input type="text" name="tarea" id="tarea"
+            class="form-control mb-2"
+            placeholder="Descripción de la tarea">
+
+        <input type="date" name="fecha_asignacion" id="fecha_asignacion"
+            class="form-control mb-2">
+
+        <select name="empleado_id" id="empleado_id" class="form-select mb-2">
+            <option value="">-- Seleccionar Empleado --</option>
+            {% for emp in empleados %}
+                <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="turno_id" id="turno_id" class="form-select mb-2">
+            <option value="">-- Seleccionar Turno --</option>
+            {% for t in turnos %}
+                <option value="{{ t.id }}">{{ t.fecha }} | {{ t.horario }}</option>
+            {% endfor %}
+        </select>
+
+    </div>
+
+    <div class="modal-footer">
+        <button class="btn btn-caramel">Guardar</button>
+        <button type="button" class="btn btn-secondary"
+            data-bs-dismiss="modal">Cancelar</button>
+    </div>
+
+    </form>
+</div>
+</div>
+</div>
+
+
+<script>
+function editarAsignacion(id, tarea, fecha, empleadoId, turnoId) {
+    document.getElementById('id').value             = id;
+    document.getElementById('tarea').value          = tarea;
+    document.getElementById('fecha_asignacion').value = fecha;
+    document.getElementById('empleado_id').value    = empleadoId;
+    document.getElementById('turno_id').value       = turnoId;
+
+    var modal = new bootstrap.Modal(
+        document.getElementById('modalAsignacion')
+    );
+    modal.show();
+}
+</script>
+
+{% endblock %}

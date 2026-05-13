@@ -1,0 +1,120 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}
+Inicio | ChocoFlow
+{% endblock %}
+
+
+{% block content %}
+
+<!-- SERVICIOS -->
+<section class="container mt-5">
+<h2 class="text-center section-title">
+¿Qué puedes hacer?
+</h2>
+
+<div class="row mt-4 text-center">
+
+<div class="col-md-4">
+<div class="card card-custom p-4 shadow">
+<h4>📦 Producción</h4>
+<p>Gestiona productos y procesos productivos</p>
+</div>
+</div>
+
+
+<div class="col-md-4">
+<div class="card card-custom p-4 shadow">
+<h4>🚚 Exportación</h4>
+<p>Controla envíos y estados de entrega</p>
+</div>
+</div>
+
+
+<div class="col-md-4">
+<div class="card card-custom p-4 shadow">
+<h4>📊 Reportes</h4>
+<p>Analiza el rendimiento de tu empresa</p>
+</div>
+</div>
+
+</div>
+</section>
+
+
+
+<!-- PRODUCCIÓN -->
+<section class="container mt-5">
+
+<h2 class="section-title text-center">
+Producciones recientes
+</h2>
+
+<div class="row mt-4">
+
+{% for p in producciones %}
+<div class="col-md-4">
+<div class="card card-custom p-3 shadow">
+
+<h5>{{ p.producto }}</h5>
+
+<p>
+Estado: {{ p.estado }}
+</p>
+
+<p>
+Cantidad: {{ p.cantidad_producida }}
+</p>
+
+</div>
+</div>
+
+{% empty %}
+
+<p class="text-center">
+No hay producciones registradas
+</p>
+
+{% endfor %}
+
+</div>
+</section>
+
+
+
+<!-- EXPORTACIONES -->
+<section class="container mt-5 mb-5">
+
+<h2 class="section-title text-center">
+Exportaciones recientes
+</h2>
+
+<div class="row mt-4">
+
+{% for e in exportaciones %}
+
+<div class="col-md-4">
+<div class="card card-custom p-3 shadow">
+
+<h5>{{ e.destino }}</h5>
+
+<p>País: {{ e.pais }}</p>
+
+<p>Estado: {{ e.estado }}</p>
+
+</div>
+</div>
+
+{% empty %}
+
+<p class="text-center">
+No hay exportaciones registradas
+</p>
+
+{% endfor %}
+
+</div>
+
+</section>
+
+{% endblock %}

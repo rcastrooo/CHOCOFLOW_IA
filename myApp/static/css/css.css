@@ -1,0 +1,78 @@
+body:not(.login-page) {
+    background-color: #fff;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content {
+    flex: 1;
+}
+
+.navbar {
+    background-color: #603C1C;
+}
+
+.navbar-brand{
+    color: white;
+}
+
+.btn-custom1 {
+    color: white;
+    border-radius: 25px;
+    border: 2px solid white;
+    margin: 5px;
+    padding: 5px 12px;
+
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.hero {
+    background-image:
+    linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+    url("https://fotografias.lasexta.com/clipping/cmsimages01/2019/03/15/B12DFAAC-A8AA-4DD1-AC49-2A155F5486BF/98.jpg?crop=900,506,x0,y47&width=1900&height=1069&optimize=high&format=webply");
+
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    color: white;
+    padding: 100px 20px;
+    text-align: center;
+}
+
+.card-custom {
+    border: none;
+    border-radius: 20px;
+    transition: 0.3s;
+}
+
+.card-custom:hover {
+    transform: scale(1.05);
+}
+
+.btn-custom {
+    background-color: #D88C51;
+    color: white;
+    border-radius: 25px;
+}
+
+.section-title {
+    color: #3E2723;
+    font-weight: bold;
+}
+
+footer {
+    background-color: #603C1C;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}

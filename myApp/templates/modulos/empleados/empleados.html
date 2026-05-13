@@ -1,0 +1,319 @@
+{% extends 'layouts/modulos.html' %}
+
+{% load static %}
+
+{% block title %}
+Gestión de Empleados
+{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/empleados.css' %}">
+
+<section class="container mt-5">
+
+<div class="container-custom shadow">
+
+<h2 class="text-center section-title mb-4">
+👨‍💼 Gestión de Empleados
+</h2>
+
+
+<!-- CABECERA -->
+<div class="cabecera-empleados">
+
+    <button class="btn btn-caramel" data-bs-toggle="modal" data-bs-target="#modalEmpleado">
+        + Nuevo Empleado
+    </button>
+
+    <form method="GET" class="form-filtros">
+        <input type="text" name="q" class="form-control" placeholder="Buscar empleado...">
+        <select name="estado" class="form-select">
+            <option value="">Todos</option>
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+            <option value="Suspendido">Suspendido</option>
+            <option value="Incapacitado">Incapacitado</option>
+        </select>
+        <button class="btn btn-choco">Filtrar</button>
+    </form>
+
+</div>
+
+
+<!-- TABLA -->
+<div class="table-responsive">
+
+<table class="table table-hover align-middle">
+
+<thead>
+
+<tr>
+<th>Cédula</th>
+<th>Nombre</th>
+<th>Email</th>
+<th>Estado</th>
+<th>Acciones</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for e in empleados %}
+
+<tr>
+
+<td>{{ e.cedula }}</td>
+<td>{{ e.nombre }}</td>
+<td>{{ e.email }}</td>
+
+<td>
+
+{% if e.estado == 'Activo' %}
+
+<span class="badge bg-success">
+{{ e.estado }}
+</span>
+
+{% elif e.estado == 'Inactivo' %}
+
+<span class="badge bg-secondary">
+{{ e.estado }}
+</span>
+
+{% else %}
+
+<span class="badge bg-warning text-dark">
+{{ e.estado }}
+</span>
+
+{% endif %}
+
+</td>
+
+<td>
+
+<button
+class="btn btn-sm btn-primary"
+
+onclick="editarEmpleado(
+'{{ e.id }}',
+'{{ e.cedula }}',
+'{{ e.nombre }}',
+'{{ e.email }}',
+'{{ e.telefono }}',
+'{{ e.direccion }}',
+'{{ e.estado }}'
+)">
+
+✏️
+
+</button>
+
+<a
+href="{% url 'inactivar_empleado' e.id %}"
+class="btn btn-sm btn-danger">
+
+🗑️
+
+</a>
+
+</td>
+
+</tr>
+
+{% empty %}
+
+<tr>
+
+<td colspan="5" class="text-center">
+No hay empleados registrados
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+
+<!-- BOTONES INFERIORES -->
+<div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+
+    <!-- CARGA MASIVA -->
+    <div>
+
+        <button
+            type="button"
+            class="btn btn-masiva custom-bottom-btn"
+            onclick="document.getElementById('csvInput').click()">
+
+            📂 Carga Masiva
+
+        </button>
+
+        <input
+            type="file"
+            id="csvInput"
+            accept=".csv"
+            style="display:none">
+
+    </div>
+
+
+    <!-- REPORTE -->
+    <a
+    href="{% url 'reporte_empleados' %}"
+    class="btn btn-reporte custom-bottom-btn">
+
+    📄 Generar Reporte
+
+    </a>
+
+</div>
+
+</div>
+
+</section>
+
+
+
+<!-- MODAL -->
+<div class="modal fade" id="modalEmpleado">
+
+<div class="modal-dialog">
+
+<div class="modal-content">
+
+<form method="POST" action="{% url 'guardar_empleado' %}">
+
+{% csrf_token %}
+
+<div class="modal-header">
+
+<h5>Empleado</h5>
+
+</div>
+
+
+<div class="modal-body">
+
+<input type="hidden" name="id" id="id">
+
+
+<input
+type="text"
+name="cedula"
+id="cedula"
+class="form-control mb-2"
+placeholder="Cédula">
+
+
+<input
+type="text"
+name="nombre"
+id="nombre"
+class="form-control mb-2"
+placeholder="Nombre">
+
+
+<input
+type="email"
+name="email"
+id="email"
+class="form-control mb-2"
+placeholder="Correo">
+
+
+<input
+type="number"
+name="telefono"
+id="telefono"
+class="form-control mb-2"
+placeholder="Teléfono">
+
+
+<input
+type="text"
+name="direccion"
+id="direccion"
+class="form-control mb-2"
+placeholder="Dirección">
+
+
+<select
+name="estado"
+id="estado"
+class="form-select">
+
+<option value="Activo">Activo</option>
+<option value="Inactivo">Inactivo</option>
+<option value="Suspendido">Suspendido</option>
+<option value="Incapacitado">Incapacitado</option>
+
+</select>
+
+</div>
+
+
+<div class="modal-footer">
+
+<button class="btn btn-caramel">
+Guardar
+</button>
+
+<button
+type="button"
+class="btn btn-secondary"
+data-bs-dismiss="modal">
+
+Cancelar
+
+</button>
+
+</div>
+
+</form>
+
+</div>
+</div>
+</div>
+
+
+
+<script>
+
+function editarEmpleado(
+id,
+cedula,
+nombre,
+email,
+telefono,
+direccion,
+estado
+){
+
+document.getElementById('id').value = id;
+document.getElementById('cedula').value = cedula;
+document.getElementById('nombre').value = nombre;
+document.getElementById('email').value = email;
+document.getElementById('telefono').value = telefono;
+document.getElementById('direccion').value = direccion;
+document.getElementById('estado').value = estado;
+
+var modal = new bootstrap.Modal(
+document.getElementById('modalEmpleado')
+);
+
+modal.show();
+
+}
+
+</script>
+
+{% endblock %}

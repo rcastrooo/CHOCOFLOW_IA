@@ -1,0 +1,105 @@
+.container-custom {
+    background-color: #f8f5f2;
+    padding: 30px;
+    border-radius: 20px;
+}
+
+.section-title {
+    color: #603C1C;
+    font-weight: bold;
+}
+
+.cabecera-asignaciones {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 20px;
+    margin-bottom: 1.5rem;
+}
+
+.form-filtros {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.form-filtros .form-control {
+    width: 220px;
+    border-radius: 15px;
+    font-size: 13px;
+    padding: 6px 12px;
+}
+
+.btn-choco {
+    background-color: #603C1C;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 7px 20px;
+    font-size: 13px;
+    transition: 0.3s;
+    white-space: nowrap;
+}
+
+.btn-choco:hover {
+    background-color: #D88C51;
+    color: white;
+    transform: scale(1.05);
+}
+
+.btn-caramel {
+    background-color: #D88C51;
+    color: white;
+    border-radius: 25px;
+    border: none;
+    padding: 8px 18px;
+    white-space: nowrap;
+}
+
+.btn-caramel:hover {
+    background-color: #c77a3f;
+    color: white;
+}
+
+.table thead {
+    background-color: #603C1C;
+    color: white;
+}
+
+.modal-content {
+    border-radius: 20px;
+    border: none;
+}
+
+.modal-header {
+    background-color: #603C1C;
+    color: white;
+}
+
+.form-control,
+.form-select {
+    border-radius: 12px;
+}
+
+.btn-reporte {
+    background-color: #603C1C;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 10px 22px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.btn-reporte:hover {
+    background-color: #D88C51;
+    color: white;
+    transform: scale(1.05);
+}

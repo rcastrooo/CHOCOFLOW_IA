@@ -1,0 +1,157 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}
+Registro | ChocoFlow
+{% endblock %}
+
+{% block body_class %}login-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/login2.css' %}">
+{% endblock %}
+
+{% block hero %}
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+<div class="row justify-content-center">
+
+<div class="col-md-6">
+
+<div class="card login-card shadow">
+
+<div class="card-body p-5">
+
+<h2 class="text-center mb-4 form-title">
+Crear Cuenta
+</h2>
+
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-danger">
+{{ message }}
+</div>
+{% endfor %}
+{% endif %}
+
+<form method="POST">
+{% csrf_token %}
+
+<!-- ID -->
+<div class="mb-3">
+<label class="form-label">
+ID / Documento
+</label>
+<input
+type="text"
+name="identificacion"
+class="form-control"
+required
+placeholder="Ingrese su Documento"
+required
+>
+</div>
+
+<!-- Nombre -->
+<div class="mb-3">
+<label class="form-label">
+Nombre completo
+</label>
+<input
+type="text"
+name="nombre"
+class="form-control"
+required
+placeholder="Ingrese su Nombre"
+required
+>
+</div>
+
+<!-- Correo -->
+<div class="mb-3">
+<label class="form-label">
+Correo electrónico
+</label>
+<input
+type="email"
+name="correo"
+class="form-control"
+required
+placeholder="Ingrese su Correo"
+required
+>
+</div>
+
+<!-- Contraseña -->
+<div class="mb-3">
+<label class="form-label">
+Contraseña
+</label>
+<input
+type="password"
+name="password"
+class="form-control"
+required
+placeholder="Ingrese su Contraseña"
+required
+>
+</div>
+
+<!-- Rol -->
+<div class="mb-3">
+<label class="form-label">
+Rol
+</label>
+<select
+name="rol"
+class="form-control"
+required
+>
+<option value="">Seleccione rol</option>
+<option value="admin">Administrador</option>
+<option value="supervisor">Supervisor</option>
+</select>
+</div>
+
+<!-- Estado -->
+<div class="mb-4">
+<label class="form-label">
+Estado
+</label>
+<select
+name="estado"
+class="form-control"
+required
+>
+<option value="">Seleccione estado</option>
+<option value="activo">Activo</option>
+<option value="inactivo">Inactivo</option>
+</select>
+</div>
+
+<div class="d-grid">
+<button type="submit" class="btn btn-login">
+Registrarse
+</button>
+</div>
+
+<div class="text-center mt-4">
+¿Ya tienes cuenta?
+<a href="{% url 'login' %}">
+Inicia sesión
+</a>
+</div>
+
+</form>
+
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+{% endblock %}
