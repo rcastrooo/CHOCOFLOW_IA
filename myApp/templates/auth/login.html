@@ -26,11 +26,11 @@ Iniciar Sesión
 </h2>
 
 {% if messages %}
-{% for message in messages %}
-<div class="alert alert-danger">
-{{ message }}
-</div>
-{% endfor %}
+    {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
 {% endif %}
 
 <form method="POST">
@@ -66,10 +66,7 @@ Entrar
 </button>
 </div>
 
-<div class="text-center mt-4">
-¿No tienes cuenta?
-<a href="{% url 'registro' %}">Regístrate</a>
-</div>
+
 
 </form>
 

@@ -110,44 +110,42 @@ def registro(request):
 
 def login_usuario(request):
     if request.method == 'POST':
-        correo = request.POST['username'].strip()
-        password = request.POST['password'].strip()
+        correo   = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
 
-        # ========================
-        # VALIDACIONES
-        # ========================
-
-        # Campos vacíos
+        # Validaciones básicas
         if not correo or not password:
             messages.error(request, "Todos los campos son obligatorios.")
             return render(request, 'auth/login.html')
 
-        # Formato correo
         import re
-        patron_correo = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
-        if not re.match(patron_correo, correo):
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$', correo):
             messages.error(request, "El correo no tiene un formato válido.")
             return render(request, 'auth/login.html')
 
-        # ========================
-        # AUTENTICACIÓN
-        # ========================
-        from django.contrib.auth.models import User
+        # Buscar el User de Django por email
         try:
             user_obj = User.objects.get(email=correo)
-            user = authenticate(
-                request,
-                username=user_obj.username,
-                password=password
-            )
+            user = authenticate(request, username=user_obj.username, password=password)
         except User.DoesNotExist:
             user = None
 
         if user:
             login(request, user)
+
+            # ── Guardar el id del perfil personalizado en sesión ──
+            try:
+                perfil = Usuario.objects.get(email=correo)
+                request.session['usuario_id'] = perfil.id
+                request.session['usuario_rol'] = perfil.rol
+                messages.success(request, f"Bienvenido, {perfil.nombre} ")
+            except Usuario.DoesNotExist:
+                messages.warning(request, "Sesión iniciada pero sin perfil asignado.")
+
             return redirect('index')
+
         else:
-            messages.error(request, "Correo o contraseña incorrectos ")
+            messages.error(request, "Correo o contraseña incorrectos.")
 
     return render(request, 'auth/login.html')
 
