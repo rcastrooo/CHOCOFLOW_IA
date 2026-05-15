@@ -14,8 +14,11 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 
 from io import BytesIO
+from dotenv import load_dotenv # IA
+import os
 import json
 import re
+load_dotenv()
 
 from .models import (
     Usuario,
@@ -63,7 +66,7 @@ def login_usuario(request):
     # Si ya hay sesión activa, redirigir según rol
     if request.user.is_authenticated:
         rol = request.session.get('rol', '').strip()
-        if rol == 'admin':
+        if rol == 'Administrador':
             return redirect('dashboard')
         elif rol == 'Supervisor':
             return redirect('dashboard_supervisor')
@@ -100,7 +103,7 @@ def login_usuario(request):
 
                 rol = usuario_db.rol.strip()
 
-                if rol == 'admin':
+                if rol == 'Administrador':
                     return redirect('dashboard')
                 elif rol == 'Supervisor':
                     return redirect('dashboard_supervisor')
@@ -291,7 +294,6 @@ def empleados(request):
 
 @login_required(login_url='login')
 def guardar_empleado(request):
-
     if request.method == 'POST':
 
         usuario_id = request.session.get('usuario_id')
@@ -449,3 +451,62 @@ def eliminar_asignacion(request, id):
     asignacion.delete()
     messages.success(request, "Asignación eliminada.")
     return redirect('asignaciones')
+
+
+# ========================
+# ASISTENTE IA CON GEMINI
+# ========================
+import google.generativeai as genai
+
+def consultar_ia(request):
+
+    # Verificar sesión manualmente
+    if not request.user.is_authenticated:
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            return JsonResponse({'error': 'No autorizado.'}, status=401)
+
+    if request.method == 'POST':
+
+        pregunta = request.POST.get('pregunta', '').strip()
+
+        if not pregunta:
+            return JsonResponse({'error': 'La pregunta no puede estar vacía.'}, status=400)
+
+        empleados_activos        = Empleado.objects.filter(estado='Activo').count()
+        empleados_suspendidos    = Empleado.objects.filter(estado='Suspendido').count()
+        producciones_proceso     = Produccion.objects.filter(estado='En Proceso').count()
+        producciones_finalizadas = Produccion.objects.filter(estado='Finalizado').count()
+        exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
+        total_lotes              = Lote.objects.count()
+        total_asignaciones       = Asignacion.objects.count()
+
+        contexto = f"""
+Eres un asistente experto en gestión de producción de chocolate llamado ChocoBot.
+Respondes en español, de forma clara, profesional y con recomendaciones prácticas.
+
+Datos actuales de la empresa ChocoFlow:
+- Empleados activos: {empleados_activos}
+- Empleados suspendidos: {empleados_suspendidos}
+- Producciones en proceso: {producciones_proceso}
+- Producciones finalizadas: {producciones_finalizadas}
+- Exportaciones pendientes: {exportaciones_pendientes}
+- Total de lotes: {total_lotes}
+- Total de asignaciones: {total_asignaciones}
+
+Con base en estos datos reales, responde la siguiente pregunta del administrador:
+{pregunta}
+        """
+
+        try:
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            # ✅ ahora
+            modelo = genai.GenerativeModel("gemini-2.0-flash")
+            respuesta = modelo.generate_content(contexto)
+
+            return JsonResponse({'respuesta': respuesta.text})
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error al consultar la IA: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)

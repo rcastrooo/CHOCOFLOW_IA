@@ -49,6 +49,122 @@
 
 </div>
 
+<!-- PANEL IA -->
+<div class="table-container" style="margin-bottom:30px;">
+
+    <h2>🤖 Asistente IA — ChocoFlow</h2>
+    <p style="color:#888; margin-bottom:20px; font-size:14px;">
+        Hazle preguntas sobre producción, empleados, exportaciones o pide recomendaciones basadas en tus datos actuales.
+    </p>
+
+    <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <input
+            type="text"
+            id="pregunta-ia"
+            placeholder="Ej: ¿Cómo puedo mejorar la producción actual?"
+            style="flex:1; padding:12px 16px; border:1px solid #ddd; border-radius:10px; font-size:15px; outline:none;"
+        />
+        <button
+            onclick="consultarIA()"
+            style="background:#4E2A12; color:white; border:none; padding:12px 24px; border-radius:10px; font-size:15px; cursor:pointer;">
+            Consultar
+        </button>
+    </div>
+
+    <!-- Sugerencias rápidas -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+        <span onclick="preguntaRapida('¿Cómo mejorar la producción actual?')"
+            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+            📦 Mejorar producción
+        </span>
+        <span onclick="preguntaRapida('¿Qué riesgos hay con las exportaciones pendientes?')"
+            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+            🚚 Riesgos exportaciones
+        </span>
+        <span onclick="preguntaRapida('¿Cómo optimizar la gestión de empleados?')"
+            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+            👥 Gestión empleados
+        </span>
+        <span onclick="preguntaRapida('Dame un resumen del estado actual de la empresa')"
+            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+            📊 Resumen general
+        </span>
+    </div>
+
+    <!-- Respuesta -->
+    <div id="respuesta-ia" style="display:none;">
+        <div style="background:#f9f4ef; border-left:4px solid #4E2A12; padding:20px; border-radius:10px;">
+            <p style="font-weight:bold; color:#4E2A12; margin-bottom:10px;">🤖 ChocoBot dice:</p>
+            <p id="texto-respuesta" style="color:#333; line-height:1.7; white-space:pre-wrap;"></p>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading-ia" style="display:none; text-align:center; padding:20px;">
+        <p style="color:#888;">🍫 ChocoBot está pensando...</p>
+    </div>
+
+    <!-- Error -->
+    <div id="error-ia" style="display:none;">
+        <p style="color:#e74c3c;">❌ <span id="texto-error"></span></p>
+    </div>
+
+</div>
+
+<script>
+    function preguntaRapida(texto) {
+        document.getElementById('pregunta-ia').value = texto;
+        consultarIA();
+    }
+
+    function consultarIA() {
+        const pregunta = document.getElementById('pregunta-ia').value.trim();
+
+        if (!pregunta) {
+            alert('Por favor escribe una pregunta.');
+            return;
+        }
+
+        // Ocultar todo
+        document.getElementById('respuesta-ia').style.display = 'none';
+        document.getElementById('error-ia').style.display     = 'none';
+        document.getElementById('loading-ia').style.display   = 'block';
+
+        // Obtener CSRF token
+        const csrfToken = document.cookie
+            .split(';')
+            .find(c => c.trim().startsWith('csrftoken='))
+            ?.split('=')[1];
+
+        fetch("{% url 'consultar_ia' %}", {
+    method: 'POST',
+    credentials: 'same-origin',  // ← agrega esta línea
+    headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken
+    },
+    body: `pregunta=${encodeURIComponent(pregunta)}`
+})
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('loading-ia').style.display = 'none';
+
+            if (data.respuesta) {
+                document.getElementById('texto-respuesta').textContent = data.respuesta;
+                document.getElementById('respuesta-ia').style.display  = 'block';
+            } else {
+                document.getElementById('texto-error').textContent = data.error;
+                document.getElementById('error-ia').style.display   = 'block';
+            }
+        })
+        .catch(err => {
+            document.getElementById('loading-ia').style.display = 'none';
+            document.getElementById('texto-error').textContent  = 'Error de conexión.';
+            document.getElementById('error-ia').style.display   = 'block';
+        });
+    }
+</script>
+
 <!-- TABLA PRODUCCIONES RECIENTES -->
 <div class="table-container">
     <h2>🏭 Producciones Recientes</h2>

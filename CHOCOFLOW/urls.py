@@ -13,6 +13,9 @@ urlpatterns = [
     
     # DASHBOARD ADMIN
     path('dashboard/', views.dashboard, name='dashboard'),
+    
+    # IA EN EL DASHBOARD DEL ADMIN
+    path('dashboard/ia/', views.consultar_ia, name='consultar_ia'),
 
     # DASHBOARD SUPERVISOR
     path('dashboard_supervisor/', views.dashboard_supervisor, name='dashboard_supervisor'),
