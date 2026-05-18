@@ -1,0 +1,122 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio — Supervisor</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- CSS externo -->
+  <link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+</head>
+
+<body>
+
+<!-- ═══════════════════════════════
+     SIDEBAR
+═══════════════════════════════ -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-box-seam"></i> Supervisor
+  </div>
+
+  <nav class="mt-2">
+    <a class="nav-link active" onclick="mostrarSeccion('inicio', this)">
+      <i class="bi bi-speedometer2"></i> Inicio
+    </a>
+
+    <a class="nav-link" onclick="mostrarSeccion('empleados', this)">
+      <i class="bi bi-people"></i> Empleados
+    </a>
+
+    <a class="nav-link" onclick="mostrarSeccion('turnos', this)">
+      <i class="bi bi-clock"></i> Turnos
+    </a>
+
+    <a class="nav-link" onclick="mostrarSeccion('asignaciones', this)">
+      <i class="bi bi-clipboard-check"></i> Asignaciones
+    </a>
+
+    <a class="nav-link" onclick="mostrarSeccion('exportaciones', this)">
+      <i class="bi bi-airplane"></i> Exportaciones
+    </a>
+
+    <a class="nav-link" onclick="mostrarSeccion('lotes', this)">
+      <i class="bi bi-box"></i> Lotes
+    </a>
+
+    <div class="sidebar-divider"></div>
+
+    <a class="nav-link" onclick="mostrarSeccion('bitacora', this)">
+      <i class="bi bi-journal-text"></i> Bitácora producción
+    </a>
+  </nav>
+</div>
+
+<!-- ═══════════════════════════════
+     CONTENIDO PRINCIPAL
+═══════════════════════════════ -->
+
+<div class="main-content">
+
+  <!-- INICIO -->
+  <div id="seccion-inicio" class="seccion activa">
+
+    <div class="topbar">
+      <span class="topbar-title">
+        <i class="bi bi-speedometer2"></i> Resumen general
+      </span>
+    </div>
+
+    <div class="bienvenida">
+      <h5><i class="bi bi-person-check"></i> Bienvenido, Supervisor</h5>
+      <p>Panel de control — resumen general del sistema</p>
+    </div>
+
+    <h6 class="section-title mb-3">Estadísticas generales</h6>
+
+    <div class="row g-3">
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="bi bi-people-fill"></i>
+          </div>
+
+          <div class="stat-number">{{ total_empleados }}</div>
+          <div class="stat-label">Empleados totales</div>
+          <div class="stat-sub">{{ empleados_activos }} activos</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+
+  function mostrarSeccion(id, el) {
+
+    document.querySelectorAll('.seccion').forEach(s => {
+      s.classList.remove('activa');
+    });
+
+    document.querySelectorAll('.nav-link').forEach(n => {
+      n.classList.remove('active');
+    });
+
+    document.getElementById('seccion-' + id).classList.add('activa');
+
+    el.classList.add('active');
+  }
+
+</script>
+
+</body>
+</html>

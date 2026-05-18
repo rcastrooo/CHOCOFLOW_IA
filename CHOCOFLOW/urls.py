@@ -19,4 +19,23 @@ urlpatterns = [
     path('asignaciones/', views.asignaciones, name='asignaciones'),
     path('asignaciones/guardar/', views.guardar_asignacion, name='guardar_asignacion'),
     path('asignaciones/eliminar/<int:id>/', views.eliminar_asignacion, name='eliminar_asignacion'),
+    
+    #EXPORTACIONES
+    path('exportaciones/',views.gestionar_exportaciones, name='gestionar_exportaciones'),
+    path('exportaciones/guardar/',views.guardar_exportacion,name='guardar_exportacion'),
+    path('exportaciones/inactivar/<int:id>/',views.inactivar_exportacion,name='inactivar_exportacion'),
+    path('exportaciones/reporte/',views.generar_reporte_exportaciones,name='reporte_exportaciones'),
+    
+    #LOTES
+    # Lotes
+    path('lotes/',views.gestionar_lotes,name='gestionar_lotes'),
+    path('lotes/guardar/',views.guardar_lote,name='guardar_lote'),
+    path('lotes/eliminar/<int:id>/',views.eliminar_lote,name='eliminar_lote'),
+    path('lotes/reporte/',views.generar_reporte_lotes,name='reporte_lotes'),
+
+    #DASHBOARD SUPERVISOR
+    # Dashboard principal del supervisor
+    path('supervisor/', views.dashboard_supervisor, name='dashboard_supervisor'),
+    
+    
 ]
