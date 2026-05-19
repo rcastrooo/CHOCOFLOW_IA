@@ -43,6 +43,13 @@
             </li>
 
             <li>
+                <a href="{% url 'turnos' %}">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    Turnos
+                </a>
+            </li>
+
+            <li>
                 <a href="{% url 'asignaciones' %}">
                     <i class="fa-solid fa-list-check"></i>
                     Asignaciones
@@ -50,21 +57,21 @@
             </li>
 
             <li>
-                <a href="#">
-                    <i class="fa-solid fa-industry"></i>
-                    Producción
-                </a>
+                 <a href="{% url 'producciones' %}">
+                      <i class="fa-solid fa-industry"></i>
+                      Producción
+                 </a>
             </li>
 
             <li>
-                <a href="#">
+                <a href="{% url 'gestionar_lotes' %}">
                     <i class="fa-solid fa-box"></i>
                     Lotes
                 </a>
             </li>
 
             <li>
-                <a href="#">
+                <a href="{% url 'gestionar_exportaciones' %}">
                     <i class="fa-solid fa-plane"></i>
                     Exportaciones
                 </a>
@@ -85,7 +92,13 @@
     <main class="content">
 
         <div class="topbar">
-            <h1>{% block titulo %}Dashboard{% endblock %}</h1>
+            <div>
+                <h1>{% block titulo %}Dashboard{% endblock %}</h1>
+            </div>
+            <div class="topbar-perfil">
+                <span>👋 Bienvenido, <strong>{{ usuario_nombre }}</strong></span>
+               
+            </div>
         </div>
 
         {% block content %}

@@ -14,7 +14,6 @@
         📋 Gestión de Asignaciones
     </h2>
 
-    <!-- MENSAJES -->
     {% if messages %}
         {% for msg in messages %}
             <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
@@ -75,9 +74,9 @@
                     )">✏️
                 </button>
 
-                <a href="{% url 'eliminar_asignacion' a.id %}"
+                <a href="{% url 'inactivar_asignacion' a.id %}"
                    class="btn btn-sm btn-danger"
-                   onclick="return confirm('¿Eliminar esta asignación?')">
+                   onclick="return confirm('¿Inactivar esta asignación?')">
                    🗑️
                 </a>
             </td>
@@ -94,13 +93,12 @@
     </table>
     </div>
 
-    <!-- BOTONES INFERIORES -->
     <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
-        <a href="{% url 'reporte_asignaciones' %}"
-           class="btn btn-reporte custom-bottom-btn">
-            📄 Generar Reporte
-        </a>
-    </div>
+    <a href="{% url 'reporte_asignaciones' %}"
+       class="btn btn-reporte custom-bottom-btn">
+        📄 Generar Reporte
+    </a>
+</div>
 
 </div>
 </section>
@@ -159,11 +157,11 @@
 
 <script>
 function editarAsignacion(id, tarea, fecha, empleadoId, turnoId) {
-    document.getElementById('id').value             = id;
-    document.getElementById('tarea').value          = tarea;
+    document.getElementById('id').value               = id;
+    document.getElementById('tarea').value            = tarea;
     document.getElementById('fecha_asignacion').value = fecha;
-    document.getElementById('empleado_id').value    = empleadoId;
-    document.getElementById('turno_id').value       = turnoId;
+    document.getElementById('empleado_id').value      = empleadoId;
+    document.getElementById('turno_id').value         = turnoId;
 
     var modal = new bootstrap.Modal(
         document.getElementById('modalAsignacion')

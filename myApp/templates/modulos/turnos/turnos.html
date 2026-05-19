@@ -1,0 +1,160 @@
+{% extends 'layouts/modulos.html' %}
+{% load static %}
+
+{% block title %}Gestión de Turnos{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/turnos.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    <h2 class="text-center section-title mb-4">
+        🕒 Gestión de Turnos
+    </h2>
+
+    <!-- CABECERA -->
+    <div class="cabecera-turnos">
+
+        <button class="btn btn-caramel"
+                data-bs-toggle="modal"
+                data-bs-target="#modalTurno">
+            + Nuevo Turno
+        </button>
+
+        <form method="GET" class="form-filtros">
+            <input type="date" name="fecha" class="form-control"
+                   value="{{ request.GET.fecha }}"
+                   placeholder="Filtrar por fecha">
+            <button class="btn btn-choco">Filtrar</button>
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Horario</th>
+                <th>Empleados</th>
+                <th>Creado por</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        {% for turno in turnos %}
+        <tr>
+            <td>{{ turno.fecha }}</td>
+            <td>{{ turno.horario }}</td>
+            <td>
+                {% for rel in turno.empturno_set.all %}
+                    <span class="badge bg-secondary">{{ rel.empleado.nombre }}</span>
+                {% empty %}
+                    <span class="text-muted">Sin empleados</span>
+                {% endfor %}
+            </td>
+            <td>{{ turno.creado_por.nombre }}</td>
+            <td>
+                <button class="btn btn-sm btn-primary"
+                    onclick="editarTurno(
+                        '{{ turno.id }}',
+                        '{{ turno.fecha|date:"Y-m-d" }}',
+                        '{{ turno.horario }}'
+                    )">✏️
+                </button>
+                <a href="{% url 'inactivar_turno' turno.id %}"
+                   class="btn btn-sm btn-danger"
+                   onclick="return confirm('¿Eliminar este turno?')">
+                   🗑️
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center">No hay turnos registrados</td>
+        </tr>
+        {% endfor %}
+
+        </tbody>
+    </table>
+    </div>
+
+    <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'reporte_turnos' %}"
+       class="btn btn-reporte custom-bottom-btn">
+        📄 Generar Reporte
+    </a>
+</div>
+
+</div>
+</section>
+
+
+<!-- MODAL -->
+<div class="modal fade" id="modalTurno">
+<div class="modal-dialog">
+<div class="modal-content">
+
+    <form method="POST" action="{% url 'guardar_turno' %}">
+    {% csrf_token %}
+
+    <div class="modal-header">
+        <h5>Turno</h5>
+    </div>
+
+    <div class="modal-body">
+
+        <input type="hidden" name="id" id="id">
+
+        <input type="date" name="fecha" id="fecha"
+               class="form-control mb-2">
+
+        <select name="horario" id="horario" class="form-select mb-2">
+            <option value="">-- Seleccionar Horario --</option>
+            <option value="Mañana 6:00am - 2:00pm">Mañana 6:00am - 2:00pm</option>
+            <option value="Tarde 2:00pm - 10:00pm">Tarde 2:00pm - 10:00pm</option>
+            <option value="Noche 10:00pm - 6:00am">Noche 10:00pm - 6:00am</option>
+        </select>
+
+        <select name="empleado_ids" id="empleado_ids"
+                class="form-select mb-2" multiple>
+            {% for emp in empleados %}
+                <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+            {% endfor %}
+        </select>
+        <small class="text-muted">Mantén Ctrl para seleccionar varios empleados</small>
+
+    </div>
+
+    <div class="modal-footer">
+        <button class="btn btn-caramel">Guardar</button>
+        <button type="button" class="btn btn-secondary"
+            data-bs-dismiss="modal">Cancelar</button>
+    </div>
+
+    </form>
+</div>
+</div>
+</div>
+
+
+<script>
+function editarTurno(id, fecha, horario) {
+    document.getElementById('id').value      = id;
+    document.getElementById('fecha').value   = fecha;
+    document.getElementById('horario').value = horario;
+
+    var modal = new bootstrap.Modal(
+        document.getElementById('modalTurno')
+    );
+    modal.show();
+}
+</script>
+
+{% endblock %}

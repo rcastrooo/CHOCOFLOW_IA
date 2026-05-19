@@ -13,9 +13,9 @@
 }
 
 /* =========================
-   CABECERA — FILTROS
+   CABECERA
 ========================= */
-.cabecera-asignaciones {
+.cabecera-lotes {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -28,7 +28,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
 }
 
 .form-filtros .form-control {
@@ -36,13 +35,6 @@
     border-radius: 15px;
     font-size: 15px;
     padding: 6px 12px;
-}
-
-.form-filtros .form-select {
-    width: 130px;
-    border-radius: 15px;
-    font-size: 15px;
-    padding: 6px 10px;
 }
 
 /* =========================
@@ -71,7 +63,6 @@
     border-radius: 25px;
     border: none;
     padding: 8px 18px;
-    font-size: 15px;
     white-space: nowrap;
 }
 
@@ -80,9 +71,6 @@
     color: white;
 }
 
-/* =========================
-   BOTONES INFERIORES
-========================= */
 .btn-reporte {
     background-color: #603C1C;
     color: white;
@@ -92,11 +80,9 @@
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
     font-weight: 500;
     font-size: 15px;
-    cursor: pointer;
     transition: all 0.3s ease;
 }
 

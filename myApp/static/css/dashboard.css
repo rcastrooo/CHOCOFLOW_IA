@@ -164,3 +164,81 @@ body {
         margin-left: 90px;
     }
 }
+
+/* PERFIL EN SIDEBAR */
+.perfil-usuario {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 10px;
+}
+
+.perfil-avatar {
+    background: rgba(255,255,255,0.15);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: white;
+    flex-shrink: 0;
+}
+
+.perfil-info {
+    overflow: hidden;
+}
+
+.perfil-nombre {
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.perfil-rol {
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+    margin: 0;
+}
+
+/* TOPBAR */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+}
+
+.topbar h1 {
+    font-size: 26px;
+    color: #4E2A12;
+    font-weight: 700;
+    margin: 0;
+}
+
+.topbar-perfil {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.topbar-perfil span {
+    color: #555;
+    font-size: 14px;
+}
+
+.topbar-rol {
+    background: #4E2A12;
+    color: white !important;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 12px !important;
+}

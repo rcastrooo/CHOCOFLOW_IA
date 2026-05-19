@@ -19,7 +19,7 @@ import os
 import json
 import re
 load_dotenv()
-
+from google import genai
 from .models import (
     Usuario,
     Empleado,
@@ -28,7 +28,8 @@ from .models import (
     Asignacion,
     Produccion,
     Lote,
-    Exportacion
+    Exportacion,
+    Bitacora
 )
 
 # ========================
@@ -242,6 +243,31 @@ def dashboard(request):
 
     return render(request, 'dashboard.html', context)
 
+@login_required(login_url='login')
+def dashboard(request):
+
+    # Obtener datos del usuario en sesión
+    usuario_id = request.session.get('usuario_id')
+    usuario_nombre = 'Administrador'
+    usuario_rol    = 'Administrador'
+
+    try:
+        usuario_db     = Usuario.objects.get(id=usuario_id)
+        usuario_nombre = usuario_db.nombre
+        usuario_rol    = usuario_db.rol
+    except Usuario.DoesNotExist:
+        pass
+
+    # ... resto de variables que ya tienes ...
+
+    context = {
+        # ... todo lo que ya tienes ...
+        'usuario_nombre': usuario_nombre,
+        'usuario_rol':    usuario_rol,
+    }
+
+    return render(request, 'dashboard.html', context)
+
 # =======================
 # DASHBOARD SUPERVISOR
 # =======================
@@ -356,9 +382,9 @@ def generar_reporte_empleados(request):
     elementos.append(Paragraph("Reporte de Empleados - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Cédula', 'Nombre', 'Email', 'Estado']]
+    datos = [['Cédula', 'Nombre', 'Email', 'Telefono', 'Estado']]
     for emp in lista:
-        datos.append([emp.cedula, emp.nombre, emp.email, emp.estado])
+        datos.append([emp.cedula, emp.nombre, emp.email, emp.telefono, emp.estado])
 
     tabla = Table(datos)
     tabla.setStyle(TableStyle([
@@ -387,7 +413,9 @@ def generar_reporte_empleados(request):
 def asignaciones(request):
 
     query = request.GET.get('q')
-    lista = Asignacion.objects.select_related('empleado', 'turno', 'asignado_por').all()
+    lista = Asignacion.objects.select_related(
+        'empleado', 'turno', 'asignado_por'
+    ).filter(empleado__estado='Activo')
 
     if query:
         lista = lista.filter(
@@ -438,6 +466,7 @@ def guardar_asignacion(request):
         asignacion.empleado         = get_object_or_404(Empleado, id=emp_id)
         asignacion.turno            = get_object_or_404(Turno, id=turno_id)
         asignacion.asignado_por     = usuario_perfil
+        asignacion.estado           = 'Activo'
 
         asignacion.save()
         messages.success(request, "Asignación guardada correctamente.")
@@ -446,17 +475,706 @@ def guardar_asignacion(request):
 
 
 @login_required(login_url='login')
-def eliminar_asignacion(request, id):
+def inactivar_asignacion(request, id):
     asignacion = get_object_or_404(Asignacion, id=id)
-    asignacion.delete()
-    messages.success(request, "Asignación eliminada.")
+    asignacion.estado = 'Inactivo'
+    asignacion.save()
+    messages.success(request, "Asignación inactivada.")
     return redirect('asignaciones')
+
+# ==============================
+# REPORTE PDF DE ASIGNACIONES
+# ==============================
+
+@login_required(login_url='login')
+def generar_reporte_asignaciones(request):
+
+    lista  = Asignacion.objects.select_related('empleado', 'turno', 'asignado_por').all()
+    query  = request.GET.get('q')
+
+    if query:
+        lista = lista.filter(
+            Q(tarea__icontains=query) |
+            Q(empleado__nombre__icontains=query)
+        )
+
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    elementos.append(Paragraph("Reporte de Asignaciones - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Tarea', 'Empleado', 'Turno', 'Fecha', 'Asignado por']]
+    for a in lista:
+        datos.append([
+            a.tarea,
+            a.empleado.nombre,
+            a.turno.horario,
+            str(a.fecha_asignacion),
+            a.asignado_por.nombre,
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_asignaciones.pdf"'
+    response.write(pdf)
+    return response
+
+
+# ===================
+# TURNOS
+# ===================
+
+@login_required(login_url='login')
+def turnos(request):
+
+    fecha_filtro = request.GET.get('fecha')
+    lista = Turno.objects.select_related('creado_por').prefetch_related('empturno_set__empleado').order_by('-id')
+
+    if fecha_filtro:
+        lista = lista.filter(fecha=fecha_filtro)
+
+    empleados = Empleado.objects.filter(estado='Activo')
+
+    return render(request, 'modulos/turnos/turnos.html', {
+        'turnos':    lista,
+        'empleados': empleados
+    })
+
+
+@login_required(login_url='login')
+def guardar_turno(request):
+
+    if request.method == 'POST':
+
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida.")
+            return redirect('login')
+
+        try:
+            usuario = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            messages.error(request, "Usuario no encontrado.")
+            return redirect('login')
+
+        turno_id     = request.POST.get('id')
+        fecha        = request.POST.get('fecha')
+        horario      = request.POST.get('horario')
+        empleado_ids = request.POST.getlist('empleado_ids')  # ← corregido
+
+        if not fecha or not horario:
+            messages.error(request, "Todos los campos son obligatorios.")
+            return redirect('turnos')
+
+        # Crear o editar
+        if turno_id:
+            turno = get_object_or_404(Turno, id=turno_id)
+            turno.fecha   = fecha
+            turno.horario = horario
+            turno.save()
+            # Actualizar empleados
+            EmpTurno.objects.filter(turno=turno).delete()
+        else:
+            turno = Turno.objects.create(
+                fecha=fecha,
+                horario=horario,
+                creado_por=usuario
+            )
+
+        # Asignar empleados
+        for emp_id in empleado_ids:
+            try:
+                empleado = Empleado.objects.get(id=emp_id)
+                EmpTurno.objects.create(empleado=empleado, turno=turno)
+            except Empleado.DoesNotExist:
+                pass
+
+        messages.success(request, "Turno guardado correctamente.")
+
+    return redirect('turnos')
+
+
+@login_required(login_url='login')
+def inactivar_turno(request, id):
+    turno = get_object_or_404(Turno, id=id)
+    EmpTurno.objects.filter(turno=turno).delete()
+    turno.delete()
+    messages.success(request, "Turno eliminado correctamente.")
+    return redirect('turnos')
+
+# ==============================
+# REPORTE PDF DE TURNOS
+# ==============================
+
+@login_required(login_url='login')
+def generar_reporte_turnos(request):
+
+    lista = Turno.objects.select_related('creado_por').prefetch_related('empturno_set__empleado').all()
+    fecha = request.GET.get('fecha')
+
+    if fecha:
+        lista = lista.filter(fecha=fecha)
+
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    elementos.append(Paragraph("Reporte de Turnos - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Fecha', 'Horario', 'Empleados', 'Creado por']]
+    for t in lista:
+        empleados_turno = ', '.join([
+            rel.empleado.nombre for rel in t.empturno_set.all()
+        ]) or 'Sin empleados'
+
+        datos.append([
+            str(t.fecha),
+            t.horario,
+            empleados_turno,
+            t.creado_por.nombre,
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_turnos.pdf"'
+    response.write(pdf)
+    return response
+
+
+
+# ==============================
+# LOGICA DE EXPORTACIONES
+# ==============================
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from .models import Exportacion, Usuario
+
+@login_required(login_url='login')
+def gestionar_exportaciones(request):
+    q      = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
+
+    exportaciones = Exportacion.objects.select_related('creado_por').all()
+
+    if q:
+        # Filtra solo por destino (es nacional, no hay país)
+        exportaciones = exportaciones.filter(destino__icontains=q)
+
+    if estado:
+        exportaciones = exportaciones.filter(estado=estado)
+
+    return render(request, 'modulos/exportaciones/exportaciones.html', {
+        'exportaciones': exportaciones,
+        'q': q,
+        'estado_filtro': estado,
+    })
+
+
+@login_required(login_url='login')
+def guardar_exportacion(request):
+    if request.method == 'POST':
+
+        # Obtener el Usuario personalizado desde la sesión (igual que en empleados)
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida. Inicia sesión nuevamente.")
+            return redirect('login')
+
+        try:
+            usuario_perfil = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            messages.error(request, "No se encontró tu perfil de usuario.")
+            return redirect('login')
+
+        id            = request.POST.get('id')
+        destino       = request.POST.get('destino')
+        fecha_envio   = request.POST.get('fecha_envio')
+        fecha_entrega = request.POST.get('fecha_entrega')
+        estado        = request.POST.get('estado')
+
+        # Validación de fechas
+        if fecha_entrega < fecha_envio:
+            messages.error(request, 'La fecha de entrega no puede ser anterior a la de envío.')
+            return redirect('gestionar_exportaciones')
+
+        if id:  # ✏️ Editar
+            exp               = get_object_or_404(Exportacion, pk=id)
+            exp.destino       = destino
+            exp.fecha_envio   = fecha_envio
+            exp.fecha_entrega = fecha_entrega
+            exp.estado        = estado
+            exp.save()
+            messages.success(request, 'Exportación actualizada correctamente.')
+
+        else:   # ➕ Crear
+            Exportacion.objects.create(
+                destino       = destino,
+                fecha_envio   = fecha_envio,
+                fecha_entrega = fecha_entrega,
+                estado        = estado,
+                creado_por    = usuario_perfil,  # ← igual que en guardar_empleado
+            )
+            messages.success(request, 'Exportación creada correctamente.')
+
+    return redirect('gestionar_exportaciones')
+
+
+@login_required(login_url='login')
+def inactivar_exportacion(request, id):
+    exp        = get_object_or_404(Exportacion, pk=id)
+    exp.estado = 'Cancelado'  # No borra, solo cambia el estado
+    exp.save()
+    messages.success(request, 'Exportación cancelada correctamente.')
+    return redirect('gestionar_exportaciones')
+
+
+@login_required(login_url='login')
+def generar_reporte_exportaciones(request):
+
+    exportaciones = Exportacion.objects.select_related('creado_por').all()
+
+    busqueda = request.GET.get('busqueda')
+    estado   = request.GET.get('estado')
+
+    if busqueda:
+        exportaciones = exportaciones.filter(destino__icontains=busqueda)
+
+    if estado and estado != "Todos":
+        exportaciones = exportaciones.filter(estado=estado)
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    titulo = Paragraph("Reporte de Exportaciones - ChocoFlow", estilos['Title'])
+    elementos.append(titulo)
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Destino', 'Fecha Envío', 'Fecha Entrega', 'Estado', 'Creado por']]
+
+    for exp in exportaciones:
+        datos.append([
+            exp.destino,
+            str(exp.fecha_envio),
+            str(exp.fecha_entrega),
+            exp.estado,
+            str(exp.creado_por),
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0,0), (-1,0), colors.white),
+        ('GRID',       (0,0), (-1,-1), 1, colors.black),
+        ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,1), (-1,-1), colors.beige),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_exportaciones.pdf"'
+    response.write(pdf)
+    return response
+
+# ==============================
+# LOGICA DE LOTES
+# ==============================
+@login_required(login_url='login')
+def gestionar_lotes(request):
+
+    # Lee el filtro de búsqueda que viene de la URL
+    q = request.GET.get('q', '')
+
+    # Trae todos los lotes junto con su producción y exportación relacionadas
+    lotes = Lote.objects.select_related('produccion', 'exportacion').all()
+
+    # Si escribió algo en el buscador, filtra por código de lote
+    if q:
+        lotes = lotes.filter(codigo_lote__icontains=q)
+
+    # Trae producciones y exportaciones para los selectores del modal
+    producciones  = Produccion.objects.all()
+    exportaciones = Exportacion.objects.all()
+
+    return render(request, 'modulos/lotes/lotes.html', {
+        'lotes':         lotes,
+        'producciones':  producciones,
+        'exportaciones': exportaciones,
+        'q':             q,
+    })
+
+
+@login_required(login_url='login')
+def guardar_lote(request):
+    if request.method == 'POST':
+
+        # Obtener el Usuario personalizado desde la sesión
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida. Inicia sesión nuevamente.")
+            return redirect('login')
+
+        # Recoge los datos enviados desde el formulario del modal
+        lote_id          = request.POST.get('id')
+        codigo_lote      = request.POST.get('codigo_lote')
+        cantidad         = request.POST.get('cantidad')
+        fecha_produccion = request.POST.get('fecha_produccion')
+        fecha_vencimiento= request.POST.get('fecha_vencimiento')
+        produccion_id    = request.POST.get('produccion_id')
+        exportacion_id   = request.POST.get('exportacion_id')
+
+        # Validación: todos los campos son obligatorios
+        if not all([codigo_lote, cantidad, fecha_produccion, fecha_vencimiento, produccion_id, exportacion_id]):
+            messages.error(request, "Todos los campos son obligatorios.")
+            return redirect('gestionar_lotes')
+
+        # Validación de fechas
+        if fecha_vencimiento < fecha_produccion:
+            messages.error(request, "La fecha de vencimiento no puede ser anterior a la de producción.")
+            return redirect('gestionar_lotes')
+
+        # Trae los objetos relacionados desde la BD
+        produccion  = get_object_or_404(Produccion,  pk=produccion_id)
+        exportacion = get_object_or_404(Exportacion, pk=exportacion_id)
+
+        if lote_id:  # ✏️ Editar lote existente
+            lote                  = get_object_or_404(Lote, pk=lote_id)
+            lote.codigo_lote      = codigo_lote
+            lote.cantidad         = cantidad
+            lote.fecha_produccion = fecha_produccion
+            lote.fecha_vencimiento= fecha_vencimiento
+            lote.produccion       = produccion
+            lote.exportacion      = exportacion
+            lote.save()
+            messages.success(request, f"Lote '{codigo_lote}' actualizado correctamente.")
+
+        else:  # ➕ Crear lote nuevo
+            # Verifica que el código de lote no esté duplicado
+            if Lote.objects.filter(codigo_lote=codigo_lote).exists():
+                messages.error(request, f"Ya existe un lote con el código '{codigo_lote}'.")
+                return redirect('gestionar_lotes')
+
+            Lote.objects.create(
+                codigo_lote       = codigo_lote,
+                cantidad          = cantidad,
+                fecha_produccion  = fecha_produccion,
+                fecha_vencimiento = fecha_vencimiento,
+                produccion        = produccion,
+                exportacion       = exportacion,
+            )
+            messages.success(request, f"Lote '{codigo_lote}' creado correctamente.")
+
+    return redirect('gestionar_lotes')
+
+
+@login_required(login_url='login')
+def eliminar_lote(request, id):
+
+    # Busca el lote o retorna 404 si no existe
+    lote = get_object_or_404(Lote, pk=id)
+    codigo = lote.codigo_lote  # Guarda el código antes de eliminar para el mensaje
+    lote.delete()              # Elimina el registro de la BD definitivamente
+    messages.success(request, f"Lote '{codigo}' eliminado correctamente.")
+    return redirect('gestionar_lotes')
+
+
+@login_required(login_url='login')
+def generar_reporte_lotes(request):
+
+    # Trae todos los lotes con sus relaciones
+    lotes = Lote.objects.select_related('produccion', 'exportacion').all()
+
+    # Aplica filtro de búsqueda si viene en la URL
+    busqueda = request.GET.get('busqueda', '')
+    if busqueda:
+        lotes = lotes.filter(codigo_lote__icontains=busqueda)
+
+    # Crea el PDF en memoria
+    buffer = BytesIO()
+    doc    = SimpleDocTemplate(buffer, pagesize=letter)
+
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    # Título del reporte
+    titulo = Paragraph("Reporte de Lotes - ChocoFlow", estilos['Title'])
+    elementos.append(titulo)
+    elementos.append(Spacer(1, 20))
+
+    # Primera fila = encabezados de la tabla
+    datos = [['Código Lote', 'Cantidad', 'Fecha Producción', 'Fecha Vencimiento', 'Producción', 'Exportación']]
+
+    # Una fila por cada lote
+    for lote in lotes:
+        datos.append([
+            lote.codigo_lote,
+            str(lote.cantidad),
+            str(lote.fecha_produccion),
+            str(lote.fecha_vencimiento),
+            str(lote.produccion),   # usa el __str__ de Produccion
+            str(lote.exportacion),  # usa el __str__ de Exportacion
+        ])
+
+    # Construye y estiliza la tabla
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#603C1C')), # encabezado chocolate
+        ('TEXTCOLOR',  (0,0), (-1,0), colors.white),               # texto blanco
+        ('GRID',       (0,0), (-1,-1), 1, colors.black),           # bordes negros
+        ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),           # negrita en encabezado
+        ('BACKGROUND', (0,1), (-1,-1), colors.beige),              # fondo beige en datos
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    # Extrae el PDF y lo manda al navegador como descarga
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_lotes.pdf"'
+    response.write(pdf)
+    return response
+
+##dashboard supervisor
+def dashboard_supervisor(request):
+    """
+    Vista principal del supervisor.
+    Consulta el conteo de cada módulo y los envía
+    al template para mostrarlos en las tarjetas de resumen.
+    """
+
+    # Total de empleados registrados en el sistema
+    total_empleados = Empleado.objects.count()
+
+    # Solo los empleados que tienen estado 'Activo'
+    empleados_activos = Empleado.objects.filter(estado='Activo').count()
+
+    # Total de turnos registrados
+    total_turnos = Turno.objects.count()
+
+    # Total de asignaciones de tareas registradas
+    total_asignaciones = Asignacion.objects.count()
+
+    # Solo las exportaciones que aún están en estado 'Pendiente'
+    exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
+
+    # Total de lotes registrados
+    total_lotes = Lote.objects.count()
+
+    # Total de entradas registradas en la bitácora de producción
+    total_bitacora = Bitacora.objects.count()
+
+    # Se empaquetan todos los datos en un diccionario
+    # para que el template pueda acceder a ellos con {{ variable }}
+    context = {
+        'total_empleados':          total_empleados,
+        'empleados_activos':        empleados_activos,
+        'total_turnos':             total_turnos,
+        'total_asignaciones':       total_asignaciones,
+        'exportaciones_pendientes': exportaciones_pendientes,
+        'total_lotes':              total_lotes,
+        'total_bitacora':           total_bitacora,
+    }
+
+    return render(request, 'dashboardsuper.html', context)
+
+
+# ===================
+# PRODUCCION
+# ===================
+
+@login_required(login_url='login')
+def producciones(request):
+
+    query  = request.GET.get('q')
+    estado = request.GET.get('estado')
+
+    lista = Produccion.objects.select_related(
+        'empleado_responsable', 'creado_por'
+    ).all()
+
+    if query:
+        lista = lista.filter(
+            Q(producto__icontains=query) |
+            Q(empleado_responsable__nombre__icontains=query)
+        )
+
+    if estado and estado != 'Todos':
+        lista = lista.filter(estado=estado)
+
+    empleados = Empleado.objects.filter(estado='Activo')
+
+    return render(request, 'modulos/produccion/produccion.html', {
+        'producciones': lista,
+        'empleados':    empleados,
+    })
+
+
+@login_required(login_url='login')
+def guardar_produccion(request):
+
+    if request.method == 'POST':
+
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida.")
+            return redirect('login')
+
+        try:
+            usuario_perfil = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            messages.error(request, "No se encontró tu perfil.")
+            return redirect('login')
+
+        produccion_id = request.POST.get('id')
+        produccion    = get_object_or_404(Produccion, id=produccion_id) if produccion_id else Produccion()
+
+        producto             = request.POST.get('producto', '').strip()
+        ingredientes         = request.POST.get('ingredientes', '').strip()
+        cantidad_planificada = request.POST.get('cantidad_planificada', '').strip()
+        cantidad_producida   = request.POST.get('cantidad_producida', '').strip()
+        fecha_inicio         = request.POST.get('fecha_inicio', '').strip()
+        fecha_fin            = request.POST.get('fecha_fin', '').strip()
+        fecha_entrega        = request.POST.get('fecha_entrega', '').strip()
+        fecha_limite         = request.POST.get('fecha_limite', '').strip()
+        estado               = request.POST.get('estado', '').strip()
+        emp_id               = request.POST.get('empleado_responsable')
+
+        if not producto or not emp_id or not fecha_inicio or not fecha_fin:
+            messages.error(request, "Los campos obligatorios no pueden estar vacíos.")
+            return redirect('producciones')
+
+        produccion.producto             = producto
+        produccion.ingredientes         = ingredientes
+        produccion.cantidad_planificada = cantidad_planificada
+        produccion.cantidad_producida   = cantidad_producida
+        produccion.fecha_inicio         = fecha_inicio
+        produccion.fecha_fin            = fecha_fin
+        produccion.fecha_entrega        = fecha_entrega
+        produccion.fecha_limite         = fecha_limite
+        produccion.estado               = estado
+        produccion.empleado_responsable = get_object_or_404(Empleado, id=emp_id)
+        produccion.creado_por           = usuario_perfil
+
+        produccion.save()
+        messages.success(request, "Producción guardada correctamente.")
+
+    return redirect('producciones')
+
+
+@login_required(login_url='login')
+def inactivar_produccion(request, id):
+    produccion = get_object_or_404(Produccion, id=id)
+    produccion.estado = 'Cancelado'
+    produccion.save()
+    messages.success(request, "Producción cancelada.")
+    return redirect('producciones')
+
+
+@login_required(login_url='login')
+def generar_reporte_producciones(request):
+
+    lista  = Produccion.objects.select_related('empleado_responsable').all()
+    query  = request.GET.get('q')
+    estado = request.GET.get('estado')
+
+    if query:
+        lista = lista.filter(producto__icontains=query)
+
+    if estado and estado != 'Todos':
+        lista = lista.filter(estado=estado)
+
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    elementos.append(Paragraph("Reporte de Producciones - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Producto', 'Responsable', 'Cant. Producida', 'Fecha Inicio', 'Fecha Fin', 'Estado']]
+    for p in lista:
+        datos.append([
+            p.producto,
+            p.empleado_responsable.nombre,
+            p.cantidad_producida,
+            str(p.fecha_inicio),
+            str(p.fecha_fin),
+            p.estado
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_producciones.pdf"'
+    response.write(pdf)
+    return response
 
 
 # ========================
 # ASISTENTE IA CON GEMINI
 # ========================
-import google.generativeai as genai
+import google.generativeai as genai 
 
 def consultar_ia(request):
 
@@ -499,11 +1217,12 @@ Con base en estos datos reales, responde la siguiente pregunta del administrador
         """
 
         try:
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
             # ✅ ahora
-            modelo = genai.GenerativeModel("gemini-2.0-flash")
-            respuesta = modelo.generate_content(contexto)
-
+            cliente   = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            respuesta = cliente.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=contexto
+        )
             return JsonResponse({'respuesta': respuesta.text})
 
         except Exception as e:

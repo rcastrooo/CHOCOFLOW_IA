@@ -13,9 +13,9 @@
 }
 
 /* =========================
-   CABECERA — FILTROS
+   CABECERA
 ========================= */
-.cabecera-asignaciones {
+.cabecera-turnos {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -32,17 +32,10 @@
 }
 
 .form-filtros .form-control {
-    width: 220px;
+    width: 180px;
     border-radius: 15px;
     font-size: 15px;
     padding: 6px 12px;
-}
-
-.form-filtros .form-select {
-    width: 130px;
-    border-radius: 15px;
-    font-size: 15px;
-    padding: 6px 10px;
 }
 
 /* =========================
@@ -125,6 +118,7 @@
 .modal-header {
     background-color: #603C1C;
     color: white;
+    border-radius: 20px 20px 0 0;
 }
 
 .form-control,

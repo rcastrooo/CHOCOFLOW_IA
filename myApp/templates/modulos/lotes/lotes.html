@@ -1,0 +1,179 @@
+{% extends 'layouts/modulos.html' %}
+{% load static %}
+
+{% block title %}Gestión de Lotes{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/lotes.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+  <h2 class="text-center section-title mb-4">🏷️ Gestión de Lotes</h2>
+
+  <!-- Mensajes de éxito o error -->
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+
+  <!-- CABECERA -->
+  <div class="cabecera-lotes">
+
+    <button class="btn btn-caramel" data-bs-toggle="modal" data-bs-target="#modalLote">
+      + Nuevo Lote
+    </button>
+
+    <form method="GET" class="form-filtros">
+      <input type="text" name="q" class="form-control"
+             placeholder="Buscar código de lote..." value="{{ q }}">
+      <button class="btn btn-choco">Filtrar</button>
+    </form>
+
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Código Lote</th>
+        <th>Cantidad</th>
+        <th>Fecha Producción</th>
+        <th>Fecha Vencimiento</th>
+        <th>Producción</th>
+        <th>Exportación</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lote in lotes %}
+      <tr>
+        <td>{{ lote.codigo_lote }}</td>
+        <td>{{ lote.cantidad }}</td>
+        <td>{{ lote.fecha_produccion }}</td>
+        <td>{{ lote.fecha_vencimiento }}</td>
+        <td>{{ lote.produccion }}</td>
+        <td>{{ lote.exportacion }}</td>
+        <td>
+          <!-- Botón editar: abre el modal con los datos del lote -->
+          <button class="btn btn-sm btn-primary"
+            onclick="editarLote(
+              '{{ lote.id }}',
+              '{{ lote.codigo_lote }}',
+              '{{ lote.cantidad }}',
+              '{{ lote.fecha_produccion }}',
+              '{{ lote.fecha_vencimiento }}',
+              '{{ lote.produccion.id }}',
+              '{{ lote.exportacion.id }}'
+            )">✏️</button>
+
+          <!-- Botón eliminar: borra el lote definitivamente -->
+          <a href="{% url 'eliminar_lote' lote.id %}"
+             class="btn btn-sm btn-danger"
+             onclick="return confirm('¿Eliminar el lote {{ lote.codigo_lote }}? Esta acción no se puede deshacer.')">
+             🗑️
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center">No hay lotes registrados.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <!-- BOTÓN REPORTE -->
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'reporte_lotes' %}?busqueda={{ q }}"
+       class="btn btn-reporte custom-bottom-btn">
+       📄 Generar Reporte
+    </a>
+  </div>
+
+</div>
+</section>
+
+
+<!-- MODAL CREAR / EDITAR -->
+<div class="modal fade" id="modalLote">
+<div class="modal-dialog">
+<div class="modal-content">
+
+  <form method="POST" action="{% url 'guardar_lote' %}">
+  {% csrf_token %}
+
+    <div class="modal-header">
+      <h5 class="modal-title">Lote</h5>
+      <button type="button" class="btn-close btn-close-white"
+              data-bs-dismiss="modal"></button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Campo oculto: si tiene valor es edición, si no es creación -->
+      <input type="hidden" name="id" id="lote_id">
+
+      <input type="text" name="codigo_lote" id="lote_codigo"
+             class="form-control mb-2" placeholder="Código de lote" required>
+
+      <input type="number" name="cantidad" id="lote_cantidad"
+             class="form-control mb-2" placeholder="Cantidad" required>
+
+      <label class="form-label mb-0">Fecha de Producción</label>
+      <input type="date" name="fecha_produccion" id="lote_fecha_produccion"
+             class="form-control mb-2" required>
+
+      <label class="form-label mb-0">Fecha de Vencimiento</label>
+      <input type="date" name="fecha_vencimiento" id="lote_fecha_vencimiento"
+             class="form-control mb-2" required>
+
+      <label class="form-label mb-0">Producción</label>
+      <select name="produccion_id" id="lote_produccion" class="form-select mb-2">
+        {% for p in producciones %}
+          <option value="{{ p.id }}">{{ p }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="form-label mb-0">Exportación</label>
+      <select name="exportacion_id" id="lote_exportacion" class="form-select">
+        {% for e in exportaciones %}
+          <option value="{{ e.id }}">{{ e }}</option>
+        {% endfor %}
+      </select>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-caramel">Guardar</button>
+      <button type="button" class="btn btn-secondary"
+              data-bs-dismiss="modal">Cancelar</button>
+    </div>
+
+  </form>
+</div>
+</div>
+</div>
+
+
+<script>
+function editarLote(id, codigo, cantidad, fecha_produccion, fecha_vencimiento, produccion_id, exportacion_id) {
+  // Rellena el modal con los datos del lote seleccionado
+  document.getElementById('lote_id').value               = id;
+  document.getElementById('lote_codigo').value           = codigo;
+  document.getElementById('lote_cantidad').value         = cantidad;
+  document.getElementById('lote_fecha_produccion').value = fecha_produccion;
+  document.getElementById('lote_fecha_vencimiento').value= fecha_vencimiento;
+  document.getElementById('lote_produccion').value       = produccion_id;
+  document.getElementById('lote_exportacion').value      = exportacion_id;
+
+  // Abre el modal
+  new bootstrap.Modal(document.getElementById('modalLote')).show();
+}
+</script>
+
+{% endblock %}

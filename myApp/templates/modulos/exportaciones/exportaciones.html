@@ -1,0 +1,178 @@
+{% extends 'layouts/modulos.html' %}
+{% load static %}
+
+{% block title %}Gestión de Exportaciones{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/exportaciones.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+  <h2 class="text-center section-title mb-4">📦 Gestión de Exportaciones</h2>
+
+  <!-- Mensajes de éxito o error -->
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+
+  <!-- CABECERA -->
+  <div class="cabecera-exportaciones">
+
+    <button class="btn btn-caramel" data-bs-toggle="modal" data-bs-target="#modalExportacion">
+      + Nueva Exportación
+    </button>
+
+    <form method="GET" class="form-filtros">
+      <input type="text" name="q" class="form-control"
+             placeholder="Buscar destino..." value="{{ q }}">
+      <select name="estado" class="form-select">
+        <option value="">Todos</option>
+        <option value="Pendiente"  {% if estado_filtro == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
+        <option value="Enviado"    {% if estado_filtro == 'Enviado'    %}selected{% endif %}>Enviado</option>
+        <option value="Entregado"  {% if estado_filtro == 'Entregado'  %}selected{% endif %}>Entregado</option>
+        <option value="Cancelado"  {% if estado_filtro == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
+      </select>
+      <button class="btn btn-choco">Filtrar</button>
+    </form>
+
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Destino</th>
+        <th>Fecha Envío</th>
+        <th>Fecha Entrega</th>
+        <th>Estado</th>
+        <th>Creado por</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for exp in exportaciones %}
+      <tr>
+        <td>{{ exp.destino }}</td>
+        <td>{{ exp.fecha_envio }}</td>
+        <td>{{ exp.fecha_entrega }}</td>
+        <td>
+          {% if exp.estado == 'Pendiente' %}
+            <span class="badge bg-warning text-dark">{{ exp.estado }}</span>
+          {% elif exp.estado == 'Enviado' %}
+            <span class="badge bg-primary">{{ exp.estado }}</span>
+          {% elif exp.estado == 'Entregado' %}
+            <span class="badge bg-success">{{ exp.estado }}</span>
+          {% else %}
+            <span class="badge bg-danger">{{ exp.estado }}</span>
+          {% endif %}
+        </td>
+        <td>{{ exp.creado_por }}</td>
+        <td>
+          <!-- Botón editar: abre el modal con los datos del registro -->
+          <button class="btn btn-sm btn-primary"
+            onclick="editarExportacion(
+              '{{ exp.id }}',
+              '{{ exp.destino }}',
+              '{{ exp.fecha_envio }}',
+              '{{ exp.fecha_entrega }}',
+              '{{ exp.estado }}'
+            )">✏️</button>
+
+          <!-- Botón inactivar: cambia estado a Cancelado, no borra -->
+          <a href="{% url 'inactivar_exportacion' exp.id %}"
+             class="btn btn-sm btn-danger"
+             onclick="return confirm('¿Cancelar esta exportación?')">🗑️</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="text-center">No hay exportaciones registradas.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <!-- BOTÓN REPORTE -->
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'reporte_exportaciones' %}?busqueda={{ q }}&estado={{ estado_filtro }}"
+       class="btn btn-reporte custom-bottom-btn">
+       📄 Generar Reporte
+    </a>
+  </div>
+
+</div>
+</section>
+
+
+<!-- MODAL CREAR / EDITAR -->
+<div class="modal fade" id="modalExportacion">
+<div class="modal-dialog">
+<div class="modal-content">
+
+  <form method="POST" action="{% url 'guardar_exportacion' %}">
+  {% csrf_token %}
+
+    <div class="modal-header">
+      <h5 class="modal-title">Exportación</h5>
+      <button type="button" class="btn-close btn-close-white"
+              data-bs-dismiss="modal"></button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Campo oculto: si tiene valor es edición, si no es creación -->
+      <input type="hidden" name="id" id="exp_id">
+
+      <input type="text" name="destino" id="exp_destino"
+             class="form-control mb-2" placeholder="Destino" required>
+
+      <label class="form-label mb-0">Fecha de Envío</label>
+      <input type="date" name="fecha_envio" id="exp_fecha_envio"
+             class="form-control mb-2" required>
+
+      <label class="form-label mb-0">Fecha de Entrega</label>
+      <input type="date" name="fecha_entrega" id="exp_fecha_entrega"
+             class="form-control mb-2" required>
+
+      <select name="estado" id="exp_estado" class="form-select">
+        <option value="Pendiente">Pendiente</option>
+        <option value="Enviado">Enviado</option>
+        <option value="Entregado">Entregado</option>
+        <option value="Cancelado">Cancelado</option>
+      </select>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-caramel">Guardar</button>
+      <button type="button" class="btn btn-secondary"
+              data-bs-dismiss="modal">Cancelar</button>
+    </div>
+
+  </form>
+</div>
+</div>
+</div>
+
+
+<script>
+function editarExportacion(id, destino, fecha_envio, fecha_entrega, estado) {
+  // Rellena el modal con los datos del registro seleccionado
+  document.getElementById('exp_id').value            = id;
+  document.getElementById('exp_destino').value       = destino;
+  document.getElementById('exp_fecha_envio').value   = fecha_envio;
+  document.getElementById('exp_fecha_entrega').value = fecha_entrega;
+  document.getElementById('exp_estado').value        = estado;
+
+  // Abre el modal
+  new bootstrap.Modal(document.getElementById('modalExportacion')).show();
+}
+</script>
+
+{% endblock %}
