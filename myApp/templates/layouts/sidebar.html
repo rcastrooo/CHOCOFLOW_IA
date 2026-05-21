@@ -2,8 +2,10 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>{% block title %}ChocoFlow{% endblock %}</title>
 
     <!-- Bootstrap -->
@@ -12,95 +14,189 @@
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
-    <!-- CSS Global -->
+    <!-- CSS -->
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+
 </head>
+
 <body>
 
 <div class="layout">
 
-    <!-- SIDEBAR -->
+    <!-- =========================
+         SIDEBAR
+    ========================== -->
+
     <aside class="sidebar">
 
-        <div class="logo">
-            <h2>🍫 ChocoFlow</h2>
+        <!-- TOP -->
+        <div class="sidebar-top">
+
+            <!-- LOGO -->
+            <div class="logo">
+
+                <div class="logo-icon">
+                    <i class="fa-solid fa-cube"></i>
+                </div>
+
+                <div class="logo-texto">
+                    <h2>ChocoFlow</h2>
+                    <span>Sistema Inteligente</span>
+                </div>
+
+            </div>
+
+            <!-- MENÚ -->
+            <ul class="menu">
+
+                <!-- DASHBOARD -->
+                <li>
+                    <a href="{% url 'dashboard' %}"
+                       class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+
+                        <i class="fa-solid fa-house"></i>
+                        <span>Dashboard</span>
+
+                    </a>
+                </li>
+
+                <!-- EMPLEADOS -->
+                <li>
+                    <a href="{% url 'empleados' %}"
+                       class="{% if request.resolver_match.url_name == 'empleados' %}active{% endif %}">
+
+                        <i class="fa-solid fa-users"></i>
+                        <span>Empleados</span>
+
+                    </a>
+                </li>
+
+                <!-- TURNOS -->
+                <li>
+                    <a href="{% url 'turnos' %}"
+                       class="{% if request.resolver_match.url_name == 'turnos' %}active{% endif %}">
+
+                        <i class="fa-solid fa-calendar-days"></i>
+                        <span>Turnos</span>
+
+                    </a>
+                </li>
+
+                <!-- ASIGNACIONES -->
+                <li>
+                    <a href="{% url 'asignaciones' %}"
+                       class="{% if request.resolver_match.url_name == 'asignaciones' %}active{% endif %}">
+
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Asignaciones</span>
+
+                    </a>
+                </li>
+
+                <!-- PRODUCCIÓN -->
+                <li>
+                    <a href="{% url 'producciones' %}"
+                       class="{% if request.resolver_match.url_name == 'producciones' %}active{% endif %}">
+
+                        <i class="fa-solid fa-industry"></i>
+                        <span>Producción</span>
+
+                    </a>
+                </li>
+
+                <!-- LOTES -->
+                <li>
+                    <a href="{% url 'gestionar_lotes' %}"
+                       class="{% if request.resolver_match.url_name == 'gestionar_lotes' %}active{% endif %}">
+
+                        <i class="fa-solid fa-box"></i>
+                        <span>Lotes</span>
+
+                    </a>
+                </li>
+
+                <!-- EXPORTACIONES -->
+                <li>
+                    <a href="{% url 'gestionar_exportaciones' %}"
+                       class="{% if request.resolver_match.url_name == 'gestionar_exportaciones' %}active{% endif %}">
+
+                        <i class="fa-solid fa-plane"></i>
+                        <span>Exportaciones</span>
+
+                    </a>
+                </li>
+
+                <!-- SOLICITUDES -->
+                <li>
+                    <a href="{% url 'solicitudes' %}"
+                       class="{% if request.resolver_match.url_name == 'solicitudes' %}active{% endif %}">
+
+                        <i class="fa-solid fa-right-left"></i>
+                        <span>Solicitudes</span>
+
+                    </a>
+                </li>
+
+            </ul>
+
         </div>
 
-        <ul class="menu">
+        <!-- =========================
+             FOOTER SIDEBAR
+        ========================== -->
 
-            <li>
-                <a href="{% url 'dashboard' %}">
-                    <i class="fa-solid fa-house"></i>
-                    Dashboard
-                </a>
-            </li>
+        <div class="sidebar-bottom">
 
-            <li>
-                <a href="{% url 'empleados' %}">
-                    <i class="fa-solid fa-users"></i>
-                    Empleados
-                </a>
-            </li>
+            <!-- PERFIL -->
+            <div class="perfil-sidebar">
 
-            <li>
-                <a href="{% url 'turnos' %}">
-                    <i class="fa-solid fa-calendar-days"></i>
-                    Turnos
-                </a>
-            </li>
+                <div class="perfil-avatar">
+                    <i class="fa-solid fa-user"></i>
+                </div>
 
-            <li>
-                <a href="{% url 'asignaciones' %}">
-                    <i class="fa-solid fa-list-check"></i>
-                    Asignaciones
-                </a>
-            </li>
+                <div class="perfil-info">
+                    <h4>{{ usuario_nombre }}</h4>
+                    <span>Administrador</span>
+                </div>
 
-            <li>
-                 <a href="{% url 'producciones' %}">
-                      <i class="fa-solid fa-industry"></i>
-                      Producción
-                 </a>
-            </li>
+            </div>
 
-            <li>
-                <a href="{% url 'gestionar_lotes' %}">
-                    <i class="fa-solid fa-box"></i>
-                    Lotes
-                </a>
-            </li>
+            <!-- LOGOUT -->
+            <a href="{% url 'logout' %}" class="logout-btn">
 
-            <li>
-                <a href="{% url 'gestionar_exportaciones' %}">
-                    <i class="fa-solid fa-plane"></i>
-                    Exportaciones
-                </a>
-            </li>
+                <i class="fa-solid fa-right-from-bracket"></i>
 
-            <li>
-                <a href="{% url 'logout' %}">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    Cerrar sesión
-                </a>
-            </li>
+                <span>Cerrar sesión</span>
 
-        </ul>
+            </a>
+
+        </div>
 
     </aside>
 
-    <!-- CONTENIDO -->
+    <!-- =========================
+         CONTENIDO
+    ========================== -->
+
     <main class="content">
 
+        <!-- TOPBAR -->
         <div class="topbar">
+
             <div>
                 <h1>{% block titulo %}Dashboard{% endblock %}</h1>
             </div>
+
             <div class="topbar-perfil">
-                <span>👋 Bienvenido, <strong>{{ usuario_nombre }}</strong></span>
-               
+                <span>
+                    👋 Bienvenido,
+                    <strong>{{ usuario_nombre }}</strong>
+                </span>
             </div>
+
         </div>
 
+        <!-- CONTENIDO DINÁMICO -->
         {% block content %}
         {% endblock %}
 

@@ -1,3 +1,7 @@
+/* =========================
+   RESET
+========================= */
+
 *{
     margin: 0;
     padding: 0;
@@ -34,8 +38,8 @@ body{
     );
 
     position: fixed;
-    left: 0;
     top: 0;
+    left: 0;
 
     display: flex;
     flex-direction: column;
@@ -64,9 +68,11 @@ body{
 
     display: flex;
     align-items: center;
+
     gap: 14px;
 
     padding-bottom: 22px;
+
     margin-bottom: 25px;
 
     border-bottom: 1px solid rgba(255,255,255,.10);
@@ -85,16 +91,18 @@ body{
     align-items: center;
     justify-content: center;
 
-    color: white;
-
     flex-shrink: 0;
 }
 
 .logo-icon i{
+
+    color: white;
+
     font-size: 18px;
 }
 
 .logo-texto{
+
     display: flex;
     flex-direction: column;
 }
@@ -136,6 +144,7 @@ body{
 
     display: flex;
     align-items: center;
+
     gap: 15px;
 
     padding: 14px 16px;
@@ -174,7 +183,7 @@ body{
     transform: translateX(4px);
 }
 
-/* ACTIVO */
+/* ITEM ACTIVO */
 
 .menu li a.active{
 
@@ -191,24 +200,24 @@ body{
 
     width: 100%;
 
-    padding-top: 22px;
+    margin-top: 25px;
+
+    padding-top: 20px;
 
     border-top: 1px solid rgba(255,255,255,.12);
-
-    margin-top: 25px;
 }
 
 /* =========================
-   PERFIL
+   PERFIL USUARIO
 ========================= */
 
 .perfil-sidebar{
 
-    display: flex !important;
+    display: flex;
 
-    align-items: center !important;
+    align-items: center;
 
-    gap: 14px !important;
+    gap: 12px;
 
     margin-bottom: 18px;
 }
@@ -217,22 +226,20 @@ body{
 
 .perfil-avatar{
 
-    width: 48px !important;
-    height: 48px !important;
+    width: 45px;
+    height: 45px;
 
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 45px;
 
     border-radius: 50%;
 
     background: rgba(255,255,255,.14);
 
-    display: flex !important;
+    display: flex;
 
-    align-items: center !important;
-    justify-content: center !important;
+    align-items: center;
 
-    flex-shrink: 0;
+    justify-content: center;
 }
 
 .perfil-avatar i{
@@ -242,72 +249,72 @@ body{
     font-size: 18px;
 }
 
-/* TEXTO PERFIL */
+/* INFO PERFIL */
 
 .perfil-info{
 
-    display: flex !important;
-
-    flex-direction: column !important;
-
-    justify-content: center !important;
+    overflow: hidden;
 }
+
+/* NOMBRE */
 
 .perfil-info h4{
 
-    margin: 0 !important;
+    color: white;
 
-    color: white !important;
+    font-size: 15px;
 
-    font-size: 15px !important;
+    font-weight: 600;
 
-    font-weight: 600 !important;
-
-    line-height: 1.2 !important;
+    margin: 0;
 
     white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
 }
+
+/* ROL */
 
 .perfil-info span{
 
-    margin-top: 2px !important;
+    color: rgba(255,255,255,.65);
 
-    color: rgba(255,255,255,.65) !important;
+    font-size: 12px;
 
-    font-size: 12px !important;
+    display: block;
 
-    line-height: 1.2 !important;
+    margin-top: 2px;
 }
 
 /* =========================
-   BOTÓN LOGOUT
+   LOGOUT
 ========================= */
 
 .logout-btn{
 
     width: 100%;
 
-    display: flex !important;
+    display: flex;
 
-    align-items: center !important;
+    align-items: center;
 
-    justify-content: center !important;
+    justify-content: center;
 
     gap: 10px;
 
-    padding: 12px 15px;
+    padding: 12px;
 
-    border-radius: 14px;
+    border-radius: 12px;
 
-    border: 1px solid rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.20);
 
-    text-decoration: none !important;
+    color: white;
 
-    color: rgba(255,255,255,.88) !important;
+    text-decoration: none;
 
-    font-size: 14px !important;
-
-    font-weight: 500 !important;
+    font-size: 14px;
 
     transition: .3s ease;
 }
@@ -316,11 +323,9 @@ body{
 
 .logout-btn:hover{
 
-    background: rgba(255,255,255,.12);
+    background: rgba(255,255,255,.10);
 
-    border-color: rgba(255,255,255,.35);
-
-    color: white !important;
+    color: white;
 }
 
 /* =========================
@@ -411,7 +416,7 @@ body{
     .menu li a,
     .logout-btn{
 
-        justify-content: center !important;
+        justify-content: center;
     }
 
     .logo{

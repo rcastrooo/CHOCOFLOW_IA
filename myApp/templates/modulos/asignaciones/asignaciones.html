@@ -5,15 +5,20 @@
 
 {% block content %}
 
+{# ============================================================ #}
+{#  Hoja de estilos específica del módulo de asignaciones       #}
+{# ============================================================ #}
 <link rel="stylesheet" href="{% static 'css/asignaciones.css' %}">
 
 <section class="container mt-5">
 <div class="container-custom shadow">
 
+    {# ----------- Título principal del módulo ----------- #}
     <h2 class="text-center section-title mb-4">
         📋 Gestión de Asignaciones
     </h2>
 
+    {# ----------- Mensajes de alerta (éxito, error, etc.) ----------- #}
     {% if messages %}
         {% for msg in messages %}
             <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
@@ -23,15 +28,19 @@
         {% endfor %}
     {% endif %}
 
-    <!-- CABECERA -->
+    {# ============================================================ #}
+    {#  CABECERA: botón nueva asignación + formulario de búsqueda   #}
+    {# ============================================================ #}
     <div class="cabecera-asignaciones">
 
+        {# Botón que abre el modal para crear una nueva asignación #}
         <button class="btn btn-caramel"
             data-bs-toggle="modal"
             data-bs-target="#modalAsignacion">
             + Nueva Asignación
         </button>
 
+        {# Formulario de búsqueda/filtro por tarea o nombre de empleado #}
         <form method="GET" class="form-filtros">
             <input type="text" name="q" class="form-control"
                 placeholder="Buscar tarea o empleado..."
@@ -41,7 +50,9 @@
 
     </div>
 
-    <!-- TABLA -->
+    {# ============================================================ #}
+    {#  TABLA de asignaciones registradas                           #}
+    {# ============================================================ #}
     <div class="table-responsive mt-3">
     <table class="table table-hover align-middle">
         <thead>
@@ -56,14 +67,19 @@
         </thead>
         <tbody>
 
+        {# Iterar sobre cada asignación recibida desde la vista #}
         {% for a in asignaciones %}
         <tr>
             <td>{{ a.tarea }}</td>
             <td>{{ a.empleado.nombre }}</td>
+
+            {# Mostrar el horario del turno (campo actualizado en el modelo) #}
             <td>{{ a.turno.horario }}</td>
+
             <td>{{ a.fecha_asignacion }}</td>
             <td>{{ a.asignado_por.nombre }}</td>
             <td>
+                {# Botón editar: llama a la función JS que pre-carga el modal con los datos de la fila #}
                 <button class="btn btn-sm btn-primary"
                     onclick="editarAsignacion(
                         '{{ a.id }}',
@@ -74,6 +90,7 @@
                     )">✏️
                 </button>
 
+                {# Botón inactivar: redirige a la vista que cambia el estado a 'Pendiente' #}
                 <a href="{% url 'inactivar_asignacion' a.id %}"
                    class="btn btn-sm btn-danger"
                    onclick="return confirm('¿Inactivar esta asignación?')">
@@ -81,6 +98,8 @@
                 </a>
             </td>
         </tr>
+
+        {# Mensaje cuando no existen asignaciones registradas #}
         {% empty %}
         <tr>
             <td colspan="6" class="text-center">
@@ -93,22 +112,26 @@
     </table>
     </div>
 
+    {# ----------- Botón para generar el reporte PDF ----------- #}
     <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
-    <a href="{% url 'reporte_asignaciones' %}"
-       class="btn btn-reporte custom-bottom-btn">
-        📄 Generar Reporte
-    </a>
-</div>
+        <a href="{% url 'reporte_asignaciones' %}"
+           class="btn btn-reporte custom-bottom-btn">
+            📄 Generar Reporte
+        </a>
+    </div>
 
 </div>
 </section>
 
 
-<!-- MODAL -->
+{# ============================================================ #}
+{#  MODAL: Crear / Editar asignación                            #}
+{# ============================================================ #}
 <div class="modal fade" id="modalAsignacion">
 <div class="modal-dialog">
 <div class="modal-content">
 
+    {# Formulario que envía datos a la vista guardar_asignacion vía POST #}
     <form method="POST" action="{% url 'guardar_asignacion' %}">
     {% csrf_token %}
 
@@ -118,15 +141,19 @@
 
     <div class="modal-body">
 
+        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
         <input type="hidden" name="id" id="id">
 
+        {# Campo: descripción de la tarea a asignar #}
         <input type="text" name="tarea" id="tarea"
             class="form-control mb-2"
             placeholder="Descripción de la tarea">
 
+        {# Campo: fecha en la que se realiza la asignación #}
         <input type="date" name="fecha_asignacion" id="fecha_asignacion"
             class="form-control mb-2">
 
+        {# Select: empleados activos disponibles para ser asignados #}
         <select name="empleado_id" id="empleado_id" class="form-select mb-2">
             <option value="">-- Seleccionar Empleado --</option>
             {% for emp in empleados %}
@@ -134,10 +161,13 @@
             {% endfor %}
         </select>
 
+        {# Select: turnos activos — solo se muestra el horario (campo corregido) #}
         <select name="turno_id" id="turno_id" class="form-select mb-2">
             <option value="">-- Seleccionar Turno --</option>
             {% for t in turnos %}
-                <option value="{{ t.id }}">{{ t.fecha }} | {{ t.horario }}</option>
+                {# CORRECCIÓN: se eliminó t.fecha (no existe en el modelo Turno);
+                   ahora solo se muestra t.horario, que es el campo correcto #}
+                <option value="{{ t.id }}">{{ t.horario }}</option>
             {% endfor %}
         </select>
 
@@ -155,14 +185,20 @@
 </div>
 
 
+{# ============================================================ #}
+{#  SCRIPT: pre-carga los datos de una asignación en el modal   #}
+{#  para poder editarla                                         #}
+{# ============================================================ #}
 <script>
 function editarAsignacion(id, tarea, fecha, empleadoId, turnoId) {
+    // Asignar los valores recibidos a cada campo del modal
     document.getElementById('id').value               = id;
     document.getElementById('tarea').value            = tarea;
     document.getElementById('fecha_asignacion').value = fecha;
     document.getElementById('empleado_id').value      = empleadoId;
     document.getElementById('turno_id').value         = turnoId;
 
+    // Abrir el modal con Bootstrap
     var modal = new bootstrap.Modal(
         document.getElementById('modalAsignacion')
     );

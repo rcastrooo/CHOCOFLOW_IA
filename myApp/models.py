@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 # -------------------------
 # Usuario
 # -------------------------
@@ -60,40 +61,101 @@ class Turno(models.Model):
         ('Tarde 2:00pm - 10:00pm', 'Tarde 2:00pm - 10:00pm'),
     ]
 
-    fecha = models.DateField()
     horario = models.CharField(max_length=50, choices=HORARIO_CHOICES)
-
-    creado_por = models.ForeignKey(
-        Usuario,
-        on_delete=models.CASCADE,
-        db_column='creado_por'
-    )
+    activo = models.BooleanField(default=True)
+    creado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='creado_por')
 
     def __str__(self):
-        return f"{self.fecha} - {self.horario}"
+        return f"{self.horario}"
 
 
 # -------------------------
-# Emp_Turno
+# Rotacion Turno
 # -------------------------
-class EmpTurno(models.Model):
+class RotacionTurno(models.Model):
+    ESTADO_CHOICES = [
+        ('Asignado', 'Asignado'),
+        ('Completado', 'Completado'),
+        ('Pendiente', 'Pendiente'),
+    ]
 
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id')
-    turno = models.ForeignKey(Turno, on_delete=models.CASCADE, db_column='turno_id')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    semana = models.IntegerField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    sabado_asignado = models.BooleanField(default=False)
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    turno = models.ForeignKey(Turno, on_delete=models.CASCADE)
+    
+    # Esto es lo que evita que los empleados tengan doble turno en la misma semana
+    class Meta:
+        constraints = [
+        models.UniqueConstraint(
+            fields=['empleado', 'fecha_inicio', 'fecha_fin'],
+            name='unique_turno_semanal'
+        )
+    ]
 
     def __str__(self):
-        return f"{self.empleado} - {self.turno}"
+        return f"{self.empleado} - {self.turno} - Semana {self.semana}"
+
+# -------------------------
+# Solicitud Cambio de Turno
+# -------------------------
+class Solicitud(models.Model):
+    ESTADO_CHOICES = [
+        ('Pendiente', 'Pendiente'),
+        ('Aprobado', 'Aprobado'),
+        ('Rechazado', 'Rechazado'),
+    ]
+
+    turno_actual = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_actual')
+    turno_solicitado = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_solicitado')
+    motivo = models.TextField()
+    fecha_solicitud = models.DateField(auto_now_add=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.empleado} - {self.estado}"
 
 # -------------------------
 # Asignacion
 # -------------------------
 class Asignacion(models.Model):
+    ESTADO_CHOICES = [
+        ('Pendiente', 'Pendiente'),
+        ('En Proceso', 'En Proceso'),
+        ('Finalizado', 'Finalizado'),
+
+    ]
+    
     tarea = models.CharField(max_length=255)
     fecha_asignacion = models.DateField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
 
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id')
     turno = models.ForeignKey(Turno, on_delete=models.CASCADE, db_column='turno_id')
     asignado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='asignado_por')
+    
+      # VALIDACIÓN
+    def clean(self):
+
+        tareas_diarias = Asignacion.objects.filter(
+            empleado=self.empleado,
+            fecha_asignacion=self.fecha_asignacion
+        ).exclude(id=self.id).count()
+
+        if tareas_diarias >= 2:
+            raise ValidationError(
+                "El empleado ya tiene el máximo de 2 tareas diarias."
+            )
+
+    # GUARDA VALIDANDO
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.tarea} - {self.empleado}"
@@ -109,14 +171,11 @@ class Produccion(models.Model):
         ('Finalizado', 'Finalizado'),
     ]
 
-    producto = models.CharField(max_length=255)
+    producto = models.CharField(max_length=255, null=True, blank=True)
     ingredientes = models.CharField(max_length=255)
-    cantidad_planificada = models.CharField(max_length=255)
-    cantidad_producida = models.CharField(max_length=255)
+    cantidad_requerida = models.CharField(max_length=255, null=True, blank=True)
     fecha_entrega = models.DateField()
     fecha_limite = models.DateField()
-    fecha_inicio = models.DateField()
-    fecha_fin = models.DateField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
     empleado_responsable = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_responsable')
@@ -137,12 +196,14 @@ class Exportacion(models.Model):
     ]
 
     destino = models.CharField(max_length=255)
-    pais = models.CharField(max_length=255)
+    pais = models.CharField(max_length=255, default='Sin producto')
     fecha_envio = models.DateField()
     fecha_entrega = models.DateField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
-    creado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='creado_por')
+    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id', null=True,      # ← permite nulo
+        blank=True)
+    producto = models.CharField(max_length=255)
 
     def __str__(self):
         return f"{self.destino} - {self.estado}"
@@ -152,7 +213,7 @@ class Exportacion(models.Model):
 # -------------------------
 class Lote(models.Model):
     codigo_lote = models.CharField(max_length=100, unique=True)
-    cantidad = models.IntegerField()
+    cantidad = models.CharField(max_length=255)
     fecha_produccion = models.DateField()
     fecha_vencimiento = models.DateField()
 
@@ -170,7 +231,6 @@ class Bitacora(models.Model):
     TIPO_CHOICES = [
         ('Diario', 'Diario'),
         ('Semanal', 'Semanal'),
-        ('Mensual', 'Mensual'),
     ]
 
     ESTADO_CHOICES = [
@@ -186,37 +246,21 @@ class Bitacora(models.Model):
     fecha_registro      = models.DateField(auto_now_add=True)
     estado              = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Borrador')
     observaciones       = models.TextField(blank=True, null=True)
-    entregas_pendientes = models.IntegerField(default=0)
-    unidades_producidas = models.IntegerField(default=0)
+    unidades_producidas = models.CharField(max_length=255, null=True, blank=True)
+    unidades_pendientes = models.CharField(max_length=255, null=True, blank=True)
 
     # Quién hizo el reporte
-    supervisor = models.ForeignKey(
-        Usuario,
-        on_delete=models.CASCADE,
-        db_column='supervisor_id',
-        related_name='bitacoras_creadas'
-    )
+    supervisor = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='supervisor_id', related_name='bitacoras_creadas')
 
     # Producción a la que hace referencia
-    produccion = models.ForeignKey(
-        Produccion,
-        on_delete=models.CASCADE,
-        db_column='produccion_id',
-        null=True,
-        blank=True
-    )
+    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id',null=True,
+    blank=True)
 
     # ← NUEVOS CAMPOS para el flujo admin
-    revisado_por         = models.ForeignKey(
-        Usuario,
-        on_delete=models.SET_NULL,
-        db_column='revisado_por',
-        null=True,
-        blank=True,
-        related_name='bitacoras_revisadas'
-    )
-    fecha_revision       = models.DateField(null=True, blank=True)
-    observacion_admin    = models.TextField(blank=True, null=True)
+    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, db_column='revisado_por', null=True, blank=True,
+    related_name='bitacoras_revisadas')
+    fecha_revision = models.DateField(null=True, blank=True)
+    observacion_admin = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.titulo} - {self.fecha_registro}"    
