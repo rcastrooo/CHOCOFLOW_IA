@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 # -------------------------
 # Usuario
 # -------------------------
@@ -15,18 +16,27 @@ class Usuario(models.Model):
         ('Suspendido', 'Suspendido'),
     ]
 
-    nombre = models.CharField(max_length=100)
-    email = models.EmailField(unique=True, max_length=255)
-    telefono = models.IntegerField()
-    direccion = models.CharField(max_length=255)
-    contrasena = models.CharField(max_length=255)
-    rol = models.CharField(max_length=20, choices=ROL_CHOICES)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    HORARIO_CHOICES = [
+        ('Mañana 6:00am - 2:00pm', 'Mañana 6:00am - 2:00pm'),
+        ('Tarde 2:00pm - 10:00pm', 'Tarde 2:00pm - 10:00pm'),
+    ]
+
+    nombre       = models.CharField(max_length=100)
+    email        = models.EmailField(unique=True, max_length=255)
+    ttelefono    = models.CharField(max_length=10, blank=True, null=True)
+    direccion    = models.CharField(max_length=255)
+    contrasena   = models.CharField(max_length=255)
+    rol          = models.CharField(max_length=20, choices=ROL_CHOICES)
+    estado       = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    horario_fijo = models.CharField(
+        max_length=50,
+        choices=HORARIO_CHOICES,
+        blank=True,
+        null=True
+    )
 
     def __str__(self):
         return self.nombre
-
-
 # -------------------------
 # Empleado
 # -------------------------
@@ -41,7 +51,7 @@ class Empleado(models.Model):
     cedula = models.CharField(max_length=20, null=True, blank=True)
     nombre = models.CharField(max_length=100)
     email = models.EmailField(unique=True, max_length=255)
-    telefono = models.IntegerField()
+    telefono = models.CharField(max_length=10, blank=True, null=True)
     direccion = models.CharField(max_length=255)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
@@ -60,40 +70,106 @@ class Turno(models.Model):
         ('Tarde 2:00pm - 10:00pm', 'Tarde 2:00pm - 10:00pm'),
     ]
 
-    fecha = models.DateField()
-    horario = models.CharField(max_length=50, choices=HORARIO_CHOICES)
-
+    horario  = models.CharField(max_length=50, choices=HORARIO_CHOICES)
+    activo   = models.BooleanField(default=True)
     creado_por = models.ForeignKey(
         Usuario,
         on_delete=models.CASCADE,
-        db_column='creado_por'
+        db_column='creado_por',
+        related_name='turnos_creados'  # ← esto resuelve el conflicto E303
     )
 
     def __str__(self):
-        return f"{self.fecha} - {self.horario}"
+        return f"{self.horario}"
 
 
 # -------------------------
-# Emp_Turno
+# Rotacion Turno
 # -------------------------
-class EmpTurno(models.Model):
+class RotacionTurno(models.Model):
+    ESTADO_CHOICES = [
+        ('Asignado', 'Asignado'),
+        ('Completado', 'Completado'),
+        ('Pendiente', 'Pendiente'),
+    ]
 
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id')
-    turno = models.ForeignKey(Turno, on_delete=models.CASCADE, db_column='turno_id')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    semana = models.IntegerField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    sabado_asignado = models.BooleanField(default=False)
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    turno = models.ForeignKey(Turno, on_delete=models.CASCADE)
+    
+    # Esto es lo que evita que los empleados tengan doble turno en la misma semana
+    class Meta:
+        constraints = [
+        models.UniqueConstraint(
+            fields=['empleado', 'fecha_inicio', 'fecha_fin'],
+            name='unique_turno_semanal'
+        )
+    ]
 
     def __str__(self):
-        return f"{self.empleado} - {self.turno}"
+        return f"{self.empleado} - {self.turno} - Semana {self.semana}"
+
+# -------------------------
+# Solicitud Cambio de Turno
+# -------------------------
+class Solicitud(models.Model):
+    ESTADO_CHOICES = [
+        ('Pendiente', 'Pendiente'),
+        ('Aprobado', 'Aprobado'),
+        ('Rechazado', 'Rechazado'),
+    ]
+
+    turno_actual = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_actual')
+    turno_solicitado = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_solicitado')
+    motivo = models.TextField()
+    fecha_solicitud = models.DateField(auto_now_add=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.empleado} - {self.estado}"
 
 # -------------------------
 # Asignacion
 # -------------------------
 class Asignacion(models.Model):
+    ESTADO_CHOICES = [
+        ('Pendiente', 'Pendiente'),
+        ('En Proceso', 'En Proceso'),
+        ('Finalizado', 'Finalizado'),
+
+    ]
+    
     tarea = models.CharField(max_length=255)
     fecha_asignacion = models.DateField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
 
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id')
     turno = models.ForeignKey(Turno, on_delete=models.CASCADE, db_column='turno_id')
     asignado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='asignado_por')
+    
+      # VALIDACIÓN
+    def clean(self):
+
+        tareas_diarias = Asignacion.objects.filter(
+            empleado=self.empleado,
+            fecha_asignacion=self.fecha_asignacion
+        ).exclude(id=self.id).count()
+
+        if tareas_diarias >= 2:
+            raise ValidationError(
+                "El empleado ya tiene el máximo de 2 tareas diarias."
+            )
+
+    # GUARDA VALIDANDO
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.tarea} - {self.empleado}"
@@ -109,14 +185,11 @@ class Produccion(models.Model):
         ('Finalizado', 'Finalizado'),
     ]
 
-    producto = models.CharField(max_length=255)
+    producto = models.CharField(max_length=255, null=True, blank=True)
     ingredientes = models.CharField(max_length=255)
-    cantidad_planificada = models.CharField(max_length=255)
-    cantidad_producida = models.CharField(max_length=255)
+    cantidad_requerida = models.CharField(max_length=255, null=True, blank=True)
     fecha_entrega = models.DateField()
     fecha_limite = models.DateField()
-    fecha_inicio = models.DateField()
-    fecha_fin = models.DateField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
     empleado_responsable = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_responsable')
@@ -137,12 +210,14 @@ class Exportacion(models.Model):
     ]
 
     destino = models.CharField(max_length=255)
-    pais = models.CharField(max_length=255)
+    pais = models.CharField(max_length=255, default='Sin producto')
     fecha_envio = models.DateField()
     fecha_entrega = models.DateField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
-    creado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='creado_por')
+    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id', null=True,      # ← permite nulo
+        blank=True)
+    producto = models.CharField(max_length=255)
 
     def __str__(self):
         return f"{self.destino} - {self.estado}"
@@ -152,10 +227,9 @@ class Exportacion(models.Model):
 # -------------------------
 class Lote(models.Model):
     codigo_lote = models.CharField(max_length=100, unique=True)
-    cantidad = models.IntegerField()
+    cantidad = models.CharField(max_length=255)
     fecha_produccion = models.DateField()
     fecha_vencimiento = models.DateField()
-    
 
     produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id')
     exportacion = models.ForeignKey(Exportacion, on_delete=models.CASCADE, db_column='exportacion_id')
@@ -163,59 +237,44 @@ class Lote(models.Model):
     def __str__(self):
         return self.codigo_lote
     
-# -------------------------
-# BitacoraProduccion
-# -------------------------
-# Modelo que permite al supervisor registrar novedades y seguimiento
-# de los procesos de producción sin modificar el modelo Produccion directamente.
-class BitacoraProduccion(models.Model):
+# ---------------------
+# Bitacora
+# ---------------------
+class Bitacora(models.Model):
 
-    # Opciones de tipo de novedad que el supervisor puede registrar
     TIPO_CHOICES = [
-        ('Observación general', 'Observación general'),     # Nota informativa sin urgencia
-        ('Incidencia en proceso', 'Incidencia en proceso'), # Problema o fallo durante la producción
-        ('Ajuste de cantidad', 'Ajuste de cantidad'),       # Cambio en cantidad planificada o producida
-        ('Cambio de estado', 'Cambio de estado'),           # Modificación en el estado del proceso
-        ('Nota de calidad', 'Nota de calidad'),             # Observación relacionada con estándares de calidad
+        ('Diario', 'Diario'),
+        ('Semanal', 'Semanal'),
     ]
 
-    # Tipo de novedad seleccionado de las opciones anteriores
-    tipo_novedad = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    ESTADO_CHOICES = [
+        ('Borrador', 'Borrador'),
+        ('Enviado', 'Enviado'),
+        ('Aprobado', 'Aprobado'),
+        ('Rechazado', 'Rechazado'),
+    ]
 
-    # Descripción detallada de la novedad o seguimiento registrado
-    descripcion = models.TextField()
+    titulo              = models.CharField(max_length=255)
+    descripcion         = models.TextField()
+    tipo_reporte        = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    fecha_registro      = models.DateField(auto_now_add=True)
+    estado              = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Borrador')
+    observaciones       = models.TextField(blank=True, null=True)
+    unidades_producidas = models.CharField(max_length=255, null=True, blank=True)
+    unidades_pendientes = models.CharField(max_length=255, null=True, blank=True)
 
-    # Fecha y hora en que se creó la entrada; se llena automáticamente al guardar
-    fecha_registro = models.DateTimeField(auto_now_add=True)
+    # Quién hizo el reporte
+    supervisor = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='supervisor_id', related_name='bitacoras_creadas')
 
-    # Relación con el proceso de producción al que pertenece esta entrada.
-    # Si se elimina la producción, se eliminan también todas sus entradas de bitácora.
-    # related_name='bitacora' permite acceder desde Produccion con: produccion.bitacora.all()
-    produccion = models.ForeignKey(
-        Produccion,
-        on_delete=models.CASCADE,
-        db_column='produccion_id',
-        related_name='bitacora'
-    )
+    # Producción a la que hace referencia
+    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id',null=True,
+    blank=True)
 
-    # Supervisor que registró la entrada.
-    # Si se elimina el usuario, se eliminan también sus entradas.
-    # related_name='bitacora_entries' permite acceder desde Usuario con: usuario.bitacora_entries.all()
-    registrado_por = models.ForeignKey(
-        Usuario,
-        on_delete=models.CASCADE,
-        db_column='registrado_por',
-        related_name='bitacora_entries'
-    )
+    # ← NUEVOS CAMPOS para el flujo admin
+    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, db_column='revisado_por', null=True, blank=True,
+    related_name='bitacoras_revisadas')
+    fecha_revision = models.DateField(null=True, blank=True)
+    observacion_admin = models.TextField(blank=True, null=True)
 
-    class Meta:
-        # Las entradas se ordenan de más reciente a más antigua por defecto
-        ordering = ['-fecha_registro']
-
-        # Nombres legibles para el panel de administración de Django
-        verbose_name = 'Entrada de bitácora'
-        verbose_name_plural = 'Bitácora de producción'
-
-    # Representación en texto del objeto: muestra producción, tipo y fecha de la entrada
     def __str__(self):
-        return f"{self.produccion} - {self.tipo_novedad} - {self.fecha_registro:%Y-%m-%d %H:%M}"
+        return f"{self.titulo} - {self.fecha_registro}"    

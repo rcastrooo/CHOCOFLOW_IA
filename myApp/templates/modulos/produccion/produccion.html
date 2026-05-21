@@ -1,0 +1,260 @@
+{% extends 'layouts/modulos.html' %}
+{% load static %}
+
+{% block title %}Gestión de Producción{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/produccion.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    <h2 class="text-center section-title mb-4">
+        🏭 Gestión de Producción
+    </h2>
+
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">
+                {{ msg }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- CABECERA -->
+    <div class="cabecera-produccion">
+
+        <button class="btn btn-caramel"
+                data-bs-toggle="modal"
+                data-bs-target="#modalProduccion">
+            + Nueva Producción
+        </button>
+
+        <form method="GET" class="form-filtros">
+            <input type="text" name="q" class="form-control"
+                   placeholder="Buscar producto..."
+                   value="{{ request.GET.q }}">
+            <select name="estado" class="form-select">
+                <option value="">Todos</option>
+                <option value="Pendiente"  {% if request.GET.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="En Proceso" {% if request.GET.estado == 'En Proceso' %}selected{% endif %}>En Proceso</option>
+                <option value="Finalizado" {% if request.GET.estado == 'Finalizado' %}selected{% endif %}>Finalizado</option>
+                <option value="Cancelado"  {% if request.GET.estado == 'Cancelado' %}selected{% endif %}>Cancelado</option>
+            </select>
+            <button class="btn btn-choco">Filtrar</button>
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Responsable</th>
+                <th>Cant. Planificada</th>
+                <th>Cant. Producida</th>
+                <th>Fecha Inicio</th>
+                <th>Fecha Fin</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        {% for p in producciones %}
+        <tr>
+            <td>{{ p.producto }}</td>
+            <td>{{ p.empleado_responsable.nombre }}</td>
+            <td>{{ p.cantidad_planificada }}</td>
+            <td>{{ p.cantidad_producida }}</td>
+            <td>{{ p.fecha_inicio }}</td>
+            <td>{{ p.fecha_fin }}</td>
+            <td>
+                {% if p.estado == 'Finalizado' %}
+                    <span class="badge bg-success">{{ p.estado }}</span>
+                {% elif p.estado == 'En Proceso' %}
+                    <span class="badge bg-warning text-dark">{{ p.estado }}</span>
+                {% elif p.estado == 'Pendiente' %}
+                    <span class="badge bg-info text-dark">{{ p.estado }}</span>
+                {% else %}
+                    <span class="badge bg-danger">{{ p.estado }}</span>
+                {% endif %}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary"
+                    onclick="editarProduccion(
+                        '{{ p.id }}',
+                        '{{ p.producto }}',
+                        '{{ p.ingredientes }}',
+                        '{{ p.cantidad_planificada }}',
+                        '{{ p.cantidad_producida }}',
+                        '{{ p.fecha_inicio|date:"Y-m-d" }}',
+                        '{{ p.fecha_fin|date:"Y-m-d" }}',
+                        '{{ p.fecha_entrega|date:"Y-m-d" }}',
+                        '{{ p.fecha_limite|date:"Y-m-d" }}',
+                        '{{ p.estado }}',
+                        '{{ p.empleado_responsable.id }}'
+                    )">✏️
+                </button>
+                <a href="{% url 'inactivar_produccion' p.id %}"
+                   class="btn btn-sm btn-danger"
+                   onclick="return confirm('¿Cancelar esta producción?')">
+                   🗑️
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="8" class="text-center">No hay producciones registradas</td>
+        </tr>
+        {% endfor %}
+
+        </tbody>
+    </table>
+    </div>
+
+    <!-- BOTONES INFERIORES -->
+    <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+        <a href="{% url 'reporte_producciones' %}"
+           class="btn btn-reporte custom-bottom-btn">
+            📄 Generar Reporte
+        </a>
+    </div>
+
+</div>
+</section>
+
+
+<!-- MODAL -->
+<div class="modal fade" id="modalProduccion">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+
+    <form method="POST" action="{% url 'guardar_produccion' %}">
+    {% csrf_token %}
+
+    <div class="modal-header">
+        <h5>Producción</h5>
+    </div>
+
+    <div class="modal-body">
+
+        <input type="hidden" name="id" id="id">
+
+        <div class="row">
+            <div class="col-md-6">
+                <input type="text" name="producto" id="producto"
+                       class="form-control mb-2"
+                       placeholder="Nombre del producto">
+            </div>
+            <div class="col-md-6">
+                <input type="text" name="ingredientes" id="ingredientes"
+                       class="form-control mb-2"
+                       placeholder="Ingredientes">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <input type="text" name="cantidad_planificada" id="cantidad_planificada"
+                       class="form-control mb-2"
+                       placeholder="Cantidad planificada">
+            </div>
+            <div class="col-md-6">
+                <input type="text" name="cantidad_producida" id="cantidad_producida"
+                       class="form-control mb-2"
+                       placeholder="Cantidad producida">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label text-muted" style="font-size:13px;">Fecha inicio</label>
+                <input type="date" name="fecha_inicio" id="fecha_inicio"
+                       class="form-control mb-2">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label text-muted" style="font-size:13px;">Fecha fin</label>
+                <input type="date" name="fecha_fin" id="fecha_fin"
+                       class="form-control mb-2">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label text-muted" style="font-size:13px;">Fecha entrega</label>
+                <input type="date" name="fecha_entrega" id="fecha_entrega"
+                       class="form-control mb-2">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label text-muted" style="font-size:13px;">Fecha límite</label>
+                <input type="date" name="fecha_limite" id="fecha_limite"
+                       class="form-control mb-2">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <select name="empleado_responsable" id="empleado_responsable"
+                        class="form-select mb-2">
+                    <option value="">-- Responsable --</option>
+                    {% for emp in empleados %}
+                        <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <select name="estado" id="estado" class="form-select mb-2">
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="En Proceso">En Proceso</option>
+                    <option value="Finalizado">Finalizado</option>
+                    <option value="Cancelado">Cancelado</option>
+                </select>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="modal-footer">
+        <button class="btn btn-caramel">Guardar</button>
+        <button type="button" class="btn btn-secondary"
+            data-bs-dismiss="modal">Cancelar</button>
+    </div>
+
+    </form>
+</div>
+</div>
+</div>
+
+
+<script>
+function editarProduccion(id, producto, ingredientes, cantPlan, cantProd,
+                           fechaInicio, fechaFin, fechaEntrega, fechaLimite,
+                           estado, empId) {
+
+    document.getElementById('id').value                    = id;
+    document.getElementById('producto').value              = producto;
+    document.getElementById('ingredientes').value          = ingredientes;
+    document.getElementById('cantidad_planificada').value  = cantPlan;
+    document.getElementById('cantidad_producida').value    = cantProd;
+    document.getElementById('fecha_inicio').value          = fechaInicio;
+    document.getElementById('fecha_fin').value             = fechaFin;
+    document.getElementById('fecha_entrega').value         = fechaEntrega;
+    document.getElementById('fecha_limite').value          = fechaLimite;
+    document.getElementById('estado').value                = estado;
+    document.getElementById('empleado_responsable').value  = empId;
+
+    var modal = new bootstrap.Modal(
+        document.getElementById('modalProduccion')
+    );
+    modal.show();
+}
+</script>
+
+{% endblock %}

@@ -1,39 +1,152 @@
-from django.http import HttpResponse
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import json
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q
+from .models import RotacionTurno
 
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfgen import canvas
 
+from io import BytesIO
+from dotenv import load_dotenv # IA
+import os
+import json
+import re
+load_dotenv()
+from google import genai
+from .models import (
+    Usuario,
+    Empleado,
+    Turno,
+    RotacionTurno,
+    Solicitud,
+    Asignacion,
+    Produccion,
+    Lote,
+    Exportacion,
+    Bitacora
+)
+
+# ========================
+# FUNCIÓN AUXILIAR
+# ========================
+
+def parse_body(request):
+    try:
+        return json.loads(request.body)
+    except:
+        return {}
+
+# ========================
+# INDEX — si no hay sesión, va al login
+# ========================
 
 def index(request):
-    return HttpResponse("Inicio")
+    # Si ya tiene sesión activa, llevarlo a su dashboard
+    if request.user.is_authenticated:
+        rol = request.session.get('rol', '').strip()
+        if rol == 'Administrador':
+            return redirect('dashboard')
+        elif rol == 'Supervisor':
+            return redirect('dashboard_supervisor')
+
+    # Si no tiene sesión, mostrar la página de inicio normalmente
+    return render(request, 'index.html')
+
+# ========================
+# LOGIN
+# ========================
 
 def login_usuario(request):
-    return HttpResponse("Login")
 
-def registro(request):
-    return HttpResponse("Registro")
+    # Si ya hay sesión activa, redirigir según rol
+    if request.user.is_authenticated:
+        rol = request.session.get('rol', '').strip()
+        if rol == 'Administrador':
+            return redirect('dashboard')
+        elif rol == 'Supervisor':
+            return redirect('dashboard_supervisor')
+
+    if request.method == 'POST':
+
+        correo   = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+
+        # Validar campos vacíos
+        if not correo or not password:
+            messages.error(request, "Todos los campos son obligatorios.")
+            return render(request, 'auth/login.html')
+
+        # Validar formato del correo
+        patron_correo = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
+        if not re.match(patron_correo, correo):
+            messages.error(request, "El correo no tiene un formato válido.")
+            return render(request, 'auth/login.html')
+
+        try:
+            user_obj = User.objects.get(email=correo)
+            user     = authenticate(request, username=user_obj.username, password=password)
+        except User.DoesNotExist:
+            user = None
+
+        if user is not None:
+            login(request, user)
+
+            try:
+                usuario_db = Usuario.objects.get(email=correo)
+                request.session['usuario_id'] = usuario_db.id
+                request.session['rol']        = usuario_db.rol.strip()
+                request.session['horario_fijo'] = usuario_db.horario_fijo or ''
+
+                rol = usuario_db.rol.strip()
+
+                if rol == 'Administrador':
+                    return redirect('dashboard')
+                elif rol == 'Supervisor':
+                    return redirect('dashboard_supervisor')
+                else:
+                    messages.error(request, f"Rol no reconocido: '{rol}'")
+                    return redirect('login')
+
+            except Usuario.DoesNotExist:
+                messages.error(request, "No existe perfil del usuario.")
+                return redirect('login')
+        else:
+            messages.error(request, "Correo o contraseña incorrectos.")
+
+    return render(request, 'auth/login.html')
+
+# ========================
+# CERRAR SESIÓN
+# ========================
+
+def cerrar_sesion(request):
+    logout(request)
+    request.session.flush()
+    return redirect('index')
+
+# ========================
+# REGISTRO
+# ========================
 
 def registro(request):
 
     if request.method == 'POST':
 
-        identificacion = request.POST['identificacion'].strip()
-        nombre = request.POST['nombre'].strip()
-        correo = request.POST['correo'].strip()
-        password = request.POST['password'].strip()
-        rol = request.POST['rol']
-        estado = request.POST['estado']
+        identificacion = request.POST.get('identificacion', '').strip()
+        nombre         = request.POST.get('nombre', '').strip()
+        correo         = request.POST.get('correo', '').strip()
+        password       = request.POST.get('password', '').strip()
+        rol            = request.POST.get('rol', '')
+        estado         = request.POST.get('estado', '')
 
-        # ========================
-        # VALIDACIONES DE CAMPOS
-        # ========================
-
-        # Identificación: solo números, mínimo 5 dígitos
         if not identificacion.isdigit():
             messages.error(request, "La identificación solo debe contener números.")
             return redirect('registro')
@@ -42,7 +155,6 @@ def registro(request):
             messages.error(request, "La identificación debe tener al menos 5 dígitos.")
             return redirect('registro')
 
-        # Nombre: solo letras y espacios, mínimo 3 caracteres
         if not all(c.isalpha() or c.isspace() for c in nombre):
             messages.error(request, "El nombre solo debe contener letras.")
             return redirect('registro')
@@ -51,14 +163,11 @@ def registro(request):
             messages.error(request, "El nombre debe tener al menos 3 caracteres.")
             return redirect('registro')
 
-        # Correo: formato válido
-        import re
         patron_correo = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
         if not re.match(patron_correo, correo):
             messages.error(request, "El correo no tiene un formato válido.")
             return redirect('registro')
 
-        # Contraseña: mínimo 8 caracteres, una mayúscula y un número
         if len(password) < 8:
             messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
             return redirect('registro')
@@ -71,19 +180,6 @@ def registro(request):
             messages.error(request, "La contraseña debe tener al menos un número.")
             return redirect('registro')
 
-        # Rol y estado: no pueden estar vacíos
-        if not rol:
-            messages.error(request, "Debes seleccionar un rol.")
-            return redirect('registro')
-
-        if not estado:
-            messages.error(request, "Debes seleccionar un estado.")
-            return redirect('registro')
-
-        # ========================
-        # VALIDACIONES DE BD
-        # ========================
-
         if User.objects.filter(username=identificacion).exists():
             messages.error(request, "Esa identificación ya está registrada.")
             return redirect('registro')
@@ -92,9 +188,6 @@ def registro(request):
             messages.error(request, "Ese correo ya está registrado.")
             return redirect('registro')
 
-        # ========================
-        # CREAR USUARIO
-        # ========================
         User.objects.create_user(
             username=identificacion,
             first_name=nombre,
@@ -102,177 +195,354 @@ def registro(request):
             password=password
         )
 
-        messages.success(request, "Usuario registrado correctamente ")
+        Usuario.objects.create(
+            nombre=nombre,
+            email=correo,
+            telefono=0,
+            direccion='Sin dirección',
+            contrasena=password,
+            rol=rol,
+            estado=estado
+        )
+
+        messages.success(request, "Usuario registrado correctamente.")
         return redirect('login')
 
     return render(request, 'auth/registro.html')
 
+# =======================
+# DASHBOARD ADMINISTRADOR
+# =======================
 
-def login_usuario(request):
-    if request.method == 'POST':
-        correo   = request.POST.get('username', '').strip()
-        password = request.POST.get('password', '').strip()
+@login_required(login_url='login')
+def dashboard(request):
 
-        # Validaciones básicas
-        if not correo or not password:
-            messages.error(request, "Todos los campos son obligatorios.")
-            return render(request, 'auth/login.html')
+    # Estadísticas generales
+    total_usuarios           = Usuario.objects.count()
+    total_empleados          = Empleado.objects.count()
+    empleados_activos        = Empleado.objects.filter(estado='Activo').count()
+    empleados_suspendidos    = Empleado.objects.filter(estado='Suspendido').count()
+    total_producciones       = Produccion.objects.count()
+    producciones_proceso     = Produccion.objects.filter(estado='En Proceso').count()
+    producciones_finalizadas = Produccion.objects.filter(estado='Finalizado').count()
+    total_exportaciones      = Exportacion.objects.count()
+    exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
+    total_lotes              = Lote.objects.count()
 
-        import re
-        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$', correo):
-            messages.error(request, "El correo no tiene un formato válido.")
-            return render(request, 'auth/login.html')
+    asignaciones = Asignacion.objects.select_related(
+        'empleado'
+    ).order_by('-id')[:5]
 
-        # Buscar el User de Django por email
-        try:
-            user_obj = User.objects.get(email=correo)
-            user = authenticate(request, username=user_obj.username, password=password)
-        except User.DoesNotExist:
-            user = None
+    producciones_recientes = Produccion.objects.select_related(
+        'empleado_responsable'
+    ).order_by('-id')[:5]
 
-        if user:
-            login(request, user)
+    # Datos del usuario en sesión
+    usuario_id     = request.session.get('usuario_id')
+    usuario_nombre = 'Administrador'
+    usuario_rol    = 'Administrador'
 
-            # Guardar el perfil personalizado en sesión
-            try:
-                perfil = Usuario.objects.get(email=correo)
-                request.session['usuario_id'] = perfil.id
-                request.session['usuario_rol'] = perfil.rol
-                messages.success(request, f"Bienvenido, {perfil.nombre}")
-
-                # ── Redirigir según el rol ──
-                if perfil.rol == 'Administrador':
-                    return redirect('dashboard_administrador')  # cambia por tu url real
-                elif perfil.rol == 'Supervisor':
-                    return redirect('dashboard_supervisor')     # cambia por tu url real
-                else:
-                    return redirect('index')
-
-            except Usuario.DoesNotExist:
-                messages.warning(request, "Sesión iniciada pero sin perfil asignado.")
-                return redirect('index')
-
-        else:
-            messages.error(request, "Correo o contraseña incorrectos.")
-
-    return render(request, 'auth/login.html')
-
-# Importación de modelos actualizados
-from .models import (
-    Usuario, Turno, EmpTurno, Asignacion,
-    Produccion, Lote, Exportacion,BitacoraProduccion
-)
-
-# ========================
-# FUNCIÓN AUXILIAR
-# ========================
-def parse_body(request):
-    """
-    Convierte el body de la petición (JSON) a diccionario Python.
-    """
     try:
-        return json.loads(request.body)
-    except:
-        return {}
+        usuario_db = Usuario.objects.get(id=usuario_id)
+        usuario_nombre = usuario_db.nombre
+        usuario_rol    = usuario_db.rol
+    except Usuario.DoesNotExist:
+        pass
 
+    context = {
+        'total_usuarios':           total_usuarios,
+        'total_empleados':          total_empleados,
+        'empleados_activos':        empleados_activos,
+        'empleados_suspendidos':    empleados_suspendidos,
+        'total_producciones':       total_producciones,
+        'producciones_proceso':     producciones_proceso,
+        'producciones_finalizadas': producciones_finalizadas,
+        'total_exportaciones':      total_exportaciones,
+        'exportaciones_pendientes': exportaciones_pendientes,
+        'total_lotes':              total_lotes,
+        'asignaciones':             asignaciones,
+        'producciones_recientes':   producciones_recientes,
+        'usuario_nombre':           usuario_nombre,
+        'usuario_rol':              usuario_rol,
+    }
 
-# ========================
-# USUARIOS
-# ========================
-@csrf_exempt
-def usuarios(request):
-    """
-    GET  -> Lista todos los usuarios
-    POST -> Crea un usuario (la contraseña se encripta automáticamente en el model)
-    """
+    return render(request, 'dashboard.html', context)
 
-    # CONSULTAR
-    if request.method == "GET":
-        data = list(Usuario.objects.values())
-        return JsonResponse(data, safe=False)
+@login_required(login_url='login')
+def gestionar_supervisores(request):
 
-    # CREAR
-    if request.method == "POST":
-        body = parse_body(request)
+    if request.method == 'POST':
+        supervisor_id = request.POST.get('supervisor_id')
+        horario       = request.POST.get('horario_fijo')
 
-        usuario = Usuario.objects.create(
-            nombre=body.get("nombre"),
-            email=body.get("email"),
-            contrasena=body.get("contrasena"),  # Se encripta en save()
-            rol=body.get("rol"),
-            estado=body.get("estado", "Activo")
+        supervisor = get_object_or_404(Usuario, id=supervisor_id, rol='Supervisor')
+        supervisor.horario_fijo = horario
+        supervisor.save()
+        messages.success(request, f"Horario de {supervisor.nombre} actualizado.")
+        return redirect('gestionar_supervisores')
+
+    supervisores = Usuario.objects.filter(rol='Supervisor')
+    return render(request, 'modulos/supervisores/gestionar_supervisores.html', {
+        'supervisores': supervisores,
+    })
+
+# =======================
+# DASHBOARD SUPERVISOR
+# =======================
+
+def dashboard_supervisor(request):
+
+    empleados_activos       = Empleado.objects.filter(estado='Activo').count()
+    turnos                  = Turno.objects.count()
+    producciones_proceso    = Produccion.objects.filter(estado='En Proceso').count()
+    producciones_pendientes = Produccion.objects.filter(estado='Pendiente').count()
+    asignaciones            = Asignacion.objects.select_related('empleado').order_by('-id')[:10]
+    lotes                   = Lote.objects.order_by('-fecha_vencimiento')[:5]
+
+    context = {
+        'empleados_activos':       empleados_activos,
+        'turnos':                  turnos,
+        'producciones_proceso':    producciones_proceso,
+        'producciones_pendientes': producciones_pendientes,
+        'asignaciones':            asignaciones,
+        'lotes':                   lotes,
+    }
+
+    return render(request, 'dashboard_supervisor.html', context)
+
+#funcion de api para tener en tiempo real los datos con la BD
+@login_required(login_url='login')
+def api_stats_supervisor(request):
+    from django.utils import timezone
+    hoy = timezone.now().date()
+
+    data = {
+        # Empleados y turnos
+        'total_empleados':          Empleado.objects.count(),
+        'empleados_activos':        Empleado.objects.filter(estado='Activo').count(),
+        'turno_activo':             Turno.objects.filter(fecha=hoy).first(),
+        'asignaciones_hoy':         Asignacion.objects.filter(fecha_asignacion=hoy).count(),
+        'sin_turno':                Empleado.objects.filter(estado='Activo').exclude(
+                                        empturno_turno_fecha=hoy
+                                    ).count(),
+        # Lotes y exportaciones
+        'lotes_totales':            Lote.objects.count(),
+        'exportaciones_pendientes': Exportacion.objects.filter(estado='Pendiente').count(),
+        'exportaciones_enviadas':   Exportacion.objects.filter(estado='Enviado').count(),
+        # Bitácora
+        'bitacora_hoy':             Bitacora.objects.filter(fecha_registro=hoy).count(),
+        'bitacora_pendientes':      Bitacora.objects.filter(
+                                        fecha_registro=hoy, estado='Borrador'
+                                    ).count(),
+        'bitacora_enviados':        Bitacora.objects.filter(
+                                        fecha_registro=hoy, estado='Enviado'
+                                    ).count(),
+    }
+
+    turno = Turno.objects.filter(fecha=hoy).first()
+    data['turno_nombre'] = turno.horario if turno else 'Sin turno hoy'
+
+    return JsonResponse(data)
+
+@login_required(login_url='login')
+def empleados_supervisor(request):
+    from datetime import date
+
+    horario = request.session.get('horario_fijo', '')
+
+    if not horario:
+        messages.error(request, "No tienes un horario asignado. Contacta al administrador.")
+        return redirect('dashboard_supervisor')
+
+    # Buscar rotaciones activas HOY con ese horario
+    hoy = date.today()
+    rotaciones_hoy = RotacionTurno.objects.filter(
+        turno__horario=horario,
+        fecha_inicio__lte=hoy,
+        fecha_fin__gte=hoy,
+        estado__in=['Asignado', 'Pendiente']
+    ).values_list('empleado_id', flat=True)
+
+    lista = Empleado.objects.filter(
+        id__in=rotaciones_hoy,
+        estado='Activo'
+    )
+
+    query = request.GET.get('q', '')
+    if query:
+        lista = lista.filter(
+            Q(nombre__icontains=query) |
+            Q(cedula__icontains=query)  |
+            Q(email__icontains=query)
         )
 
-        return JsonResponse({
-            "mensaje": "Usuario creado correctamente",
-            "id": usuario.id
-        })
+    return render(request, 'modulos/empleados/empleados_supervisor.html', {
+        'empleados': lista,
+        'horario':   horario,
+        'fecha_hoy': hoy,
+        'busqueda':  query,
+    })
 
+# ===================
+# EMPLEADOS 
+# ===================
 
-# ========================
-# TURNOS
-# ========================
-@csrf_exempt
-def turnos(request):
-    """
-    GET  -> Lista turnos
-    POST -> Crea turno
-    """
+@login_required(login_url='login')
+def empleados(request):
+    from datetime import date
 
-    if request.method == "GET":
-        data = list(Turno.objects.values())
-        return JsonResponse(data, safe=False)
+    rol     = request.session.get('rol', '')
+    query   = request.GET.get('q', '')
+    estado  = request.GET.get('estado', '')
 
-    if request.method == "POST":
-        body = parse_body(request)
+    # Base del queryset
+    lista = Empleado.objects.all()
 
-        turno = Turno.objects.create(
-            fecha=body.get("fecha"),
-            horario=body.get("horario"),
-            hora_inicio=body.get("hora_inicio"),
-            hora_fin=body.get("hora_fin")
+    if rol == 'Supervisor':
+        # Solo ve empleados activos de su horario hoy
+        horario = request.session.get('horario_fijo', '')
+
+        if not horario:
+            messages.error(request, "No tienes un horario asignado. Contacta al administrador.")
+            return redirect('dashboard_supervisor')
+
+        hoy = date.today()
+        rotaciones_hoy = RotacionTurno.objects.filter(
+            turno__horario=horario,
+            fecha_inicio__lte=hoy,
+            fecha_fin__gte=hoy,
+            estado__in=['Asignado', 'Pendiente']
+        ).values_list('empleado_id', flat=True)
+
+        lista = lista.filter(id__in=rotaciones_hoy, estado='Activo')
+
+    else:
+        # Admin ve todos con filtros normales
+        if estado and estado != 'Todos':
+            lista = lista.filter(estado=estado)
+
+    if query:
+        lista = lista.filter(
+            Q(nombre__icontains=query) |
+            Q(cedula__icontains=query)  |
+            Q(email__icontains=query)
         )
 
-        return JsonResponse({
-            "mensaje": "Turno creado",
-            "id": turno.id
-        })
+    return render(request, 'modulos/empleados/empleados.html', {
+        'empleados':  lista,
+        'rol':        rol,
+        'horario':    request.session.get('horario_fijo', ''),
+        'fecha_hoy':  date.today(),
+        'busqueda':   query,
+    })
+@login_required(login_url='login')
+def guardar_empleado(request):
+    if request.method == 'POST':
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida.")
+            return redirect('login')
+        try:
+            usuario_perfil = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            messages.error(request, "No se encontró tu perfil.")
+            return redirect('login')
 
+        empleado_id = request.POST.get('id')
+        empleado    = get_object_or_404(Empleado, id=empleado_id) if empleado_id else Empleado()
 
-# ===================
-# LOGICA DE ASIGNACIONES
-# ===================
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.db.models import Q
-from .models import Asignacion, Empleado, Turno, Usuario
+        empleado.cedula     = request.POST.get('cedula')
+        empleado.nombre     = request.POST.get('nombre')
+        empleado.email      = request.POST.get('email')
+        empleado.telefono   = request.POST.get('telefono')
+        empleado.direccion  = request.POST.get('direccion')
+        empleado.estado     = request.POST.get('estado')
+        empleado.creado_por = usuario_perfil
+        empleado.save()
+        messages.success(request, "Empleado guardado correctamente.")
+
+    return redirect('empleados')
 
 
 @login_required(login_url='login')
+def inactivar_empleado(request, id):
+    empleado        = get_object_or_404(Empleado, id=id)
+    empleado.estado = 'Inactivo'
+    empleado.save()
+    messages.success(request, f"{empleado.nombre} fue inactivado.")
+    return redirect('empleados')
+# ==============================
+# REPORTE PDF DE EMPLEADOS
+# ==============================
+
+def generar_reporte_empleados(request):
+
+    lista    = Empleado.objects.all()
+    busqueda = request.GET.get('busqueda')
+    estado   = request.GET.get('estado')
+
+    if busqueda:
+        lista = lista.filter(nombre__icontains=busqueda)
+
+    if estado and estado != 'Todos':
+        lista = lista.filter(estado=estado)
+
+    buffer = BytesIO()
+    doc    = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    elementos.append(Paragraph("Reporte de Empleados - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Cédula', 'Nombre', 'Email', 'Telefono', 'Estado']]
+    for emp in lista:
+        datos.append([emp.cedula, emp.nombre, emp.email, emp.telefono, emp.estado])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_empleados.pdf"'
+    response.write(pdf)
+    return response
+
+# ===================
+# ASIGNACIONES
+# ===================
+
 def asignaciones(request):
 
     query = request.GET.get('q')
-    estado_filtro = request.GET.get('estado')
-
     lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
-    ).all()
+    ).filter(empleado__estado='Activo')
 
     if query:
         lista = lista.filter(
             Q(tarea__icontains=query) |
-            Q(empleado__nombre__icontains=query)
+            Q(empleado_nombre_icontains=query)
         )
 
-    # Datos para el modal
     empleados = Empleado.objects.filter(estado='Activo')
     turnos    = Turno.objects.all()
 
     return render(request, 'modulos/asignaciones/asignaciones.html', {
         'asignaciones': lista,
-        'empleados': empleados,
-        'turnos': turnos,
+        'empleados':    empleados,
+        'turnos':       turnos,
     })
 
 
@@ -281,7 +551,6 @@ def guardar_asignacion(request):
 
     if request.method == 'POST':
 
-        # Obtener usuario de sesión
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida. Inicia sesión nuevamente.")
@@ -294,17 +563,12 @@ def guardar_asignacion(request):
             return redirect('login')
 
         asignacion_id = request.POST.get('id')
+        asignacion    = get_object_or_404(Asignacion, id=asignacion_id) if asignacion_id else Asignacion()
 
-        if asignacion_id:
-            asignacion = get_object_or_404(Asignacion, id=asignacion_id)
-        else:
-            asignacion = Asignacion()
-
-        # Validaciones básicas
-        tarea      = request.POST.get('tarea', '').strip()
-        fecha      = request.POST.get('fecha_asignacion', '').strip()
-        emp_id     = request.POST.get('empleado_id')
-        turno_id   = request.POST.get('turno_id')
+        tarea    = request.POST.get('tarea', '').strip()
+        fecha    = request.POST.get('fecha_asignacion', '').strip()
+        emp_id   = request.POST.get('empleado_id')
+        turno_id = request.POST.get('turno_id')
 
         if not tarea or not fecha or not emp_id or not turno_id:
             messages.error(request, "Todos los campos son obligatorios.")
@@ -315,6 +579,7 @@ def guardar_asignacion(request):
         asignacion.empleado         = get_object_or_404(Empleado, id=emp_id)
         asignacion.turno            = get_object_or_404(Turno, id=turno_id)
         asignacion.asignado_por     = usuario_perfil
+        asignacion.estado           = 'Activo'
 
         asignacion.save()
         messages.success(request, "Asignación guardada correctamente.")
@@ -323,412 +588,207 @@ def guardar_asignacion(request):
 
 
 @login_required(login_url='login')
-def eliminar_asignacion(request, id):
-
+def inactivar_asignacion(request, id):
     asignacion = get_object_or_404(Asignacion, id=id)
-    asignacion.delete()
-    messages.success(request, "Asignación eliminada.")
+    asignacion.estado = 'Inactivo'
+    asignacion.save()
+    messages.success(request, "Asignación inactivada.")
     return redirect('asignaciones')
-# ========================
-# PRODUCCIÓN
-# ========================
-@csrf_exempt
-def producciones(request):
-    """
-    GET  -> Lista producciones
-    POST -> Crea producción
-    """
 
-    if request.method == "GET":
-        data = list(Produccion.objects.values())
-        return JsonResponse(data, safe=False)
-
-    if request.method == "POST":
-        body = parse_body(request)
-
-        produccion = Produccion.objects.create(
-            producto=body.get("producto"),
-            ingredientes=body.get("ingredientes"),
-            cantidad_planificada=body.get("cantidad_planificada"),
-            fecha_entrega=body.get("fecha_entrega"),
-            fecha_limite=body.get("fecha_limite"),
-            usuario_id=body.get("usuario_id"),  # opcional
-            estado="Pendiente"
-        )
-
-        return JsonResponse({
-            "mensaje": "Producción creada",
-            "id": produccion.id
-        })
-
-
-# ========================
-# INICIAR PRODUCCIÓN
-# ========================
-def iniciar_produccion(request, id):
-    """
-    Cambia estado de producción a 'En Proceso'
-    """
-    try:
-        produccion = Produccion.objects.get(id=id)
-        produccion.estado = "En Proceso"
-        produccion.save()
-
-        return JsonResponse({"mensaje": "Producción iniciada"})
-    except Produccion.DoesNotExist:
-        return JsonResponse({"error": "Producción no encontrada"}, status=404)
-
-
-# ========================
-# FINALIZAR PRODUCCIÓN
-# ========================
-@csrf_exempt
-def finalizar_produccion(request, id):
-    """
-    Finaliza producción y crea lote automáticamente
-    """
-    try:
-        produccion = Produccion.objects.get(id=id)
-        body = parse_body(request)
-
-        cantidad = body.get("cantidad_producida", 0)
-
-        # Actualizar producción
-        produccion.estado = "Finalizado"
-        produccion.cantidad_producida = cantidad
-        produccion.save()
-
-        # Crear lote automáticamente (trazabilidad)
-        lote = Lote.objects.create(
-            codigo_lote=f"LOTE-{produccion.id}",
-            cantidad=cantidad,
-            fecha_produccion=produccion.fecha_inicio,
-            fecha_vencimiento=produccion.fecha_limite,
-            produccion=produccion
-        )
-
-        return JsonResponse({
-            "mensaje": "Producción finalizada",
-            "lote": lote.codigo_lote
-        })
-
-    except Produccion.DoesNotExist:
-        return JsonResponse({"error": "Producción no encontrada"}, status=404)
-
-
-# ========================
-# LOTES
-# ========================
-def lotes(request):
-    """
-    GET -> Lista lotes
-    """
-    data = list(Lote.objects.values())
-    return JsonResponse(data, safe=False)
-
-
-# ========================
-# EXPORTACIONES
-# ========================
-@csrf_exempt
-def exportaciones(request):
-    """
-    GET  -> Lista exportaciones
-    POST -> Crea exportación
-    """
-
-    if request.method == "GET":
-        data = list(Exportacion.objects.values())
-        return JsonResponse(data, safe=False)
-
-    if request.method == "POST":
-        body = parse_body(request)
-
-        exportacion = Exportacion.objects.create(
-            destino=body.get("destino"),
-            pais=body.get("pais"),
-            estado="Pendiente"
-        )
-
-        return JsonResponse({
-            "mensaje": "Exportación creada",
-            "id": exportacion.id
-        })
-
-
-# ========================
-# ENVIAR EXPORTACIÓN
-# ========================
-def enviar_exportacion(request, id):
-    """
-    Cambia estado a 'Enviado'
-    """
-    try:
-        exportacion = Exportacion.objects.get(id=id)
-        exportacion.estado = "Enviado"
-        exportacion.save()
-
-        return JsonResponse({"mensaje": "Exportación enviada"})
-    except Exportacion.DoesNotExist:
-        return JsonResponse({"error": "Exportación no encontrada"}, status=404)
-
-
-# ========================
-# CONFIRMAR ENTREGA
-# ========================
-def confirmar_entrega(request, id):
-    """
-    Cambia estado a 'Entregado'
-    """
-    try:
-        exportacion = Exportacion.objects.get(id=id)
-        exportacion.estado = "Entregado"
-        exportacion.save()
-
-        return JsonResponse({"mensaje": "Entrega confirmada"})
-    except Exportacion.DoesNotExist:
-        return JsonResponse({"error": "Exportación no encontrada"}, status=404)
-
-# -------------------------------------
-# =======================
-# LOGICA INDEX
-# =======================
-from .models import Empleado, Produccion, Exportacion, Lote, Asignacion
+# ==============================
+# REPORTE PDF DE ASIGNACIONES
+# ==============================
 
 @login_required(login_url='login')
-def index(request):
+def generar_reporte_asignaciones(request):
 
-    total_empleados    = Empleado.objects.filter(estado='Activo').count()
-    total_producciones = Produccion.objects.count()
-    total_exportaciones = Exportacion.objects.count()
-    total_lotes        = Lote.objects.count()
-
-    # Porcentajes para las barras
-    emp_total  = Empleado.objects.count()
-    prod_total = Produccion.objects.count()
-    exp_total  = Exportacion.objects.count()
-    asig_total = Asignacion.objects.count()
-
-    return render(request, 'index.html', {
-        'total_empleados':     total_empleados,
-        'total_producciones':  total_producciones,
-        'total_exportaciones': total_exportaciones,
-        'total_lotes':         total_lotes,
-
-        'pct_empleados':    min(int((total_empleados / emp_total * 100) if emp_total else 0), 100),
-        'pct_producciones': min(int((Produccion.objects.filter(estado='Finalizado').count() / prod_total * 100) if prod_total else 0), 100),
-        'pct_exportaciones':min(int((Exportacion.objects.filter(estado='Entregado').count() / exp_total * 100) if exp_total else 0), 100),
-        'pct_asignaciones': min(int((asig_total / 10 * 100) if asig_total else 0), 100),
-
-        'producciones_recientes':  Produccion.objects.select_related('empleado_responsable').order_by('-id')[:5],
-        'exportaciones_recientes': Exportacion.objects.order_by('-id')[:5],
-    })
-
-# ===================
-# LOGICA DE EMPLEADOS
-# ===================
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-
-@login_required(login_url='login')
-def empleados(request):
-    query = request.GET.get('q')
-    estado = request.GET.get('estado')
-
-    lista = Empleado.objects.all()
+    lista  = Asignacion.objects.select_related('empleado', 'turno', 'asignado_por').all()
+    query  = request.GET.get('q')
 
     if query:
         lista = lista.filter(
-            Q(nombre__icontains=query) |
-            Q(email__icontains=query) |
-            Q(cedula__icontains=query)
+            Q(tarea__icontains=query) |
+            Q(empleado_nombre_icontains=query)
         )
 
-    if estado:
-        lista = lista.filter(estado=estado)
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
 
-    return render(request, 'modulos/empleados/empleados.html', {
-        'empleados': lista
+    elementos.append(Paragraph("Reporte de Asignaciones - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Tarea', 'Empleado', 'Turno', 'Fecha', 'Asignado por']]
+    for a in lista:
+        datos.append([
+            a.tarea,
+            a.empleado.nombre,
+            a.turno.horario,
+            str(a.fecha_asignacion),
+            a.asignado_por.nombre,
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_asignaciones.pdf"'
+    response.write(pdf)
+    return response
+
+
+# ===================
+# TURNOS
+# ===================
+
+@login_required(login_url='login')
+def turnos(request):
+
+    fecha_filtro = request.GET.get('fecha')
+    lista = Turno.objects.select_related('creado_por').prefetch_related('empturno_set__empleado').order_by('-id')
+
+    if fecha_filtro:
+        lista = lista.filter(fecha=fecha_filtro)
+
+    empleados = Empleado.objects.filter(estado='Activo')
+
+    return render(request, 'modulos/turnos/turnos.html', {
+        'turnos':    lista,
+        'empleados': empleados
     })
 
 
 @login_required(login_url='login')
-def guardar_empleado(request):
+def guardar_turno(request):
+
     if request.method == 'POST':
 
-        # Obtener el Usuario personalizado desde la sesión
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
-            messages.error(request, "Sesión inválida. Inicia sesión nuevamente.")
+            messages.error(request, "Sesión inválida.")
             return redirect('login')
 
         try:
-            usuario_perfil = Usuario.objects.get(id=usuario_id)
+            usuario = Usuario.objects.get(id=usuario_id)
         except Usuario.DoesNotExist:
-            messages.error(request, "No se encontró tu perfil de usuario.")
+            messages.error(request, "Usuario no encontrado.")
             return redirect('login')
 
-        empleado_id = request.POST.get('id')
+        turno_id     = request.POST.get('id')
+        fecha        = request.POST.get('fecha')
+        horario      = request.POST.get('horario')
+        empleado_ids = request.POST.getlist('empleado_ids')  # ← corregido
 
-        if empleado_id:
-            empleado = get_object_or_404(Empleado, id=empleado_id)
+        if not fecha or not horario:
+            messages.error(request, "Todos los campos son obligatorios.")
+            return redirect('turnos')
+
+        # Crear o editar
+        if turno_id:
+            turno = get_object_or_404(Turno, id=turno_id)
+            turno.fecha   = fecha
+            turno.horario = horario
+            turno.save()
+            # Actualizar empleados
+            EmpTurno.objects.filter(turno=turno).delete()
         else:
-            empleado = Empleado()
+            turno = Turno.objects.create(
+                fecha=fecha,
+                horario=horario,
+                creado_por=usuario
+            )
 
-        empleado.cedula    = request.POST.get('cedula')
-        empleado.nombre    = request.POST.get('nombre')
-        empleado.email     = request.POST.get('email')
-        empleado.telefono  = request.POST.get('telefono')
-        empleado.direccion = request.POST.get('direccion')
-        empleado.estado    = request.POST.get('estado')
-        empleado.creado_por = usuario_perfil   # ← ya funciona correctamente
+        # Asignar empleados
+        for emp_id in empleado_ids:
+            try:
+                empleado = Empleado.objects.get(id=emp_id)
+                EmpTurno.objects.create(empleado=empleado, turno=turno)
+            except Empleado.DoesNotExist:
+                pass
 
-        empleado.save()
-        messages.success(request, "Empleado guardado correctamente.")
+        messages.success(request, "Turno guardado correctamente.")
 
-    return redirect('empleados')
+    return redirect('turnos')
 
 
 @login_required(login_url='login')
-def inactivar_empleado(request, id):
-    empleado = get_object_or_404(Empleado, id=id)
-    empleado.estado = 'Inactivo'
-    empleado.save()
-    messages.success(request, f"{empleado.nombre} fue inactivado.")
-    return redirect('empleados')
+def inactivar_turno(request, id):
+    turno = get_object_or_404(Turno, id=id)
+    EmpTurno.objects.filter(turno=turno).delete()
+    turno.delete()
+    messages.success(request, "Turno eliminado correctamente.")
+    return redirect('turnos')
+
 # ==============================
-# LOGICA DE REPORTE DE EMPLEADOS
+# REPORTE PDF DE TURNOS
 # ==============================
-from django.shortcuts import render
-from .models import Empleado
 
-from django.http import HttpResponse
+@login_required(login_url='login')
+def generar_reporte_turnos(request):
 
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+    lista = Turno.objects.select_related('creado_por').prefetch_related('empturno_set__empleado').all()
+    fecha = request.GET.get('fecha')
 
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Table,
-    TableStyle,
-    Paragraph,
-    Spacer
-)
+    if fecha:
+        lista = lista.filter(fecha=fecha)
 
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-
-from io import BytesIO
-
-
-def empleados(request):
-
-    empleados = Empleado.objects.all()
-
-    busqueda = request.GET.get('busqueda')
-    estado = request.GET.get('estado')
-
-    if busqueda:
-        empleados = empleados.filter(nombre__icontains=busqueda)
-
-    if estado and estado != "Todos":
-        empleados = empleados.filter(estado=estado)
-
-    context = {
-        'empleados': empleados
-    }
-
-    return render(
-        request,
-        'modulos/empleados/empleados.html',
-        context
-    )
-
-
-def generar_reporte_empleados(request):
-
-    empleados = Empleado.objects.all()
-
-    busqueda = request.GET.get('busqueda')
-    estado = request.GET.get('estado')
-
-    if busqueda:
-        empleados = empleados.filter(nombre__icontains=busqueda)
-
-    if estado and estado != "Todos":
-        empleados = empleados.filter(estado=estado)
-
-    buffer = BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter
-    )
-
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
     elementos = []
+    estilos   = getSampleStyleSheet()
 
-    estilos = getSampleStyleSheet()
-
-    titulo = Paragraph(
-        "Reporte de Empleados - ChocoFlow",
-        estilos['Title']
-    )
-
-    elementos.append(titulo)
+    elementos.append(Paragraph("Reporte de Turnos - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [
-        [
-            'Cédula',
-            'Nombre',
-            'Email',
-            'Estado'
-        ]
-    ]
-
-    for emp in empleados:
+    datos = [['Fecha', 'Horario', 'Empleados', 'Creado por']]
+    for t in lista:
+        empleados_turno = ', '.join([
+            rel.empleado.nombre for rel in t.empturno_set.all()
+        ]) or 'Sin empleados'
 
         datos.append([
-            emp.cedula,
-            emp.nombre,
-            emp.email,
-            emp.estado
+            str(t.fecha),
+            t.horario,
+            empleados_turno,
+            t.creado_por.nombre,
         ])
 
     tabla = Table(datos)
-
     tabla.setStyle(TableStyle([
-
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',(0,0),(-1,0),colors.white),
-
-        ('GRID', (0,0), (-1,-1), 1, colors.black),
-
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-
-        ('BACKGROUND', (0,1), (-1,-1), colors.beige),
-
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
     ]))
 
     elementos.append(tabla)
-
     doc.build(elementos)
 
     pdf = buffer.getvalue()
-
     buffer.close()
 
-    response = HttpResponse(
-        content_type='application/pdf'
-    )
-
-    response['Content-Disposition'] = (
-        'attachment; filename="reporte_empleados.pdf"'
-    )
-
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_turnos.pdf"'
     response.write(pdf)
-
     return response
+
+
 
 # ==============================
 # LOGICA DE EXPORTACIONES
@@ -1008,8 +1068,8 @@ def generar_reporte_lotes(request):
             str(lote.cantidad),
             str(lote.fecha_produccion),
             str(lote.fecha_vencimiento),
-            str(lote.produccion),   # usa el __str__ de Produccion
-            str(lote.exportacion),  # usa el __str__ de Exportacion
+            str(lote.produccion),   # usa el _str_ de Produccion
+            str(lote.exportacion),  # usa el _str_ de Exportacion
         ])
 
     # Construye y estiliza la tabla
@@ -1061,7 +1121,7 @@ def dashboard_supervisor(request):
     total_lotes = Lote.objects.count()
 
     # Total de entradas registradas en la bitácora de producción
-    total_bitacora = BitacoraProduccion.objects.count()
+    total_bitacora = Bitacora.objects.count()
 
     # Se empaquetan todos los datos en un diccionario
     # para que el template pueda acceder a ellos con {{ variable }}
@@ -1077,3 +1137,208 @@ def dashboard_supervisor(request):
 
     return render(request, 'dashboardsuper.html', context)
 
+
+# ===================
+# PRODUCCION
+# ===================
+
+@login_required(login_url='login')
+def producciones(request):
+
+    query  = request.GET.get('q')
+    estado = request.GET.get('estado')
+
+    lista = Produccion.objects.select_related(
+        'empleado_responsable', 'creado_por'
+    ).all()
+
+    if query:
+        lista = lista.filter(
+            Q(producto__icontains=query) |
+            Q(empleado_responsable_nombre_icontains=query)
+        )
+
+    if estado and estado != 'Todos':
+        lista = lista.filter(estado=estado)
+
+    empleados = Empleado.objects.filter(estado='Activo')
+
+    return render(request, 'modulos/produccion/produccion.html', {
+        'producciones': lista,
+        'empleados':    empleados,
+    })
+
+
+@login_required(login_url='login')
+def guardar_produccion(request):
+
+    if request.method == 'POST':
+
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida.")
+            return redirect('login')
+
+        try:
+            usuario_perfil = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            messages.error(request, "No se encontró tu perfil.")
+            return redirect('login')
+
+        produccion_id = request.POST.get('id')
+        produccion    = get_object_or_404(Produccion, id=produccion_id) if produccion_id else Produccion()
+
+        producto             = request.POST.get('producto', '').strip()
+        ingredientes         = request.POST.get('ingredientes', '').strip()
+        cantidad_planificada = request.POST.get('cantidad_planificada', '').strip()
+        cantidad_producida   = request.POST.get('cantidad_producida', '').strip()
+        fecha_inicio         = request.POST.get('fecha_inicio', '').strip()
+        fecha_fin            = request.POST.get('fecha_fin', '').strip()
+        fecha_entrega        = request.POST.get('fecha_entrega', '').strip()
+        fecha_limite         = request.POST.get('fecha_limite', '').strip()
+        estado               = request.POST.get('estado', '').strip()
+        emp_id               = request.POST.get('empleado_responsable')
+
+        if not producto or not emp_id or not fecha_inicio or not fecha_fin:
+            messages.error(request, "Los campos obligatorios no pueden estar vacíos.")
+            return redirect('producciones')
+
+        produccion.producto             = producto
+        produccion.ingredientes         = ingredientes
+        produccion.cantidad_planificada = cantidad_planificada
+        produccion.cantidad_producida   = cantidad_producida
+        produccion.fecha_inicio         = fecha_inicio
+        produccion.fecha_fin            = fecha_fin
+        produccion.fecha_entrega        = fecha_entrega
+        produccion.fecha_limite         = fecha_limite
+        produccion.estado               = estado
+        produccion.empleado_responsable = get_object_or_404(Empleado, id=emp_id)
+        produccion.creado_por           = usuario_perfil
+
+        produccion.save()
+        messages.success(request, "Producción guardada correctamente.")
+
+    return redirect('producciones')
+
+
+@login_required(login_url='login')
+def inactivar_produccion(request, id):
+    produccion = get_object_or_404(Produccion, id=id)
+    produccion.estado = 'Cancelado'
+    produccion.save()
+    messages.success(request, "Producción cancelada.")
+    return redirect('producciones')
+
+
+@login_required(login_url='login')
+def generar_reporte_producciones(request):
+
+    lista  = Produccion.objects.select_related('empleado_responsable').all()
+    query  = request.GET.get('q')
+    estado = request.GET.get('estado')
+
+    if query:
+        lista = lista.filter(producto__icontains=query)
+
+    if estado and estado != 'Todos':
+        lista = lista.filter(estado=estado)
+
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    elementos.append(Paragraph("Reporte de Producciones - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Producto', 'Responsable', 'Cant. Producida', 'Fecha Inicio', 'Fecha Fin', 'Estado']]
+    for p in lista:
+        datos.append([
+            p.producto,
+            p.empleado_responsable.nombre,
+            p.cantidad_producida,
+            str(p.fecha_inicio),
+            str(p.fecha_fin),
+            p.estado
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_producciones.pdf"'
+    response.write(pdf)
+    return response
+
+
+# ========================
+# ASISTENTE IA CON GEMINI
+# ========================
+import google.generativeai as genai 
+
+def consultar_ia(request):
+
+    # Verificar sesión manualmente
+    if not request.user.is_authenticated:
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            return JsonResponse({'error': 'No autorizado.'}, status=401)
+
+    if request.method == 'POST':
+
+        pregunta = request.POST.get('pregunta', '').strip()
+
+        if not pregunta:
+            return JsonResponse({'error': 'La pregunta no puede estar vacía.'}, status=400)
+
+        empleados_activos        = Empleado.objects.filter(estado='Activo').count()
+        empleados_suspendidos    = Empleado.objects.filter(estado='Suspendido').count()
+        producciones_proceso     = Produccion.objects.filter(estado='En Proceso').count()
+        producciones_finalizadas = Produccion.objects.filter(estado='Finalizado').count()
+        exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
+        total_lotes              = Lote.objects.count()
+        total_asignaciones       = Asignacion.objects.count()
+
+        contexto = f"""
+Eres un asistente experto en gestión de producción de chocolate llamado ChocoBot.
+Respondes en español, de forma clara, profesional y con recomendaciones prácticas.
+
+Datos actuales de la empresa ChocoFlow:
+- Empleados activos: {empleados_activos}
+- Empleados suspendidos: {empleados_suspendidos}
+- Producciones en proceso: {producciones_proceso}
+- Producciones finalizadas: {producciones_finalizadas}
+- Exportaciones pendientes: {exportaciones_pendientes}
+- Total de lotes: {total_lotes}
+- Total de asignaciones: {total_asignaciones}
+
+Con base en estos datos reales, responde la siguiente pregunta del administrador:
+{pregunta}
+        """
+
+        try:
+            # ✅ ahora
+            cliente   = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            respuesta = cliente.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=contexto
+        )
+            return JsonResponse({'respuesta': respuesta.text})
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error al consultar la IA: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)

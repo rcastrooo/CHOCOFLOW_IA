@@ -12,7 +12,7 @@ class Command(BaseCommand):
                 "username": "admin001",
                 "nombre": "Administrador Principal",
                 "email": "admin@gmail.com",
-                "password": "Admin1234",
+                "password": "Admin123*",
                 "rol": "Administrador",
                 "estado": "Activo",
             },
@@ -20,37 +20,46 @@ class Command(BaseCommand):
                 "username": "super001",
                 "nombre": "Supervisor Principal",
                 "email": "supervisor@gmail.com",
-                "password": "Super1234",
+                "password": "Super123*",
                 "rol": "Supervisor",
                 "estado": "Activo",
             },
         ]
 
         for u in usuarios:
-            if not User.objects.filter(username=u["username"]).exists():
-                django_user = User.objects.create_user(
-                    username=u["username"],
-                    email=u["email"],
-                    password=u["password"],        # Django encripta esto automáticamente
-                    first_name=u["nombre"],
-                )
-                print(f"User creado: {u['email']}")
-            else:
-                django_user = User.objects.get(username=u["username"])
-                print(f"Ya existe: {u['email']}")
 
-            if not Usuario.objects.filter(email=u["email"]).exists():
+            # Crear usuario de Django si no existe
+            if not User.objects.filter(username=u['username']).exists():
+                User.objects.create_user(
+                    username=u['username'],
+                    first_name=u['nombre'],
+                    email=u['email'],
+                    password=u['password']
+                )
+                self.stdout.write(self.style.SUCCESS(
+                    f"✅ User Django creado: {u['username']}"
+                ))
+            else:
+                self.stdout.write(self.style.WARNING(
+                    f"⚠️  User Django ya existe: {u['username']}"
+                ))
+
+            # Crear perfil Usuario si no existe
+            if not Usuario.objects.filter(email=u['email']).exists():
                 Usuario.objects.create(
-                    nombre=u["nombre"],
-                    email=u["email"],
-                    telefono=0,
-                    direccion="Sin definir",
-                    contrasena=django_user.password,   # guarda el hash, NO texto plano
-                    rol=u["rol"],
-                    estado=u["estado"],
+                    nombre=u['nombre'],
+                    email=u['email'],
+                    direccion='Sin dirección',
+                    contrasena=u['password'],
+                    rol=u['rol'],
+                    estado=u['estado']
                 )
-                print(f"Perfil creado: {u['rol']}")
+                self.stdout.write(self.style.SUCCESS(
+                    f"✅ Perfil creado: {u['nombre']} ({u['rol']})"
+                ))
             else:
-                print(f"Perfil ya existe: {u['email']}")
+                self.stdout.write(self.style.WARNING(
+                    f"⚠️  Perfil ya existe: {u['email']}"
+                ))
 
-        print("\n Seed completado.")
+        self.stdout.write(self.style.SUCCESS('\n🍫 Seeder ejecutado correctamente.'))
