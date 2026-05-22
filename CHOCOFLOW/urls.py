@@ -29,6 +29,11 @@ urlpatterns = [
     
     # EMPLEADOS
     path('empleados/', views.empleados, name='empleados'),
+    path('supervisor/empleados/',views.empleados_supervisor,name='empleados_supervisor'),
+    path('supervisor/turnos/',views.turnos_supervisor,name='turnos_supervisor'),
+    path('supervisor/asignaciones/',views.asignaciones_supervisor,name='asignaciones_supervisor'),
+    path('supervisor/exportaciones/',views.exportaciones_supervisor,name='exportaciones_supervisor'),
+    path('supervisor/lotes/',views.lotes_supervisor,name='lotes_supervisor'),
     path('empleados/guardar/', views.guardar_empleado, name='guardar_empleado'),
     path('empleados/inactivar/<int:id>/', views.inactivar_empleado, name='inactivar_empleado'),
     path('empleados/reporte/', views.generar_reporte_empleados, name='reporte_empleados'),

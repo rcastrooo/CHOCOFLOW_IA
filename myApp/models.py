@@ -28,13 +28,7 @@ class Usuario(models.Model):
     contrasena   = models.CharField(max_length=255)
     rol          = models.CharField(max_length=20, choices=ROL_CHOICES)
     estado       = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-    horario_fijo = models.CharField(
-        max_length=50,
-        choices=HORARIO_CHOICES,
-        blank=True,
-        null=True
-    )
-
+   
     def __str__(self):
         return self.nombre
 # -------------------------

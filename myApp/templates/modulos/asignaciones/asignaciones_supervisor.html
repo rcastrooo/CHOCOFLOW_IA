@@ -1,0 +1,127 @@
+{% extends 'layouts/modulos_supervisor.html' %}
+{% load static %}
+
+{% block title %}
+Gestión de Asignaciones
+{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/asignaciones.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    {% if rol == 'Supervisor' %}
+        <h2 class="text-center section-title mb-2">
+           📋 Gestión de Asignaciones
+        </h2>
+
+        <p class="text-center mb-4 info-turno">
+            📅 {{ fecha_hoy }}
+            &nbsp;·&nbsp;
+            Turno: <strong>{{ horario }}</strong>
+            &nbsp;·&nbsp;
+            Vista de solo lectura
+        </p>
+    {% else %}
+        <h2 class="text-center section-title mb-4">
+             Gestión de Asignacciones
+        </h2>
+    {% endif %}
+
+    <!-- CABECERA -->
+    <div class="cabecera-asignaciones">
+
+        <form method="GET" class="form-filtros">
+
+            <input
+                type="text"
+                name="q"
+                class="form-control"
+                placeholder="Buscar asignacion..."
+                value="{{ busqueda }}">
+
+            {% if rol != 'Supervisor' %}
+            <select name="estado" class="form-select">
+                <option value="">Todos</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+            </select>
+            {% endif %}
+
+            <button class="btn btn-choco">
+                {% if rol == 'Supervisor' %}
+                    Buscar
+                {% else %}
+                    Filtrar
+                {% endif %}
+            </button>
+
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle">
+
+            <thead>
+                <tr>
+                    <th>Tarea</th>
+                    <th>Empleado</th>
+                    <th>Turno</th>
+                    <th>Fecha Asignación</th>
+                    <th>Asignado por</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for e in asignaciones %}
+                <tr>
+
+                   <td>{{ a.tarea }}</td>
+                    <td>{{ a.empleado.nombre }}</td>
+                    <td>{{ a.turno.horario }}</td>
+                    <td>{{ a.fecha_asignacion }}</td>
+                    <td>{{ a.asignado_por.nombre }}</td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="5" class="text-center text-muted py-4">
+
+                        {% if rol == 'Supervisor' %}
+                            No hay asignaciones.
+                        {% else %}
+                            No hay asignaciones registradas.
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% if rol == 'Supervisor' %}
+    <p class="text-center text-muted mt-3" style="font-size:13px">
+        Vista de solo lectura · No puedes modificar turnos
+    </p>
+    {% endif %}
+
+</div>
+</section>
+
+{% endblock %}

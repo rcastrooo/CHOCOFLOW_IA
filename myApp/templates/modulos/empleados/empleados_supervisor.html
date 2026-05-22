@@ -1,0 +1,147 @@
+{% extends 'layouts/modulos_supervisor.html' %}
+{% load static %}
+
+{% block title %}
+Gestión de Empleados
+{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/empleados.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    {% if rol == 'Supervisor' %}
+        <h2 class="text-center section-title mb-2">
+            Empleados 
+        </h2>
+
+        <p class="text-center mb-4 info-turno">
+            📅 {{ fecha_hoy }}
+            &nbsp;·&nbsp;
+            Turno: <strong>{{ horario }}</strong>
+            &nbsp;·&nbsp;
+            Vista de solo lectura
+        </p>
+    {% else %}
+        <h2 class="text-center section-title mb-4">
+            👨‍💼 Gestión de Empleados
+        </h2>
+    {% endif %}
+
+    <!-- CABECERA -->
+    <div class="cabecera-empleados">
+
+        <form method="GET" class="form-filtros">
+
+            <input
+                type="text"
+                name="q"
+                class="form-control"
+                placeholder="Buscar empleado..."
+                value="{{ busqueda }}">
+
+            {% if rol != 'Supervisor' %}
+            <select name="estado" class="form-select">
+                <option value="">Todos</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+                <option value="Suspendido">Suspendido</option>
+                <option value="Incapacitado">Incapacitado</option>
+            </select>
+            {% endif %}
+
+            <button class="btn btn-choco">
+                {% if rol == 'Supervisor' %}
+                    Buscar
+                {% else %}
+                    Filtrar
+                {% endif %}
+            </button>
+
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle">
+
+            <thead>
+                <tr>
+                    <th>Cédula</th>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for e in empleados %}
+                <tr>
+
+                    <td>{{ e.cedula }}</td>
+                    <td>{{ e.nombre }}</td>
+                    <td>{{ e.email }}</td>
+                    <td>{{ e.telefono }}</td>
+
+                    <td>
+
+                        {% if e.estado == 'Activo' %}
+                            <span class="badge bg-success">
+                                {{ e.estado }}
+                            </span>
+
+                        {% elif e.estado == 'Inactivo' %}
+                            <span class="badge bg-secondary">
+                                {{ e.estado }}
+                            </span>
+
+                        {% else %}
+                            <span class="badge bg-warning text-dark">
+                                {{ e.estado }}
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="5" class="text-center text-muted py-4">
+
+                        {% if rol == 'Supervisor' %}
+                            No hay empleados activos en tu turno hoy.
+                        {% else %}
+                            No hay empleados registrados.
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% if rol == 'Supervisor' %}
+    <p class="text-center text-muted mt-3" style="font-size:13px">
+        Vista de solo lectura · No puedes modificar empleados
+    </p>
+    {% endif %}
+
+</div>
+</section>
+
+{% endblock %}

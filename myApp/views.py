@@ -13,6 +13,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
+from django.utils import timezone
 
 from io import BytesIO
 from dotenv import load_dotenv # IA
@@ -103,7 +104,7 @@ def login_usuario(request):
                 usuario_db = Usuario.objects.get(email=correo)
                 request.session['usuario_id'] = usuario_db.id
                 request.session['rol']        = usuario_db.rol.strip()
-                request.session['horario_fijo'] = usuario_db.horario_fijo or ''
+               
 
                 rol = usuario_db.rol.strip()
 
@@ -314,32 +315,40 @@ def dashboard_supervisor(request):
 @login_required(login_url='login')
 def api_stats_supervisor(request):
     from django.utils import timezone
+
     hoy = timezone.now().date()
 
     data = {
-        # Empleados y turnos
-        'total_empleados':          Empleado.objects.count(),
-        'empleados_activos':        Empleado.objects.filter(estado='Activo').count(),
-        'turno_activo':             Turno.objects.filter(fecha=hoy).first(),
-        'asignaciones_hoy':         Asignacion.objects.filter(fecha_asignacion=hoy).count(),
-        'sin_turno':                Empleado.objects.filter(estado='Activo').exclude(
-                                        empturno_turno_fecha=hoy
-                                    ).count(),
-        # Lotes y exportaciones
-        'lotes_totales':            Lote.objects.count(),
-        'exportaciones_pendientes': Exportacion.objects.filter(estado='Pendiente').count(),
-        'exportaciones_enviadas':   Exportacion.objects.filter(estado='Enviado').count(),
-        # Bitácora
-        'bitacora_hoy':             Bitacora.objects.filter(fecha_registro=hoy).count(),
-        'bitacora_pendientes':      Bitacora.objects.filter(
-                                        fecha_registro=hoy, estado='Borrador'
-                                    ).count(),
-        'bitacora_enviados':        Bitacora.objects.filter(
-                                        fecha_registro=hoy, estado='Enviado'
-                                    ).count(),
+        'total_empleados': Empleado.objects.count(),
+        'empleados_activos': Empleado.objects.filter(estado='Activo').count(),
+        'asignaciones_hoy': Asignacion.objects.filter(
+            fecha_asignacion=hoy
+        ).count(),
+
+        'lotes_totales': Lote.objects.count(),
+        'exportaciones_pendientes': Exportacion.objects.filter(
+            estado='Pendiente'
+        ).count(),
+        'exportaciones_enviadas': Exportacion.objects.filter(
+            estado='Enviado'
+        ).count(),
+
+        'bitacora_hoy': Bitacora.objects.filter(
+            fecha_registro=hoy
+        ).count(),
+
+        'bitacora_pendientes': Bitacora.objects.filter(
+            fecha_registro=hoy,
+            estado='Borrador'
+        ).count(),
+
+        'bitacora_enviados': Bitacora.objects.filter(
+            fecha_registro=hoy,
+            estado='Enviado'
+        ).count(),
     }
 
-    turno = Turno.objects.filter(fecha=hoy).first()
+    turno = Turno.objects.filter(activo=True).first()
     data['turno_nombre'] = turno.horario if turno else 'Sin turno hoy'
 
     return JsonResponse(data)
@@ -435,6 +444,23 @@ def empleados(request):
         'fecha_hoy':  date.today(),
         'busqueda':   query,
     })
+
+@login_required(login_url='login')
+def empleados_supervisor(request):
+
+    empleados = Empleado.objects.filter(
+        estado='Activo'
+    )
+
+    return render(
+        request,
+        'modulos/empleados/empleados_supervisor.html',
+        {
+            'empleados': empleados,
+            'rol': 'Supervisor'
+        }
+    )
+
 @login_required(login_url='login')
 def guardar_empleado(request):
     if request.method == 'POST':
@@ -544,6 +570,32 @@ def asignaciones(request):
         'empleados':    empleados,
         'turnos':       turnos,
     })
+
+@login_required(login_url='login')
+def asignaciones_supervisor(request):
+
+    busqueda = request.GET.get('q', '')
+
+    asignaciones = Asignacion.objects.select_related(
+        'empleado',
+        'turno'
+    ).order_by('-fecha_asignacion')
+
+    if busqueda:
+        asignaciones = asignaciones.filter(
+            Q(tarea__icontains=busqueda) |
+            Q(empleado__nombre__icontains=busqueda)
+        )
+
+    return render(
+        request,
+        'modulos/asignaciones/asignaciones_supervisor.html',
+        {
+            'asignaciones': asignaciones,
+            'rol': 'Supervisor',
+            'fecha_hoy': timezone.now().date()
+        }
+    )
 
 
 @login_required(login_url='login')
@@ -671,6 +723,33 @@ def turnos(request):
         'empleados': empleados
     })
 
+@login_required(login_url='login')
+def turnos_supervisor(request):
+
+    busqueda = request.GET.get('q', '')
+
+    turnos = RotacionTurno.objects.select_related(
+        'empleado',
+        'turno'
+    ).all().order_by('-fecha_inicio')
+
+    if busqueda:
+        turnos = turnos.filter(
+            empleado__nombre__icontains=busqueda
+        )
+
+    contexto = {
+        'turnos': turnos,
+        'rol': 'Supervisor',
+        'fecha_hoy': timezone.now().date(),
+        'busqueda': busqueda,
+    }
+
+    return render(
+        request,
+        'modulos/turnos/turnos_supervisor.html',
+        contexto
+    )
 
 @login_required(login_url='login')
 def guardar_turno(request):
@@ -818,6 +897,29 @@ def gestionar_exportaciones(request):
         'estado_filtro': estado,
     })
 
+@login_required(login_url='login')
+def exportaciones_supervisor(request):
+
+    busqueda = request.GET.get('q', '')
+
+    exportaciones = Exportacion.objects.all().order_by('-fecha_envio')
+
+    if busqueda:
+        exportaciones = exportaciones.filter(
+            Q(destino__icontains=busqueda) |
+            Q(estado__icontains=busqueda)
+        )
+
+    return render(
+        request,
+        'modulos/exportaciones/exportaciones_supervisor.html',
+        {
+            'exportaciones': exportaciones,
+            'rol': 'Supervisor',
+            'fecha_hoy': timezone.now().date(),
+            'busqueda': busqueda
+        }
+    )
 
 @login_required(login_url='login')
 def guardar_exportacion(request):
@@ -960,6 +1062,28 @@ def gestionar_lotes(request):
         'q':             q,
     })
 
+@login_required(login_url='login')
+def lotes_supervisor(request):
+
+    busqueda = request.GET.get('q', '')
+
+    lotes = Lote.objects.all().order_by('-id')
+
+    if busqueda:
+        lotes = lotes.filter(
+            Q(codigo_lote__icontains=busqueda)
+        )
+
+    return render(
+        request,
+        'modulos/lotes/lotes_supervisor.html',
+        {
+            'lotes': lotes,
+            'rol': 'Supervisor',
+            'fecha_hoy': timezone.now().date(),
+            'busqueda': busqueda
+        }
+    )
 
 @login_required(login_url='login')
 def guardar_lote(request):

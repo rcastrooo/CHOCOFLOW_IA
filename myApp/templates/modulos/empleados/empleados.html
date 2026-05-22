@@ -1,351 +1,255 @@
 {% extends 'layouts/modulos.html' %}
 {% load static %}
 
-{% block title %}
-Gestión de Empleados
-{% endblock %}
+{% block title %}Gestión de Empleados{% endblock %}
 
 {% block content %}
 
+{# ============================================================ #}
+{#  Hoja de estilos específica del módulo de empleados          #}
+{# ============================================================ #}
 <link rel="stylesheet" href="{% static 'css/empleados.css' %}">
 
 <section class="container mt-5">
 <div class="container-custom shadow">
 
-    {% if rol == 'Supervisor' %}
-        <h2 class="text-center section-title mb-2">
-            👁️ Empleados en Turno
-        </h2>
+    {# ----------- Título principal del módulo ----------- #}
+    <h2 class="text-center section-title mb-4">
+        👨‍💼 Gestión de Empleados
+    </h2>
 
-        <p class="text-center mb-4 info-turno">
-            📅 {{ fecha_hoy }}
-            &nbsp;·&nbsp;
-            Turno: <strong>{{ horario }}</strong>
-            &nbsp;·&nbsp;
-            Vista de solo lectura
-        </p>
-    {% else %}
-        <h2 class="text-center section-title mb-4">
-            👨‍💼 Gestión de Empleados
-        </h2>
+    {# ----------- Mensajes de alerta (éxito, error, etc.) ----------- #}
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+                {{ msg }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
     {% endif %}
 
-    <!-- CABECERA -->
+    {# ============================================================ #}
+    {#  CABECERA: botón nuevo empleado + formulario de búsqueda     #}
+    {# ============================================================ #}
     <div class="cabecera-empleados">
 
-        {% if rol != 'Supervisor' %}
-        <button
-            class="btn btn-caramel"
+        {# Botón que abre el modal para crear un nuevo empleado #}
+        <button class="btn btn-caramel"
             data-bs-toggle="modal"
             data-bs-target="#modalEmpleado">
-
             + Nuevo Empleado
-
         </button>
-        {% endif %}
 
+        {# Formulario de búsqueda y filtro por nombre/estado #}
         <form method="GET" class="form-filtros">
-
-            <input
-                type="text"
-                name="q"
-                class="form-control"
+            <input type="text" name="q" class="form-control"
                 placeholder="Buscar empleado..."
-                value="{{ busqueda }}">
+                value="{{ request.GET.q }}">
 
-            {% if rol != 'Supervisor' %}
+            {# Select para filtrar por estado del empleado #}
             <select name="estado" class="form-select">
                 <option value="">Todos</option>
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-                <option value="Suspendido">Suspendido</option>
-                <option value="Incapacitado">Incapacitado</option>
+                <option value="Activo"       {% if request.GET.estado == 'Activo'       %}selected{% endif %}>Activo</option>
+                <option value="Inactivo"     {% if request.GET.estado == 'Inactivo'     %}selected{% endif %}>Inactivo</option>
+                <option value="Suspendido"   {% if request.GET.estado == 'Suspendido'   %}selected{% endif %}>Suspendido</option>
+                <option value="Incapacitado" {% if request.GET.estado == 'Incapacitado' %}selected{% endif %}>Incapacitado</option>
             </select>
-            {% endif %}
 
-            <button class="btn btn-choco">
-                {% if rol == 'Supervisor' %}
-                    Buscar
-                {% else %}
-                    Filtrar
-                {% endif %}
-            </button>
-
+            <button class="btn btn-choco">Filtrar</button>
         </form>
 
     </div>
 
-    <!-- TABLA -->
+    {# ============================================================ #}
+    {#  TABLA de empleados registrados                              #}
+    {# ============================================================ #}
     <div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Cédula</th>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Teléfono</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
 
-        <table class="table table-hover align-middle">
+        {# Iterar sobre cada empleado recibido desde la vista #}
+        {% for e in empleados %}
+        <tr>
+            <td>{{ e.cedula }}</td>
+            <td>{{ e.nombre }}</td>
+            <td>{{ e.email }}</td>
+            <td>{{ e.telefono }}</td>
 
-            <thead>
-                <tr>
-                    <th>Cédula</th>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Teléfono</th>
-                    <th>Estado</th>
+            {# Badge de color según el estado del empleado #}
+            <td>
+                {% if e.estado == 'Activo' %}
+                    <span class="badge bg-success">{{ e.estado }}</span>
+                {% elif e.estado == 'Inactivo' %}
+                    <span class="badge bg-secondary">{{ e.estado }}</span>
+                {% else %}
+                    {# Cubre: Suspendido e Incapacitado #}
+                    <span class="badge bg-warning text-dark">{{ e.estado }}</span>
+                {% endif %}
+            </td>
 
-                    {% if rol != 'Supervisor' %}
-                    <th>Acciones</th>
-                    {% endif %}
-                </tr>
-            </thead>
+            <td>
+                {# Botón editar: pre-carga el modal con los datos del empleado #}
+                <button class="btn btn-sm btn-primary"
+                    onclick="editarEmpleado(
+                        '{{ e.id }}',
+                        '{{ e.cedula }}',
+                        '{{ e.nombre }}',
+                        '{{ e.email }}',
+                        '{{ e.telefono }}',
+                        '{{ e.direccion }}',
+                        '{{ e.estado }}'
+                    )">✏️
+                </button>
 
-            <tbody>
+                {# Botón inactivar: cambia el estado del empleado a 'Inactivo' #}
+                <a href="{% url 'inactivar_empleado' e.id %}"
+                   class="btn btn-sm btn-danger"
+                   onclick="return confirm('¿Inactivar este empleado?')">
+                   🗑️
+                </a>
+            </td>
+        </tr>
 
-                {% for e in empleados %}
-                <tr>
+        {# Mensaje cuando no existen empleados registrados #}
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center">
+                No hay empleados registrados
+            </td>
+        </tr>
+        {% endfor %}
 
-                    <td>{{ e.cedula }}</td>
-                    <td>{{ e.nombre }}</td>
-                    <td>{{ e.email }}</td>
-                    <td>{{ e.telefono }}</td>
-
-                    <td>
-
-                        {% if e.estado == 'Activo' %}
-                            <span class="badge bg-success">
-                                {{ e.estado }}
-                            </span>
-
-                        {% elif e.estado == 'Inactivo' %}
-                            <span class="badge bg-secondary">
-                                {{ e.estado }}
-                            </span>
-
-                        {% else %}
-                            <span class="badge bg-warning text-dark">
-                                {{ e.estado }}
-                            </span>
-                        {% endif %}
-
-                    </td>
-
-                    {% if rol != 'Supervisor' %}
-                    <td>
-
-                        <button
-                            class="btn btn-sm btn-primary"
-                            onclick="editarEmpleado(
-                                '{{ e.id }}',
-                                '{{ e.cedula }}',
-                                '{{ e.nombre }}',
-                                '{{ e.email }}',
-                                '{{ e.telefono }}',
-                                '{{ e.direccion }}',
-                                '{{ e.estado }}'
-                            )">
-
-                            ✏️
-
-                        </button>
-
-                        <a
-                            href="{% url 'inactivar_empleado' e.id %}"
-                            class="btn btn-sm btn-danger">
-
-                            🗑️
-
-                        </a>
-
-                    </td>
-                    {% endif %}
-
-                </tr>
-
-                {% empty %}
-
-                <tr>
-
-                    <td
-                        colspan="{% if rol == 'Supervisor' %}5{% else %}6{% endif %}"
-                        class="text-center text-muted py-4">
-
-                        {% if rol == 'Supervisor' %}
-                            No hay empleados activos en tu turno hoy.
-                        {% else %}
-                            No hay empleados registrados.
-                        {% endif %}
-
-                    </td>
-
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
+        </tbody>
+    </table>
     </div>
 
-    <!-- BOTONES SOLO ADMIN -->
-    {% if rol != 'Supervisor' %}
+    {# ============================================================ #}
+    {#  BOTONES INFERIORES: carga masiva y reporte PDF              #}
+    {# ============================================================ #}
     <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
 
-        <button
-            type="button"
-            class="btn btn-masiva custom-bottom-btn"
-            onclick="document.getElementById('csvInput').click()">
+        {# Botón carga masiva: activa el input de archivo CSV oculto #}
+        <div>
+            <button type="button"
+                class="btn btn-masiva custom-bottom-btn"
+                onclick="document.getElementById('csvInput').click()">
+                📂 Carga Masiva
+            </button>
 
-            📂 Carga Masiva
+            {# Input oculto que recibe el archivo CSV #}
+            <input type="file" id="csvInput" accept=".csv" style="display:none">
+        </div>
 
-        </button>
-
-        <input
-            type="file"
-            id="csvInput"
-            accept=".csv"
-            style="display:none">
-
-        <a
-            href="{% url 'reporte_empleados' %}"
-            class="btn btn-reporte custom-bottom-btn">
-
+        {# Botón para generar el reporte PDF de empleados #}
+        <a href="{% url 'reporte_empleados' %}"
+           class="btn btn-reporte custom-bottom-btn">
             📄 Generar Reporte
-
         </a>
 
     </div>
 
-    {% else %}
-
-    <p class="text-center text-muted mt-3" style="font-size:13px">
-
-        Vista de solo lectura · No puedes modificar empleados
-
-    </p>
-
-    {% endif %}
-
 </div>
 </section>
 
-<!-- MODAL SOLO ADMIN -->
-{% if rol != 'Supervisor' %}
+
+{# ============================================================ #}
+{#  MODAL: Crear / Editar empleado                              #}
+{# ============================================================ #}
 <div class="modal fade" id="modalEmpleado">
+<div class="modal-dialog">
+<div class="modal-content">
 
-    <div class="modal-dialog">
+    {# Formulario que envía datos a la vista guardar_empleado vía POST #}
+    <form method="POST" action="{% url 'guardar_empleado' %}">
+    {% csrf_token %}
 
-        <div class="modal-content">
+    <div class="modal-header">
+        <h5>Empleado</h5>
+    </div>
 
-            <form method="POST" action="{% url 'guardar_empleado' %}">
+    <div class="modal-body">
 
-                {% csrf_token %}
+        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
+        <input type="hidden" name="id" id="id">
 
-                <div class="modal-header">
-                    <h5>Empleado</h5>
-                </div>
+        {# Campo: número de cédula del empleado #}
+        <input type="text" name="cedula" id="cedula"
+            class="form-control mb-2"
+            placeholder="Cédula">
 
-                <div class="modal-body">
+        {# Campo: nombre completo del empleado #}
+        <input type="text" name="nombre" id="nombre"
+            class="form-control mb-2"
+            placeholder="Nombre">
 
-                    <input type="hidden" name="id" id="id">
+        {# Campo: correo electrónico (único en el modelo) #}
+        <input type="email" name="email" id="email"
+            class="form-control mb-2"
+            placeholder="Correo">
 
-                    <input
-                        type="text"
-                        name="cedula"
-                        id="cedula"
-                        class="form-control mb-2"
-                        placeholder="Cédula">
+        {# Campo: teléfono (máx. 10 caracteres según el modelo) #}
+        <input type="number" name="telefono" id="telefono"
+            class="form-control mb-2"
+            placeholder="Teléfono">
 
-                    <input
-                        type="text"
-                        name="nombre"
-                        id="nombre"
-                        class="form-control mb-2"
-                        placeholder="Nombre">
+        {# Campo: dirección del empleado #}
+        <input type="text" name="direccion" id="direccion"
+            class="form-control mb-2"
+            placeholder="Dirección">
 
-                    <input
-                        type="email"
-                        name="email"
-                        id="email"
-                        class="form-control mb-2"
-                        placeholder="Correo">
-
-                    <input
-                        type="number"
-                        name="telefono"
-                        id="telefono"
-                        class="form-control mb-2"
-                        placeholder="Teléfono">
-
-                    <input
-                        type="text"
-                        name="direccion"
-                        id="direccion"
-                        class="form-control mb-2"
-                        placeholder="Dirección">
-
-                    <select
-                        name="estado"
-                        id="estado"
-                        class="form-select">
-
-                        <option value="Activo">Activo</option>
-                        <option value="Inactivo">Inactivo</option>
-                        <option value="Suspendido">Suspendido</option>
-                        <option value="Incapacitado">Incapacitado</option>
-
-                    </select>
-
-                </div>
-
-                <div class="modal-footer">
-
-                    <button class="btn btn-caramel">
-                        Guardar
-                    </button>
-
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal">
-
-                        Cancelar
-
-                    </button>
-
-                </div>
-
-            </form>
-
-        </div>
+        {# Select: estado del empleado según ESTADO_CHOICES del modelo #}
+        <select name="estado" id="estado" class="form-select">
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+            <option value="Suspendido">Suspendido</option>
+            <option value="Incapacitado">Incapacitado</option>
+        </select>
 
     </div>
 
+    <div class="modal-footer">
+        <button class="btn btn-caramel">Guardar</button>
+        <button type="button" class="btn btn-secondary"
+            data-bs-dismiss="modal">Cancelar</button>
+    </div>
+
+    </form>
+</div>
+</div>
 </div>
 
+
+{# ============================================================ #}
+{#  SCRIPT: pre-carga los datos de un empleado en el modal      #}
+{#  para poder editarlo                                         #}
+{# ============================================================ #}
 <script>
-
-function editarEmpleado(
-    id,
-    cedula,
-    nombre,
-    email,
-    telefono,
-    direccion,
-    estado
-){
-
-    document.getElementById('id').value = id;
-    document.getElementById('cedula').value = cedula;
-    document.getElementById('nombre').value = nombre;
-    document.getElementById('email').value = email;
-    document.getElementById('telefono').value = telefono;
+function editarEmpleado(id, cedula, nombre, email, telefono, direccion, estado) {
+    // Asignar los valores recibidos a cada campo del modal
+    document.getElementById('id').value        = id;
+    document.getElementById('cedula').value    = cedula;
+    document.getElementById('nombre').value    = nombre;
+    document.getElementById('email').value     = email;
+    document.getElementById('telefono').value  = telefono;
     document.getElementById('direccion').value = direccion;
-    document.getElementById('estado').value = estado;
+    document.getElementById('estado').value    = estado;
 
+    // Abrir el modal con Bootstrap
     var modal = new bootstrap.Modal(
         document.getElementById('modalEmpleado')
     );
-
     modal.show();
 }
-
 </script>
-{% endif %}
 
 {% endblock %}

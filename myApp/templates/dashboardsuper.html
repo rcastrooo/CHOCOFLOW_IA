@@ -1,3 +1,4 @@
+
 {% load static %}
 <!DOCTYPE html>
 <html lang="es">
@@ -32,19 +33,19 @@
     <i class="bi bi-people"></i> Empleados
     </a>
 
-    <a class="nav-link" onclick="mostrarSeccion('turnos', this)">
+    <a class="nav-link" href="{% url 'turnos_supervisor' %}">
       <i class="bi bi-clock"></i> Turnos
     </a>
 
-    <a class="nav-link" onclick="mostrarSeccion('asignaciones', this)">
+    <a class="nav-link" href="{% url 'asignaciones_supervisor' %}">
       <i class="bi bi-clipboard-check"></i> Asignaciones
     </a>
 
-    <a class="nav-link" onclick="mostrarSeccion('exportaciones', this)">
+    <a class="nav-link" href="{% url 'exportaciones_supervisor' %}">
       <i class="bi bi-airplane"></i> Exportaciones
     </a>
 
-    <a class="nav-link" onclick="mostrarSeccion('lotes', this)">
+    <a class="nav-link" href="{% url 'lotes_supervisor' %}">
       <i class="bi bi-box"></i> Lotes
     </a>
 

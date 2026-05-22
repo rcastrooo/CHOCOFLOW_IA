@@ -1,0 +1,128 @@
+{% extends 'layouts/modulos_supervisor.html' %}
+{% load static %}
+
+{% block title %}
+Gestión de Lotes
+{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/lotes.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    {% if rol == 'Supervisor' %}
+        <h2 class="text-center section-title mb-2">
+           🏷️ Gestión de Lotes
+        </h2>
+
+        <p class="text-center mb-4 info-turno">
+            📅 {{ fecha_hoy }}
+            &nbsp;·&nbsp;
+            &nbsp;·&nbsp;
+            Vista de solo lectura
+        </p>
+    {% else %}
+        <h2 class="text-center section-title mb-4">
+             Gestión de Lotes
+        </h2>
+    {% endif %}
+
+    <!-- CABECERA -->
+    <div class="cabecera-lotes">
+
+        <form method="GET" class="form-filtros">
+
+            <input
+                type="text"
+                name="q"
+                class="form-control"
+                placeholder="Buscar asignacion..."
+                value="{{ busqueda }}">
+
+            {% if rol != 'Supervisor' %}
+            <select name="estado" class="form-select">
+                <option value="">Todos</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+            </select>
+            {% endif %}
+
+            <button class="btn btn-choco">
+                {% if rol == 'Supervisor' %}
+                    Buscar
+                {% else %}
+                    Filtrar
+                {% endif %}
+            </button>
+
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle">
+
+            <thead>
+                <tr>
+                    <th>Código Lote</th>
+                    <th>Cantidad</th>
+                    <th>Fecha Producción</th>
+                    <th>Fecha Vencimiento</th>
+                    <th>Producción</th>
+                    <th>Exportación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for e in lotes %}
+                <tr>
+
+                    <td>{{ lote.codigo_lote }}</td>
+                    <td>{{ lote.cantidad }}</td>
+                    <td>{{ lote.fecha_produccion }}</td>
+                    <td>{{ lote.fecha_vencimiento }}</td>
+                    <td>{{ lote.produccion }}</td>
+                    <td>{{ lote.exportacion }}</td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="5" class="text-center text-muted py-4">
+
+                        {% if rol == 'Supervisor' %}
+                            No hay lotes.
+                        {% else %}
+                            No hay lotes registrados.
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% if rol == 'Supervisor' %}
+    <p class="text-center text-muted mt-3" style="font-size:13px">
+        Vista de solo lectura · No puedes modificar lotes
+    </p>
+    {% endif %}
+
+</div>
+</section>
+
+{% endblock %}

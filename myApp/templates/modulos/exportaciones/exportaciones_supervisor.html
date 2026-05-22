@@ -1,0 +1,137 @@
+{% extends 'layouts/modulos_supervisor.html' %}
+{% load static %}
+
+{% block title %}
+Gestión de Exportaciones
+{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/exportaciones.css' %}">
+
+<section class="container mt-5">
+<div class="container-custom shadow">
+
+    {% if rol == 'Supervisor' %}
+        <h2 class="text-center section-title mb-2">
+           📦 Gestión de Exportaciones
+        </h2>
+
+        <p class="text-center mb-4 info-turno">
+            📅 {{ fecha_hoy }}
+            &nbsp;·&nbsp;
+            Turno: <strong>{{ horario }}</strong>
+            &nbsp;·&nbsp;
+            Vista de solo lectura
+        </p>
+    {% else %}
+        <h2 class="text-center section-title mb-4">
+             📦 Gestión de Exportaciones
+        </h2>
+    {% endif %}
+
+    <!-- CABECERA -->
+    <div class="cabecera-exportaciones">
+
+        <form method="GET" class="form-filtros">
+
+            <input
+                type="text"
+                name="q"
+                class="form-control"
+                placeholder="Buscar exportación..."
+                value="{{ busqueda }}">
+
+            {% if rol != 'Supervisor' %}
+            <select name="estado" class="form-select">
+                <option value="">Todos</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+            </select>
+            {% endif %}
+
+            <button class="btn btn-choco">
+                {% if rol == 'Supervisor' %}
+                    Buscar
+                {% else %}
+                    Filtrar
+                {% endif %}
+            </button>
+
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle">
+
+            <thead>
+                <tr>
+                    <th>Destino</th>
+                    <th>Fecha Envío</th>
+                    <th>Fecha Entrega</th>
+                    <th>Estado</th>
+                    <th>Creado por</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for e in exportaciones %}
+                <tr>
+
+                   <td>{{ exp.destino }}</td>
+                <td>{{ exp.fecha_envio }}</td>
+                <td>{{ exp.fecha_entrega }}</td>
+                <td>
+                {% if exp.estado == 'Pendiente' %}
+                    <span class="badge bg-warning text-dark">{{ exp.estado }}</span>
+                {% elif exp.estado == 'Enviado' %}
+                    <span class="badge bg-primary">{{ exp.estado }}</span>
+                {% elif exp.estado == 'Entregado' %}
+                    <span class="badge bg-success">{{ exp.estado }}</span>
+                {% else %}
+                    <span class="badge bg-danger">{{ exp.estado }}</span>
+                {% endif %}
+                </td>
+                <td>{{ exp.creado_por }}</td>
+                <td></td>
+                </tr>
+
+            {% empty %}
+
+                <tr>
+
+                    <td colspan="5" class="text-center text-muted py-4">
+
+                        {% if rol == 'Supervisor' %}
+                            No hay exportaciones.
+                        {% else %}
+                            No hay exportaciones registradas.
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% if rol == 'Supervisor' %}
+    <p class="text-center text-muted mt-3" style="font-size:13px">
+        Vista de solo lectura · No puedes modificar exportaciones
+    </p>
+    {% endif %}
+
+</div>
+</section>
+
+{% endblock %}
