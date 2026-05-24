@@ -1,0 +1,67 @@
+{% extends 'layouts/modulos_supervisor.html' %}
+{% load static %}
+
+{% block title %}Bitácoras Guardadas{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/bitacoras.css' %}">
+
+<div class="contenedor-bitacora">
+
+    <div class="encabezado">
+
+        <div class="icono">
+            <i class="bi bi-folder2-open"></i>
+        </div>
+
+        <div>
+            <h1>Bitácoras Guardadas</h1>
+            <p>Listado de bitácoras registradas.</p>
+        </div>
+
+    </div>
+
+    <div class="formulario-bitacora">
+
+        <table class="table table-hover">
+
+            <thead>
+                <tr>
+                    <th>Título</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for bitacora in bitacoras %}
+
+                <tr>
+                    <td>{{ bitacora.titulo }}</td>
+                    <td>{{ bitacora.tipo_reporte }}</td>
+                    <td>{{ bitacora.estado }}</td>
+                    <td>{{ bitacora.fecha_registro }}</td>
+                </tr>
+
+                {% empty %}
+
+                <tr>
+                    <td colspan="4">
+                        No hay bitácoras registradas.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

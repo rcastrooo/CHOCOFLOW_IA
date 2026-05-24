@@ -14,6 +14,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from django.utils import timezone
+from datetime import date
 
 from io import BytesIO
 from dotenv import load_dotenv # IA
@@ -318,38 +319,65 @@ def api_stats_supervisor(request):
 
     hoy = timezone.now().date()
 
+    # Empleados sin turno asignado
+    empleados_con_turno = RotacionTurno.objects.values_list(
+        'empleado_id',
+        flat=True
+    )
+
+    sin_turno = Empleado.objects.filter(
+        estado='Activo'
+    ).exclude(
+        id__in=empleados_con_turno
+    ).count()
+
+    turno = Turno.objects.filter(
+        activo=True
+    ).first()
+
     data = {
+
+        # Empleados
         'total_empleados': Empleado.objects.count(),
-        'empleados_activos': Empleado.objects.filter(estado='Activo').count(),
+        'empleados_activos': Empleado.objects.filter(
+            estado='Activo'
+        ).count(),
+
+        # Asignaciones
         'asignaciones_hoy': Asignacion.objects.filter(
             fecha_asignacion=hoy
         ).count(),
 
+        'sin_turno': sin_turno,
+
+        # Lotes
         'lotes_totales': Lote.objects.count(),
+
+        # Exportaciones
         'exportaciones_pendientes': Exportacion.objects.filter(
             estado='Pendiente'
         ).count(),
+
         'exportaciones_enviadas': Exportacion.objects.filter(
             estado='Enviado'
         ).count(),
 
+        # Bitácoras
         'bitacora_hoy': Bitacora.objects.filter(
             fecha_registro=hoy
         ).count(),
 
         'bitacora_pendientes': Bitacora.objects.filter(
-            fecha_registro=hoy,
             estado='Borrador'
         ).count(),
 
         'bitacora_enviados': Bitacora.objects.filter(
-            fecha_registro=hoy,
             estado='Enviado'
         ).count(),
-    }
 
-    turno = Turno.objects.filter(activo=True).first()
-    data['turno_nombre'] = turno.horario if turno else 'Sin turno hoy'
+        # Turno
+        'turno_nombre': turno.horario if turno else 'Sin turno hoy'
+    }
 
     return JsonResponse(data)
 
@@ -1406,8 +1434,169 @@ def generar_reporte_producciones(request):
     response['Content-Disposition'] = 'attachment; filename="reporte_producciones.pdf"'
     response.write(pdf)
     return response
+# ========================
+# BITACORA DE PRODUCCION
+# ========================
+def bitacora_supervisor(request):
+
+    if request.method == 'POST':
+
+        titulo = request.POST.get('titulo')
+        descripcion = request.POST.get('descripcion')
+        tipo_reporte = request.POST.get('tipo_reporte')
+        produccion_id = request.POST.get('produccion')
+        unidades_producidas = request.POST.get('unidades_producidas')
+        unidades_pendientes = request.POST.get('unidades_pendientes')
+        observaciones = request.POST.get('observaciones')
+
+        estado = request.POST.get('estado', 'Borrador')
+
+        # ========================
+        # VALIDACIONES
+        # ========================
+
+        if not titulo:
+            messages.error(
+                request,
+                "Debe ingresar un título."
+            )
+            return redirect('bitacora_supervisor')
+
+        if len(titulo.strip()) < 5:
+            messages.error(
+                request,
+                "El título debe tener mínimo 5 caracteres."
+            )
+            return redirect('bitacora_supervisor')
+
+        if not descripcion:
+            messages.error(
+                request,
+                "Debe ingresar una descripción."
+            )
+            return redirect('bitacora_supervisor')
+
+        if len(descripcion.strip()) < 20:
+            messages.error(
+                request,
+                "La descripción debe tener mínimo 20 caracteres."
+            )
+            return redirect('bitacora_supervisor')
+
+        if not tipo_reporte:
+            messages.error(
+                request,
+                "Seleccione un tipo de reporte."
+            )
+            return redirect('bitacora_supervisor')
+
+        if not produccion_id:
+            messages.error(
+                request,
+                "Seleccione una producción."
+            )
+            return redirect('bitacora_supervisor')
+
+        if not unidades_producidas:
+            messages.error(
+                request,
+                "Debe ingresar las unidades producidas."
+            )
+            return redirect('bitacora_supervisor')
+
+        if not unidades_pendientes:
+            messages.error(
+                request,
+                "Debe ingresar las unidades pendientes."
+            )
+            return redirect('bitacora_supervisor')
+
+        # ========================
+        # OBTENER PRODUCCION
+        # ========================
+
+        produccion = Produccion.objects.filter(
+            id=produccion_id
+        ).first()
+
+        if not produccion:
+            messages.error(
+                request,
+                "La producción seleccionada no existe."
+            )
+            return redirect('bitacora_supervisor')
+
+        # ========================
+        # OBTENER SUPERVISOR
+        # ========================
+
+        supervisor = Usuario.objects.filter(
+            rol='Supervisor'
+        ).first()
+
+        if not supervisor:
+            messages.error(
+                request,
+                "No existe ningún supervisor registrado."
+            )
+            return redirect('bitacora_supervisor')
+
+        # ========================
+        # GUARDAR BITACORA
+        # ========================
+
+        Bitacora.objects.create(
+            titulo=titulo,
+            descripcion=descripcion,
+            tipo_reporte=tipo_reporte,
+            unidades_producidas=unidades_producidas,
+            unidades_pendientes=unidades_pendientes,
+            observaciones=observaciones,
+            supervisor=supervisor,
+            produccion=produccion,
+            estado=estado
+        )
+
+        messages.success(
+            request,
+            "Bitácora registrada correctamente."
+        )
+
+        return redirect('listar_bitacoras')
+
+    producciones = Produccion.objects.all()
+
+    contexto = {
+        'producciones': producciones,
+        'today': date.today()
+    }
+
+    return render(
+        request,
+        'modulos/bitacora/bitacora_supervisor.html',
+        contexto
+    )
 
 
+# ========================
+# LISTAR BITÁCORAS
+# ========================
+def listar_bitacoras(request):
+
+    bitacoras = Bitacora.objects.select_related(
+        'supervisor',
+        'produccion'
+    ).order_by('-fecha_registro')
+
+    contexto = {
+        'bitacoras': bitacoras
+    }
+
+    return render(
+        request,
+        'modulos/bitacora/listar_bitacoras.html',
+        contexto
+    )
 # ========================
 # ASISTENTE IA CON GEMINI
 # ========================

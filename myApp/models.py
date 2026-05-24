@@ -257,18 +257,66 @@ class Bitacora(models.Model):
     unidades_producidas = models.CharField(max_length=255, null=True, blank=True)
     unidades_pendientes = models.CharField(max_length=255, null=True, blank=True)
 
-    # Quién hizo el reporte
-    supervisor = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='supervisor_id', related_name='bitacoras_creadas')
+    supervisor = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        db_column='supervisor_id',
+        related_name='bitacoras_creadas'
+    )
 
-    # Producción a la que hace referencia
-    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id',null=True,
-    blank=True)
+    produccion = models.ForeignKey(
+        Produccion,
+        on_delete=models.CASCADE,
+        db_column='produccion_id',
+        null=True,
+        blank=True
+    )
 
-    # ← NUEVOS CAMPOS para el flujo admin
-    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, db_column='revisado_por', null=True, blank=True,
-    related_name='bitacoras_revisadas')
-    fecha_revision = models.DateField(null=True, blank=True)
-    observacion_admin = models.TextField(blank=True, null=True)
+    revisado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        db_column='revisado_por',
+        null=True,
+        blank=True,
+        related_name='bitacoras_revisadas'
+    )
+
+    fecha_revision = models.DateField(
+        null=True,
+        blank=True
+    )
+
+    observacion_admin = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    def clean(self):
+
+        if not self.titulo:
+            raise ValidationError(
+                {'titulo': 'El título es obligatorio.'}
+            )
+
+        if len(self.titulo.strip()) < 5:
+            raise ValidationError(
+                {'titulo': 'El título debe tener mínimo 5 caracteres.'}
+            )
+
+        if not self.descripcion:
+            raise ValidationError(
+                {'descripcion': 'La descripción es obligatoria.'}
+            )
+
+        if len(self.descripcion.strip()) < 20:
+            raise ValidationError(
+                {'descripcion': 'La descripción debe tener mínimo 20 caracteres.'}
+            )
+
+        if not self.tipo_reporte:
+            raise ValidationError(
+                {'tipo_reporte': 'Seleccione un tipo de reporte.'}
+            )
 
     def __str__(self):
-        return f"{self.titulo} - {self.fecha_registro}"    
+        return f"{self.titulo} - {self.fecha_registro}"

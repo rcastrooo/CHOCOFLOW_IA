@@ -1,0 +1,227 @@
+{% extends 'layouts/modulos_supervisor.html' %}
+{% load static %}
+
+{% block title %}Nueva Bitácora{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/bitacoras.css' %}">
+
+<div class="contenedor-bitacora">
+
+    <!-- Encabezado -->
+    <div class="encabezado">
+
+        <div class="icono">
+            <i class="bi bi-journal-text"></i>
+        </div>
+
+        <div>
+            <h1>Nueva Bitácora</h1>
+            <p>Registra la información del reporte de producción.</p>
+
+            <a href="{% url 'listar_bitacoras' %}"
+               class="btn-borrador"
+               style="margin-top:10px; display:inline-block; text-decoration:none;">
+                <i class="bi bi-folder2-open"></i>
+                Ver Bitácoras Guardadas
+            </a>
+        </div>
+
+    </div>
+
+    <!-- Mensajes -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}success{% endif %} mb-3">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Formulario -->
+    <form method="POST" class="formulario-bitacora">
+
+        {% csrf_token %}
+
+        <!-- Información General -->
+        <div class="seccion">
+
+            <h3>Información General</h3>
+
+            <div class="fila">
+
+                <div class="grupo">
+                    <label>Título</label>
+                    <input
+                        type="text"
+                        name="titulo"
+                        placeholder="Ej. Bitácora producción diaria">
+                </div>
+
+                <div class="grupo">
+                    <label>Tipo de Reporte</label>
+
+                    <select name="tipo_reporte">
+
+                        <option value="">
+                            Seleccione una opción
+                        </option>
+
+                        <option value="Diario">
+                            Diario
+                        </option>
+
+                        <option value="Semanal">
+                            Semanal
+                        </option>
+
+                    </select>
+                </div>
+
+                <div class="grupo">
+                    <label>Producción Asociada</label>
+
+                    <select name="produccion">
+
+                        <option value="">
+                            Seleccione una producción
+                        </option>
+
+                        {% for p in producciones %}
+                            <option value="{{ p.id }}">
+                                {{ p }}
+                            </option>
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <div class="grupo">
+
+                <label>Descripción</label>
+
+                <textarea
+                    name="descripcion"
+                    rows="5"
+                    placeholder="Describe las actividades realizadas durante la producción..."></textarea>
+
+            </div>
+
+        </div>
+
+        <!-- Datos Producción -->
+        <div class="seccion">
+
+            <h3>Datos de Producción</h3>
+
+            <div class="fila">
+
+                <div class="grupo">
+                    <label>Unidades Producidas</label>
+
+                    <input
+                        type="text"
+                        name="unidades_producidas"
+                        placeholder="Ej. 300 cajas">
+                </div>
+
+                <div class="grupo">
+                    <label>Unidades Pendientes</label>
+
+                    <input
+                        type="text"
+                        name="unidades_pendientes"
+                        placeholder="Ej. 50 cajas">
+                </div>
+
+            </div>
+
+            <div class="grupo">
+
+                <label>Observaciones</label>
+
+                <textarea
+                    name="observaciones"
+                    rows="4"
+                    placeholder="Observaciones adicionales..."></textarea>
+
+            </div>
+
+        </div>
+
+        <!-- Información Registro -->
+        <div class="seccion">
+
+            <h3>Información del Registro</h3>
+
+            <div class="fila">
+
+                <div class="grupo">
+                    <label>Estado</label>
+
+                    <input
+                        type="text"
+                        value="Borrador"
+                        readonly>
+                </div>
+
+                <div class="grupo">
+                    <label>Fecha</label>
+
+                    <input
+                        type="text"
+                        value="{{ today }}"
+                        readonly>
+                </div>
+
+                <div class="grupo">
+                    <label>Supervisor</label>
+
+                    <input
+                        type="text"
+                        value="{{ request.user }}"
+                        readonly>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Botones -->
+        <div class="acciones">
+
+            <div class="grupo-botones">
+
+                <button
+                    type="submit"
+                    name="estado"
+                    value="Borrador"
+                    class="btn-borrador">
+
+                    Guardar Borrador
+
+                </button>
+
+                <button
+                    type="submit"
+                    name="estado"
+                    value="Enviado"
+                    class="btn-enviar">
+
+                    Enviar Reporte
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

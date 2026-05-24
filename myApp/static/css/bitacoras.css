@@ -1,0 +1,181 @@
+:root{
+    --cafe:#9b6329;
+    --cafe-oscuro:#7b4f20;
+    --beige:#f5f1ec;
+    --blanco:#ffffff;
+    --texto:#2d2d2d;
+    --gris:#d9d9d9;
+}
+
+.contenedor-bitacora{
+    width:100%;
+    padding:30px;
+}
+
+.encabezado{
+    display:flex;
+    align-items:center;
+    gap:20px;
+    margin-bottom:30px;
+}
+
+.icono{
+    width:70px;
+    height:70px;
+    border-radius:18px;
+    background:#ecd3a6;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:30px;
+    color:var(--cafe);
+}
+
+.encabezado h1{
+    font-size:3rem;
+    margin:0;
+    color:#1f1f1f;
+}
+
+.encabezado p{
+    margin-top:5px;
+    color:#666;
+}
+
+.formulario-bitacora{
+    background:#fff;
+    border-radius:25px;
+    padding:35px;
+    box-shadow:0 5px 20px rgba(0,0,0,.08);
+
+    display:block !important;
+    overflow:visible !important;
+}
+
+.seccion{
+    display:block !important;
+    margin-bottom:35px;
+}
+
+.seccion h3{
+    color:var(--cafe);
+    margin-bottom:20px;
+    font-size:1.2rem;
+}
+
+.fila{
+    display:grid !important;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:20px;
+    margin-bottom:20px;
+}
+
+.grupo{
+    display:flex !important;
+    flex-direction:column;
+}
+
+.grupo label{
+    margin-bottom:8px;
+    font-weight:600;
+    color:#444;
+}
+
+.grupo input,
+.grupo select,
+.grupo textarea{
+    width:100%;
+    padding:14px;
+    border:1px solid #d7d7d7;
+    border-radius:12px;
+    font-size:15px;
+    background:white;
+
+    display:block !important;
+}
+
+.grupo textarea{
+    resize:vertical;
+    min-height:130px;
+}
+
+.grupo input:focus,
+.grupo select:focus,
+.grupo textarea:focus{
+    outline:none;
+    border-color:var(--cafe);
+    box-shadow:0 0 0 3px rgba(155,99,41,.15);
+}
+
+.acciones{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:40px;
+}
+
+.grupo-botones{
+    display:flex;
+    gap:15px;
+}
+
+.btn-cancelar,
+.btn-borrador,
+.btn-enviar{
+    padding:14px 28px;
+    border-radius:12px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.btn-cancelar{
+    background:white;
+    border:1px solid #d6d6d6;
+}
+
+.btn-borrador{
+    background:var(--cafe);
+    border:none;
+    color:white;
+}
+
+.btn-enviar{
+    background:white;
+    border:2px solid var(--cafe);
+    color:var(--cafe);
+}
+
+.btn-borrador:hover{
+    background:var(--cafe-oscuro);
+}
+
+.btn-enviar:hover{
+    background:var(--cafe);
+    color:white;
+}
+
+.campo-error{
+    color:#dc3545;
+    font-size:.85rem;
+    margin-top:5px;
+}
+
+@media(max-width:768px){
+
+    .acciones{
+        flex-direction:column;
+        gap:20px;
+    }
+
+    .grupo-botones{
+        width:100%;
+        flex-direction:column;
+    }
+
+    .btn-cancelar,
+    .btn-borrador,
+    .btn-enviar{
+        width:100%;
+    }
+}

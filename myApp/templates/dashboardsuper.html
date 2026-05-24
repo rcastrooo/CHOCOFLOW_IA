@@ -51,7 +51,7 @@
 
     <div class="sidebar-divider"></div>
 
-    <a class="nav-link" onclick="mostrarSeccion('bitacora', this)">
+    <a class="nav-link" href="{% url 'bitacora_supervisor' %}">
       <i class="bi bi-journal-text"></i> Bitácora producción
     </a>
 
@@ -199,45 +199,79 @@
 
 <script>
 function cargarStats() {
-  fetch("{% url 'api_stats_supervisor' %}")
-    .then(r => r.json())
+
+    fetch("{% url 'api_stats_supervisor' %}")
+
+    .then(response => response.json())
+
     .then(d => {
-      const n = (val) => (val !== null && val !== undefined) ? val : '0';
 
-      // Empleados
-      document.getElementById('stat-total-empleados').textContent = n(d.total_empleados);
-      document.getElementById('stat-activos-sub').textContent     = n(d.empleados_activos) + ' activos';
+        const n = (valor) =>
+            valor !== null && valor !== undefined
+                ? valor
+                : 0;
 
-      // Turno
-      document.getElementById('stat-turno').textContent     = '0';
-      document.getElementById('stat-turno-sub').textContent = d.turno_nombre || 'Sin turno hoy';
+        // Empleados
+        document.getElementById('stat-total-empleados').textContent =
+            n(d.total_empleados);
 
-      // Asignaciones
-      document.getElementById('stat-asignaciones').textContent  = n(d.asignaciones_hoy);
-      document.getElementById('stat-sin-turno-sub').textContent = n(d.sin_turno) + ' sin turno';
+        document.getElementById('stat-activos-sub').textContent =
+            n(d.empleados_activos) + ' activos';
 
-      // Sin turno
-      document.getElementById('stat-sin-turno').textContent = n(d.sin_turno);
+        // Turno
+        document.getElementById('stat-turno').textContent =
+            d.turno_nombre || 'Sin turno';
 
-      // Lotes y exportaciones
-      document.getElementById('stat-lotes').textContent          = n(d.lotes_totales);
-      document.getElementById('stat-exp-pendientes').textContent = n(d.exportaciones_pendientes);
-      document.getElementById('stat-exp-enviadas').textContent   = n(d.exportaciones_enviadas);
+        document.getElementById('stat-turno-sub').textContent =
+            'Horario actual';
 
-      // Bitácora
-      document.getElementById('stat-bitacora-hoy').textContent       = n(d.bitacora_hoy);
-      document.getElementById('stat-bitacora-enviados').textContent   = n(d.bitacora_enviados);
-      document.getElementById('stat-bitacora-borradores').textContent = n(d.bitacora_pendientes);
-      document.getElementById('stat-bitacora-sub').textContent        = 'Último: hoy';
+        // Asignaciones
+        document.getElementById('stat-asignaciones').textContent =
+            n(d.asignaciones_hoy);
 
-      // Hora
-      document.getElementById('ultima-actualizacion').textContent =
-        new Date().toLocaleTimeString('es-CO');
+        document.getElementById('stat-sin-turno-sub').textContent =
+            n(d.sin_turno) + ' sin turno';
+
+        // Sin turno
+        document.getElementById('stat-sin-turno').textContent =
+            n(d.sin_turno);
+
+        // Lotes
+        document.getElementById('stat-lotes').textContent =
+            n(d.lotes_totales);
+
+        // Exportaciones
+        document.getElementById('stat-exp-pendientes').textContent =
+            n(d.exportaciones_pendientes);
+
+        document.getElementById('stat-exp-enviadas').textContent =
+            n(d.exportaciones_enviadas);
+
+        // Bitácoras
+        document.getElementById('stat-bitacora-hoy').textContent =
+            n(d.bitacora_hoy);
+
+        document.getElementById('stat-bitacora-enviados').textContent =
+            n(d.bitacora_enviados);
+
+        document.getElementById('stat-bitacora-borradores').textContent =
+            n(d.bitacora_pendientes);
+
+        document.getElementById('stat-bitacora-sub').textContent =
+            'Actualizado en tiempo real';
+
+        // Hora
+        document.getElementById('ultima-actualizacion').textContent =
+            new Date().toLocaleTimeString('es-CO');
+
     })
-    .catch(() => console.warn('Error al cargar estadísticas'));
+
+    .catch(error => {
+        console.error('Error cargando estadísticas:', error);
+    });
 }
 
-// Cargar al inicio y cada 30 segundos
 cargarStats();
+
 setInterval(cargarStats, 30000);
 </script>

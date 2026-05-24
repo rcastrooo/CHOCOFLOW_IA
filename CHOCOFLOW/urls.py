@@ -67,4 +67,8 @@ urlpatterns = [
     path('producciones/guardar/', views.guardar_produccion, name='guardar_produccion'),
     path('producciones/inactivar/<int:id>/', views.inactivar_produccion, name='inactivar_produccion'),
     path('producciones/reporte/', views.generar_reporte_producciones, name='reporte_producciones'),
+    
+    #BITACORA
+    path('bitacora_supervisor/', views.bitacora_supervisor,name='bitacora_supervisor'),
+    path('bitacoras/',views.listar_bitacoras,name='listar_bitacoras'),
 ]
