@@ -1,0 +1,331 @@
+{% extends 'layouts/sidebar.html' %}
+{% load static %}
+
+{% block titulo %}Inicio - Supervisor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+<!-- ═══════════════════════════════
+     CONTENIDO PRINCIPAL
+═══════════════════════════════ -->
+
+<div class="main-content">
+
+  <!-- INICIO -->
+  <div id="seccion-inicio" class="seccion activa">
+
+    <div class="topbar">
+      <span class="topbar-title">
+        <i class="bi bi-speedometer2"></i> Resumen general
+      </span>
+    </div>
+
+    <div class="bienvenida">
+      <h5><i class="bi bi-person-check"></i> Bienvenido, Supervisor</h5>
+      <p>Panel de control — resumen general del sistema</p>
+    </div>
+
+    <!-- EMPLEADOS Y TURNOS -->
+    <h6 class="mb-1" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+      Empleados y turnos
+    </h6>
+    <div class="row g-3 mb-3">
+
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+          <div class="stat-number" id="stat-total-empleados">—</div>
+          <div class="stat-label">Empleados totales</div>
+          <div class="stat-sub" id="stat-activos-sub">— activos</div>
+        </div>
+      </div>
+
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="bi bi-clock-fill"></i></div>
+          <div class="stat-number turno-text" id="stat-turno-nombre">—</div>
+          <div class="stat-label">Turno activo hoy</div>
+          <div class="stat-sub" id="stat-turno-sub">Horario actual</div>
+        </div>
+      </div>
+
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="bi bi-clipboard-check-fill"></i></div>
+          <div class="stat-number" id="stat-asignaciones">—</div>
+          <div class="stat-label">Asignaciones hoy</div>
+          <div class="stat-sub" id="stat-sin-turno-sub">— sin turno</div>
+        </div>
+      </div>
+
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon alerta"><i class="bi bi-person-x-fill"></i></div>
+          <div class="stat-number" id="stat-sin-turno" style="font-size:2rem;">—</div>
+          <div class="stat-label">Sin turno asignado</div>
+          <div class="stat-sub">Requieren acción</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- LOTES Y EXPORTACIONES -->
+    <h6 class="mb-1 mt-3" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+      Lotes y exportaciones
+    </h6>
+    <div class="row g-3 mb-3">
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="bi bi-box-seam-fill"></i></div>
+          <div class="stat-number" id="stat-lotes">—</div>
+          <div class="stat-label">Total de lotes</div>
+          <div class="stat-sub">Registrados en el sistema</div>
+        </div>
+      </div>
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="color:#ffc107;"><i class="bi bi-truck"></i></div>
+          <div class="stat-number" id="stat-exp-pendientes" style="color:#b8860b;">—</div>
+          <div class="stat-label">Exportaciones pendientes</div>
+          <div class="stat-sub">Listos para despacho</div>
+        </div>
+      </div>
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="color:#0d6efd;"><i class="bi bi-airplane-fill"></i></div>
+          <div class="stat-number" id="stat-exp-enviadas" style="color:#0d6efd;">—</div>
+          <div class="stat-label">Exportaciones enviadas</div>
+          <div class="stat-sub">En tránsito</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BITÁCORA -->
+    <h6 class="mb-1 mt-3" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+      Bitácora de producción
+    </h6>
+    <div class="row g-3 mb-4">
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="bi bi-journal-text"></i></div>
+          <div class="stat-number" id="stat-bitacora-hoy">—</div>
+          <div class="stat-label">Registros ingresados hoy</div>
+          <div class="stat-sub" id="stat-bitacora-sub">Actualizado en tiempo real</div>
+        </div>
+      </div>
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="color:#198754;"><i class="bi bi-check-circle-fill"></i></div>
+          <div class="stat-number" id="stat-bitacora-enviados" style="color:#198754;">—</div>
+          <div class="stat-label">Enviados hoy</div>
+          <div class="stat-sub">Aprobados o enviados</div>
+        </div>
+      </div>
+
+      <div class="col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="color:#D88C51;"><i class="bi bi-pencil-square"></i></div>
+          <div class="stat-number" id="stat-bitacora-borradores" style="color:#D88C51;">—</div>
+          <div class="stat-label">Borradores pendientes</div>
+          <div class="stat-sub">Sin enviar aún</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Indicador de última actualización -->
+    <p class="text-muted" style="font-size:12px; margin-bottom: 2rem;">
+      <i class="bi bi-arrow-clockwise"></i>
+      Actualizado automáticamente cada 30 segundos —
+      última vez: <span id="ultima-actualizacion">—</span>
+    </p>
+
+    <!-- ═══════════════════════════════
+         PANEL IA
+    ═══════════════════════════════ -->
+    <h6 class="mb-1 mt-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+      Asistente inteligente
+    </h6>
+
+    <div class="panel-ia">
+      <div class="panel-ia-header">
+        <div class="panel-ia-titulo">
+          <div class="ia-robot-icon">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div>
+            <h2>Asistente IA — ChocoFlow</h2>
+            <p>Hazle preguntas sobre producción, empleados o exportaciones basadas en tus datos actuales.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ia-input-row">
+        <input type="text" id="pregunta-ia"
+               placeholder="Ej: ¿Cómo puedo mejorar la producción actual?"
+               onkeypress="if(event.key==='Enter') consultarIA()"/>
+        <button onclick="consultarIA()">
+          <i class="fa-solid fa-paper-plane"></i> Consultar
+        </button>
+      </div>
+
+      <div class="ia-chips">
+        <span onclick="preguntaRapida('¿Cómo mejorar la producción actual?')">
+          📦 Mejorar producción
+        </span>
+        <span onclick="preguntaRapida('¿Qué riesgos hay con las exportaciones pendientes?')">
+          🚚 Riesgos exportaciones
+        </span>
+        <span onclick="preguntaRapida('¿Cómo optimizar la gestión de empleados?')">
+          👥 Gestión empleados
+        </span>
+        <span onclick="preguntaRapida('Dame un resumen del estado actual de la empresa')">
+          📊 Resumen general
+        </span>
+      </div>
+
+      <div id="loading-ia" style="display:none;" class="ia-loading">
+        <i class="fa-solid fa-spinner fa-spin"></i> ChocoBot está pensando...
+      </div>
+
+      <div id="respuesta-ia" style="display:none;" class="ia-respuesta">
+        <div class="ia-respuesta-header">
+          <i class="fa-solid fa-robot"></i> ChocoBot dice:
+        </div>
+        <p id="texto-respuesta"></p>
+      </div>
+
+      <div id="error-ia" style="display:none;" class="ia-error">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="texto-error"></span>
+      </div>
+    </div>
+
+  </div><!-- /seccion-inicio -->
+
+</div><!-- /main-content -->
+
+<script>
+/* ── Stats ── */
+function cargarStats() {
+  fetch("{% url 'api_stats_supervisor' %}")
+    .then(r => r.json())
+    .then(d => {
+      const n = v => (v !== null && v !== undefined) ? v : 0;
+
+      document.getElementById('stat-total-empleados').textContent = n(d.total_empleados);
+      document.getElementById('stat-activos-sub').textContent     = n(d.empleados_activos) + ' activos';
+      document.getElementById('stat-turno-nombre').textContent    = d.turno_nombre || 'Sin turno';
+      document.getElementById('stat-asignaciones').textContent    = n(d.asignaciones_hoy);
+      document.getElementById('stat-sin-turno-sub').textContent   = n(d.sin_turno) + ' sin turno';
+      document.getElementById('stat-sin-turno').textContent       = n(d.sin_turno);
+      document.getElementById('stat-lotes').textContent           = n(d.lotes_totales);
+      document.getElementById('stat-exp-pendientes').textContent  = n(d.exportaciones_pendientes);
+      document.getElementById('stat-exp-enviadas').textContent    = n(d.exportaciones_enviadas);
+      document.getElementById('stat-bitacora-hoy').textContent    = n(d.bitacora_hoy);
+      document.getElementById('stat-bitacora-enviados').textContent   = n(d.bitacora_enviados);
+      document.getElementById('stat-bitacora-borradores').textContent = n(d.bitacora_pendientes);
+      document.getElementById('ultima-actualizacion').textContent = new Date().toLocaleTimeString('es-CO');
+    })
+    .catch(err => console.error('Error cargando estadísticas:', err));
+}
+
+cargarStats();
+setInterval(cargarStats, 30000);
+
+/* ── Panel IA ── */
+function obtenerContexto() {
+  return {
+    empleados_totales:       document.getElementById('stat-total-empleados')?.textContent || '?',
+    empleados_activos:       document.getElementById('stat-activos-sub')?.textContent || '?',
+    turno_activo:            document.getElementById('stat-turno-nombre')?.textContent || '?',
+    asignaciones_hoy:        document.getElementById('stat-asignaciones')?.textContent || '?',
+    sin_turno:               document.getElementById('stat-sin-turno')?.textContent || '?',
+    lotes_totales:           document.getElementById('stat-lotes')?.textContent || '?',
+    exportaciones_pendientes:document.getElementById('stat-exp-pendientes')?.textContent || '?',
+    exportaciones_enviadas:  document.getElementById('stat-exp-enviadas')?.textContent || '?',
+    bitacora_hoy:            document.getElementById('stat-bitacora-hoy')?.textContent || '?',
+    bitacora_enviados:       document.getElementById('stat-bitacora-enviados')?.textContent || '?',
+    bitacora_borradores:     document.getElementById('stat-bitacora-borradores')?.textContent || '?',
+  };
+}
+
+function preguntaRapida(texto) {
+  document.getElementById('pregunta-ia').value = texto;
+  consultarIA();
+}
+
+async function consultarIA() {
+  const pregunta = document.getElementById('pregunta-ia').value.trim();
+  if (!pregunta) return;
+
+  const ctx = obtenerContexto();
+
+  // UI: mostrar loading, ocultar respuesta/error anteriores
+  document.getElementById('loading-ia').style.display  = 'flex';
+  document.getElementById('respuesta-ia').style.display = 'none';
+  document.getElementById('error-ia').style.display     = 'none';
+
+  const prompt = `Eres ChocoBot, el asistente inteligente de ChocoFlow, un sistema de gestión para una empresa de producción y exportación de cacao/chocolate.
+
+Datos actuales del sistema (en tiempo real):
+- Empleados totales: ${ctx.empleados_totales} (${ctx.empleados_activos})
+- Turno activo hoy: ${ctx.turno_activo}
+- Asignaciones hoy: ${ctx.asignaciones_hoy}
+- Empleados sin turno: ${ctx.sin_turno}
+- Total de lotes registrados: ${ctx.lotes_totales}
+- Exportaciones pendientes: ${ctx.exportaciones_pendientes}
+- Exportaciones enviadas: ${ctx.exportaciones_enviadas}
+- Registros de bitácora hoy: ${ctx.bitacora_hoy}
+- Registros enviados hoy: ${ctx.bitacora_enviados}
+- Borradores pendientes: ${ctx.bitacora_borradores}
+
+Pregunta del supervisor: ${pregunta}
+
+Responde de forma concisa, práctica y útil. Máximo 4 oraciones. Usa el contexto de los datos cuando sea relevante.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.content && data.content[0]?.text) {
+      document.getElementById('texto-respuesta').textContent = data.content[0].text;
+      document.getElementById('respuesta-ia').style.display = 'block';
+    } else {
+      throw new Error('Respuesta inesperada de la IA');
+    }
+  } catch (err) {
+    document.getElementById('texto-error').textContent = 'No se pudo conectar con el asistente. Intenta de nuevo.';
+    document.getElementById('error-ia').style.display = 'flex';
+    console.error('Error IA:', err);
+  } finally {
+    document.getElementById('loading-ia').style.display = 'none';
+  }
+}
+</script>
+
+{% endblock %}

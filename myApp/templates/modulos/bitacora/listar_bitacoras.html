@@ -1,0 +1,328 @@
+{% extends 'layouts/sidebar.html' %}
+{% load static %}
+
+{% block titulo %}Revisión de Bitácoras - Admin{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="main-content">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="topbar-title">
+      <i class="bi bi-journal-check"></i> Revisión de Bitácoras
+      {% if pendientes > 0 %}
+        <span class="badge bg-danger ms-2" style="font-size:0.75rem;">
+          {{ pendientes }} pendiente{{ pendientes|pluralize }}
+        </span>
+      {% endif %}
+    </span>
+  </div>
+
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-clipboard2-check"></i> Bitácoras — Administrador</h5>
+    <p>
+      Revisa los reportes enviados por los supervisores y apruébalos o recházalos con observaciones —
+      <strong>{{ fecha_hoy }}</strong>.
+    </p>
+  </div>
+
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- ALERTA PENDIENTES -->
+  {% if pendientes > 0 %}
+    <div class="alert mb-3 d-flex align-items-center gap-2"
+         style="background:#fff3e0; border:1.5px solid #D88C51; border-radius:12px; color:#603C1C; font-size:0.88rem;">
+      <i class="bi bi-bell-fill" style="font-size:1.1rem; color:#D88C51;"></i>
+      <span>
+        Tienes <strong>{{ pendientes }} bitácora{{ pendientes|pluralize }}</strong> enviada{{ pendientes|pluralize }}
+        esperando revisión.
+      </span>
+    </div>
+  {% endif %}
+
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Todas las bitácoras
+  </h6>
+
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Título</th>
+          <th>Supervisor</th>
+          <th>Tipo</th>
+          <th>Producción</th>
+          <th>Fecha registro</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bitacoras %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-journal-text" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <div>
+                <span style="font-weight:600; color:#333; font-size:0.88rem; display:block;">{{ b.titulo }}</span>
+                {% if b.observaciones %}
+                  <small class="text-muted" style="font-size:0.75rem;">{{ b.observaciones|truncatechars:40 }}</small>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ b.supervisor.nombre }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ b.tipo_reporte }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ b.produccion }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ b.fecha_registro }}</td>
+          <td>
+            {% if b.estado == 'Borrador' %}
+              <span class="badge bg-secondary">{{ b.estado }}</span>
+            {% elif b.estado == 'Enviado' %}
+              <span class="badge bg-primary">{{ b.estado }}</span>
+            {% elif b.estado == 'Aprobado' %}
+              <span class="badge bg-success">{{ b.estado }}</span>
+            {% elif b.estado == 'Rechazado' %}
+              <span class="badge bg-danger">{{ b.estado }}</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">{{ b.estado }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <!-- Botón ver detalle -->
+            <button class="btn btn-sm btn-outline-secondary me-1"
+                    style="border-radius:8px;"
+                    onclick="verDetalle(
+                      '{{ b.titulo|escapejs }}',
+                      '{{ b.supervisor.nombre|escapejs }}',
+                      '{{ b.tipo_reporte }}',
+                      '{{ b.produccion }}',
+                      '{{ b.fecha_registro }}',
+                      '{{ b.unidades_producidas }}',
+                      '{{ b.unidades_pendientes }}',
+                      '{{ b.descripcion|escapejs }}',
+                      '{{ b.observaciones|escapejs }}',
+                      '{{ b.estado }}'
+                    )">
+              <i class="bi bi-eye"></i>
+            </button>
+
+            <!-- Botón revisar: solo si está en Enviado -->
+            {% if b.estado == 'Enviado' %}
+              <button class="btn btn-sm btn-choco"
+                      style="border-radius:8px; padding:4px 10px; font-size:0.8rem;"
+                      onclick="abrirRevision('{{ b.id }}', '{{ b.titulo|escapejs }}')">
+                <i class="bi bi-check2-square"></i> Revisar
+              </button>
+            {% else %}
+              {% if b.revisado_por %}
+                <small class="text-muted d-block" style="font-size:0.75rem;">
+                  Por {{ b.revisado_por.nombre }}<br>{{ b.fecha_revision }}
+                </small>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No hay bitácoras registradas
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Solo puedes revisar bitácoras en estado <strong>Enviado</strong>. Los borradores son visibles pero no revisables.
+  </p>
+
+</div>
+
+
+<!-- ============================================================ -->
+<!--  MODAL: Ver detalle de la bitácora                           -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+        <h5 class="modal-title"><i class="bi bi-journal-text"></i> Detalle de Bitácora</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="background:#fdf9f6;">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Título</small>
+            <p id="det_titulo" style="font-weight:600; color:#333; margin:0;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Estado</small>
+            <p id="det_estado" style="margin:0;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Supervisor</small>
+            <p id="det_supervisor" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Tipo</small>
+            <p id="det_tipo" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Fecha registro</small>
+            <p id="det_fecha" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-6">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Producción</small>
+            <p id="det_produccion" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-3">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Uds. producidas</small>
+            <p id="det_uds_prod" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-3">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Uds. pendientes</small>
+            <p id="det_uds_pend" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-12">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Descripción</small>
+            <p id="det_descripcion" style="margin:0; font-size:0.88rem; color:#444; line-height:1.6; white-space:pre-line;"></p>
+          </div>
+          <div class="col-12" id="det_obs_wrap">
+            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Observaciones</small>
+            <p id="det_observaciones" style="margin:0; font-size:0.88rem; color:#444; white-space:pre-line;"></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+        <button type="button" class="btn-caramel" style="border-radius:10px; padding:8px 18px;" data-bs-dismiss="modal">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!--  MODAL: Revisar bitácora (aprobar / rechazar)                -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalRevision" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+
+      <form method="POST" id="formRevision" action="">
+        {% csrf_token %}
+
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title"><i class="bi bi-check2-square"></i> Revisar Bitácora</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body" style="background:#fdf9f6;">
+
+          <p style="font-size:0.88rem; color:#555; margin-bottom:16px;">
+            Revisando: <strong id="rev_titulo"></strong>
+          </p>
+
+          <!-- Decisión -->
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              <i class="bi bi-toggle2-on"></i> Decisión
+            </label>
+            <select name="estado"
+                    class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:white;"
+                    required>
+              <option value="Aprobado">✅ Aprobar</option>
+              <option value="Rechazado">❌ Rechazar</option>
+            </select>
+          </div>
+
+          <!-- Observación del admin -->
+          <div class="mb-1">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              <i class="bi bi-chat-left-text"></i> Observación
+              <span style="font-weight:400; color:#999;">(opcional)</span>
+            </label>
+            <textarea name="observacion_admin"
+                      class="form-control"
+                      rows="4"
+                      placeholder="Escribe aquí tu observación o retroalimentación para el supervisor..."
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:white; resize:vertical;"></textarea>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
+            <i class="bi bi-send-fill"></i> Confirmar revisión
+          </button>
+          <button type="button" class="btn-caramel" style="border-radius:10px; padding:8px 16px;" data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function abrirRevision(id, titulo) {
+  document.getElementById('rev_titulo').textContent = titulo;
+  document.getElementById('formRevision').action = '/bitacora/revisar/' + id + '/';
+  new bootstrap.Modal(document.getElementById('modalRevision')).show();
+}
+
+function verDetalle(titulo, supervisor, tipo, produccion, fecha, udsProd, udsPend, descripcion, observaciones, estado) {
+  document.getElementById('det_titulo').textContent       = titulo;
+  document.getElementById('det_supervisor').textContent   = supervisor;
+  document.getElementById('det_tipo').textContent         = tipo;
+  document.getElementById('det_produccion').textContent   = produccion;
+  document.getElementById('det_fecha').textContent        = fecha;
+  document.getElementById('det_uds_prod').textContent     = udsProd;
+  document.getElementById('det_uds_pend').textContent     = udsPend;
+  document.getElementById('det_descripcion').textContent  = descripcion;
+  document.getElementById('det_observaciones').textContent = observaciones || '—';
+
+  const badgeMap = {
+    'Borrador':  'bg-secondary',
+    'Enviado':   'bg-primary',
+    'Aprobado':  'bg-success',
+    'Rechazado': 'bg-danger',
+  };
+  document.getElementById('det_estado').innerHTML =
+    `<span class="badge ${badgeMap[estado] || 'bg-warning text-dark'}">${estado}</span>`;
+
+  new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+}
+</script>
+{% endblock %}

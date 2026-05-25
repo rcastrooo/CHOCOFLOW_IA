@@ -1,11 +1,13 @@
-{% extends 'layouts/modulos.html' %}
+{% extends 'layouts/sidebar.html' %}
 {% load static %}
+{% block titulo %}Solicitudes{% endblock %}
 
-{% block title %}Gestión de Solicitudes{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/solicitudes.css' %}">
+{% endblock %}
 
 {% block content %}
 
-<link rel="stylesheet" href="{% static 'css/solicitudes.css' %}">
 
 <div class="contenedor-solicitudes">
 

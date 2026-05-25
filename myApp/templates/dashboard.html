@@ -1,248 +1,293 @@
 {% extends 'layouts/sidebar.html' %}
+{% load static %}
 
 {% block titulo %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
 
 <!-- TARJETAS DE RESUMEN -->
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-bottom:30px;">
+<div class="cards-grid">
 
-    <div class="card">
-        <h3>👥 Total Usuarios</h3>
-        <p>{{ total_usuarios }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#e8f4fd;">
+            <i class="fa-solid fa-users" style="color:#2980b9;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Total Usuarios</span>
+            <span class="card-stat-value">{{ total_usuarios }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>🧑‍💼 Empleados Activos</h3>
-        <p>{{ empleados_activos }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#e8f8f5;">
+            <i class="fa-solid fa-user-check" style="color:#27ae60;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Empleados Activos</span>
+            <span class="card-stat-value">{{ empleados_activos }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>⛔ Empleados Suspendidos</h3>
-        <p>{{ empleados_suspendidos }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#fdf2f8;">
+            <i class="fa-solid fa-user-xmark" style="color:#8e44ad;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Empleados Suspendidos</span>
+            <span class="card-stat-value">{{ empleados_suspendidos }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>🏭 Producciones en Proceso</h3>
-        <p>{{ producciones_proceso }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#fef9e7;">
+            <i class="fa-solid fa-industry" style="color:#f39c12;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Producciones en Proceso</span>
+            <span class="card-stat-value">{{ producciones_proceso }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>✅ Producciones Finalizadas</h3>
-        <p>{{ producciones_finalizadas }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#eafaf1;">
+            <i class="fa-solid fa-circle-check" style="color:#1e8449;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Producciones Finalizadas</span>
+            <span class="card-stat-value">{{ producciones_finalizadas }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>🚚 Exportaciones Pendientes</h3>
-        <p>{{ exportaciones_pendientes }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#fef5e7;">
+            <i class="fa-solid fa-truck" style="color:#e67e22;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Exportaciones Pendientes</span>
+            <span class="card-stat-value">{{ exportaciones_pendientes }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>📦 Total Lotes</h3>
-        <p>{{ total_lotes }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#fdf2e9;">
+            <i class="fa-solid fa-boxes-stacked" style="color:#ca6f1e;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Total Lotes</span>
+            <span class="card-stat-value">{{ total_lotes }}</span>
+        </div>
     </div>
 
-    <div class="card">
-        <h3>📊 Total Producciones</h3>
-        <p>{{ total_producciones }}</p>
+    <div class="card-stat">
+        <div class="card-stat-icon" style="background:#f4ecf7;">
+            <i class="fa-solid fa-chart-bar" style="color:#7d3c98;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Total Producciones</span>
+            <span class="card-stat-value">{{ total_producciones }}</span>
+        </div>
     </div>
+
+    {% if bitacoras_pendientes %}
+    <div class="card-stat card-alerta">
+        <div class="card-stat-icon" style="background:#fdedec;">
+            <i class="fa-solid fa-book-open" style="color:#e74c3c;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Bitácoras Pendientes</span>
+            <span class="card-stat-value">{{ bitacoras_pendientes }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if solicitudes_pendientes %}
+    <div class="card-stat card-alerta">
+        <div class="card-stat-icon" style="background:#fdedec;">
+            <i class="fa-solid fa-bell" style="color:#e74c3c;"></i>
+        </div>
+        <div class="card-stat-info">
+            <span class="card-stat-label">Solicitudes Pendientes</span>
+            <span class="card-stat-value">{{ solicitudes_pendientes }}</span>
+        </div>
+    </div>
+    {% endif %}
 
 </div>
 
 <!-- PANEL IA -->
-<div class="table-container" style="margin-bottom:30px;">
+<div class="panel-ia">
+    <div class="panel-ia-header">
+        <div class="panel-ia-titulo">
+            <i class="fa-solid fa-robot"></i>
+            <div>
+                <h2>Asistente IA — ChocoFlow</h2>
+                <p>Hazle preguntas sobre producción, empleados o exportaciones basadas en tus datos actuales.</p>
+            </div>
+        </div>
+    </div>
 
-    <h2>🤖 Asistente IA — ChocoFlow</h2>
-    <p style="color:#888; margin-bottom:20px; font-size:14px;">
-        Hazle preguntas sobre producción, empleados, exportaciones o pide recomendaciones basadas en tus datos actuales.
-    </p>
-
-    <div style="display:flex; gap:10px; margin-bottom:20px;">
-        <input
-            type="text"
-            id="pregunta-ia"
-            placeholder="Ej: ¿Cómo puedo mejorar la producción actual?"
-            style="flex:1; padding:12px 16px; border:1px solid #ddd; border-radius:10px; font-size:15px; outline:none;"
-        />
-        <button
-            onclick="consultarIA()"
-            style="background:#4E2A12; color:white; border:none; padding:12px 24px; border-radius:10px; font-size:15px; cursor:pointer;">
-            Consultar
+    <div class="ia-input-row">
+        <input type="text" id="pregunta-ia"
+               placeholder="Ej: ¿Cómo puedo mejorar la producción actual?"/>
+        <button onclick="consultarIA()">
+            <i class="fa-solid fa-paper-plane"></i> Consultar
         </button>
     </div>
 
-    <!-- Sugerencias rápidas -->
-    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
-        <span onclick="preguntaRapida('¿Cómo mejorar la producción actual?')"
-            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+    <div class="ia-chips">
+        <span onclick="preguntaRapida('¿Cómo mejorar la producción actual?')">
             📦 Mejorar producción
         </span>
-        <span onclick="preguntaRapida('¿Qué riesgos hay con las exportaciones pendientes?')"
-            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+        <span onclick="preguntaRapida('¿Qué riesgos hay con las exportaciones pendientes?')">
             🚚 Riesgos exportaciones
         </span>
-        <span onclick="preguntaRapida('¿Cómo optimizar la gestión de empleados?')"
-            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+        <span onclick="preguntaRapida('¿Cómo optimizar la gestión de empleados?')">
             👥 Gestión empleados
         </span>
-        <span onclick="preguntaRapida('Dame un resumen del estado actual de la empresa')"
-            style="background:#f0e6dc; color:#4E2A12; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">
+        <span onclick="preguntaRapida('Dame un resumen del estado actual de la empresa')">
             📊 Resumen general
         </span>
     </div>
 
-    <!-- Respuesta -->
-    <div id="respuesta-ia" style="display:none;">
-        <div style="background:#f9f4ef; border-left:4px solid #4E2A12; padding:20px; border-radius:10px;">
-            <p style="font-weight:bold; color:#4E2A12; margin-bottom:10px;">🤖 ChocoBot dice:</p>
-            <p id="texto-respuesta" style="color:#333; line-height:1.7; white-space:pre-wrap;"></p>
+    <div id="loading-ia" style="display:none;" class="ia-loading">
+        <i class="fa-solid fa-spinner fa-spin"></i> ChocoBot está pensando...
+    </div>
+
+    <div id="respuesta-ia" style="display:none;" class="ia-respuesta">
+        <div class="ia-respuesta-header">
+            <i class="fa-solid fa-robot"></i> ChocoBot dice:
         </div>
+        <p id="texto-respuesta"></p>
     </div>
 
-    <!-- Loading -->
-    <div id="loading-ia" style="display:none; text-align:center; padding:20px;">
-        <p style="color:#888;">🍫 ChocoBot está pensando...</p>
+    <div id="error-ia" style="display:none;" class="ia-error">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="texto-error"></span>
+    </div>
+</div>
+
+<!-- TABLAS -->
+<div class="tablas-grid">
+
+    <!-- PRODUCCIONES RECIENTES -->
+    <div class="tabla-card">
+        <div class="tabla-header">
+            <h3><i class="fa-solid fa-industry"></i> Producciones Recientes</h3>
+            <a href="{% url 'producciones' %}" class="tabla-ver-mas">Ver todas →</a>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Responsable</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in producciones_recientes %}
+                <tr>
+                    <td>{{ p.producto }}</td>
+                    <td>{{ p.empleado_responsable.nombre }}</td>
+                    <td>
+                        {% if p.estado == 'Finalizado' %}
+                            <span class="badge badge-success">{{ p.estado }}</span>
+                        {% elif p.estado == 'En Proceso' %}
+                            <span class="badge badge-warning">{{ p.estado }}</span>
+                        {% elif p.estado == 'Pendiente' %}
+                            <span class="badge badge-info">{{ p.estado }}</span>
+                        {% else %}
+                            <span class="badge badge-danger">{{ p.estado }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="tabla-empty">No hay producciones registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 
-    <!-- Error -->
-    <div id="error-ia" style="display:none;">
-        <p style="color:#e74c3c;">❌ <span id="texto-error"></span></p>
+    <!-- ASIGNACIONES RECIENTES -->
+    <div class="tabla-card">
+        <div class="tabla-header">
+            <h3><i class="fa-solid fa-list-check"></i> Asignaciones Recientes</h3>
+            <a href="{% url 'asignaciones' %}" class="tabla-ver-mas">Ver todas →</a>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tarea</th>
+                    <th>Empleado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in asignaciones %}
+                <tr>
+                    <td>{{ a.tarea }}</td>
+                    <td>{{ a.empleado.nombre }}</td>
+                    <td>{{ a.fecha_asignacion }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="tabla-empty">No hay asignaciones registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 
 </div>
 
 <script>
-    function preguntaRapida(texto) {
-        document.getElementById('pregunta-ia').value = texto;
-        consultarIA();
-    }
+function preguntaRapida(texto) {
+    document.getElementById('pregunta-ia').value = texto;
+    consultarIA();
+}
 
-    function consultarIA() {
-        const pregunta = document.getElementById('pregunta-ia').value.trim();
+function consultarIA() {
+    const pregunta = document.getElementById('pregunta-ia').value.trim();
+    if (!pregunta) { alert('Por favor escribe una pregunta.'); return; }
 
-        if (!pregunta) {
-            alert('Por favor escribe una pregunta.');
-            return;
+    document.getElementById('respuesta-ia').style.display = 'none';
+    document.getElementById('error-ia').style.display     = 'none';
+    document.getElementById('loading-ia').style.display   = 'flex';
+
+    const csrfToken = document.cookie.split(';')
+        .find(c => c.trim().startsWith('csrftoken='))?.split('=')[1];
+
+    fetch("{% url 'consultar_ia' %}", {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `pregunta=${encodeURIComponent(pregunta)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('loading-ia').style.display = 'none';
+        if (data.respuesta) {
+            document.getElementById('texto-respuesta').textContent = data.respuesta;
+            document.getElementById('respuesta-ia').style.display  = 'block';
+        } else {
+            document.getElementById('texto-error').textContent = data.error;
+            document.getElementById('error-ia').style.display   = 'flex';
         }
-
-        // Ocultar todo
-        document.getElementById('respuesta-ia').style.display = 'none';
-        document.getElementById('error-ia').style.display     = 'none';
-        document.getElementById('loading-ia').style.display   = 'block';
-
-        // Obtener CSRF token
-        const csrfToken = document.cookie
-            .split(';')
-            .find(c => c.trim().startsWith('csrftoken='))
-            ?.split('=')[1];
-
-        fetch("{% url 'consultar_ia' %}", {
-    method: 'POST',
-    credentials: 'same-origin',  // ← agrega esta línea
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRFToken': csrfToken
-    },
-    body: `pregunta=${encodeURIComponent(pregunta)}`
-})
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('loading-ia').style.display = 'none';
-
-            if (data.respuesta) {
-                document.getElementById('texto-respuesta').textContent = data.respuesta;
-                document.getElementById('respuesta-ia').style.display  = 'block';
-            } else {
-                document.getElementById('texto-error').textContent = data.error;
-                document.getElementById('error-ia').style.display   = 'block';
-            }
-        })
-        .catch(err => {
-            document.getElementById('loading-ia').style.display = 'none';
-            document.getElementById('texto-error').textContent  = 'Error de conexión.';
-            document.getElementById('error-ia').style.display   = 'block';
-        });
-    }
+    })
+    .catch(() => {
+        document.getElementById('loading-ia').style.display = 'none';
+        document.getElementById('texto-error').textContent  = 'Error de conexión.';
+        document.getElementById('error-ia').style.display   = 'flex';
+    });
+}
 </script>
-
-<!-- TABLA PRODUCCIONES RECIENTES -->
-<div class="table-container">
-    <h2>🏭 Producciones Recientes</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Producto</th>
-                <th>Responsable</th>
-                <th>Cantidad</th>
-                <th>Estado</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in producciones_recientes %}
-            <tr>
-                <td>{{ p.id }}</td>
-                <td>{{ p.producto }}</td>
-                <td>{{ p.empleado_responsable.nombre }}</td>
-                <td>{{ p.cantidad_producida }}</td>
-                <td>
-                    {% if p.estado == 'Finalizado' %}
-                        <span style="background:#d4edda; color:#155724; padding:4px 10px; border-radius:20px; font-size:13px;">
-                            ✅ {{ p.estado }}
-                        </span>
-                    {% elif p.estado == 'En Proceso' %}
-                        <span style="background:#fff3cd; color:#856404; padding:4px 10px; border-radius:20px; font-size:13px;">
-                            ⏳ {{ p.estado }}
-                        </span>
-                    {% else %}
-                        <span style="background:#f8d7da; color:#721c24; padding:4px 10px; border-radius:20px; font-size:13px;">
-                            🔴 {{ p.estado }}
-                        </span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5" style="text-align:center; color:#999;">
-                    No hay producciones registradas.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<!-- TABLA ASIGNACIONES RECIENTES -->
-<div class="table-container">
-    <h2>📋 Asignaciones Recientes</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Tarea</th>
-                <th>Empleado</th>
-                <th>Fecha</th>
-                <th>Asignado por</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for a in asignaciones %}
-            <tr>
-                <td>{{ a.id }}</td>
-                <td>{{ a.tarea }}</td>
-                <td>{{ a.empleado.nombre }}</td>
-                <td>{{ a.fecha_asignacion }}</td>
-                <td>{{ a.asignado_por.nombre }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5" style="text-align:center; color:#999;">
-                    No hay asignaciones registradas.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
 
 {% endblock %}

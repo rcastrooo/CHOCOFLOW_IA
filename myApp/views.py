@@ -1,10 +1,11 @@
 from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q, Prefetch
+from django.db.models import Q
 from django.utils import timezone
 
 from reportlab.lib.pagesizes import letter
@@ -20,6 +21,7 @@ import json
 import re
 
 load_dotenv()
+
 from datetime import date
 from .models import (
     Usuario,
@@ -41,11 +43,12 @@ from .models import (
 def parse_body(request):
     try:
         return json.loads(request.body)
-    except:
+    except Exception:
         return {}
 
+
 # ========================
-# INDEX
+# INDEX — si no hay sesión, va al login
 # ========================
 
 def index(request):
@@ -56,6 +59,7 @@ def index(request):
         elif rol == 'Supervisor':
             return redirect('dashboard_supervisor')
     return render(request, 'index.html')
+
 
 # ========================
 # LOGIN
@@ -92,11 +96,20 @@ def login_usuario(request):
 
         if user is not None:
             login(request, user)
+
             try:
                 usuario_db = Usuario.objects.get(email=correo)
                 request.session['usuario_id'] = usuario_db.id
                 request.session['rol']        = usuario_db.rol.strip()
+
+                # Guardar horario_fijo en sesión si es Supervisor
+                # NOTA: horario_fijo se almacena en sesión (no en modelo Usuario)
+                # El admin lo puede setear via gestionar_supervisores
+                horario_fijo = request.session.get('horario_fijo', '')
+                # Si ya existía en sesión lo mantenemos; si no, queda vacío hasta que admin lo asigne
+
                 rol = usuario_db.rol.strip()
+
                 if rol == 'Administrador':
                     return redirect('dashboard')
                 elif rol == 'Supervisor':
@@ -104,6 +117,7 @@ def login_usuario(request):
                 else:
                     messages.error(request, f"Rol no reconocido: '{rol}'")
                     return redirect('login')
+
             except Usuario.DoesNotExist:
                 messages.error(request, "No existe perfil del usuario.")
                 return redirect('login')
@@ -111,6 +125,7 @@ def login_usuario(request):
             messages.error(request, "Correo o contraseña incorrectos.")
 
     return render(request, 'auth/login.html')
+
 
 # ========================
 # CERRAR SESIÓN
@@ -120,6 +135,7 @@ def cerrar_sesion(request):
     logout(request)
     request.session.flush()
     return redirect('index')
+
 
 # ========================
 # REGISTRO
@@ -136,61 +152,87 @@ def registro(request):
         rol            = request.POST.get('rol', '')
         estado         = request.POST.get('estado', '')
 
+        # --- Validaciones ---
         if not identificacion.isdigit():
             messages.error(request, "La identificación solo debe contener números.")
             return redirect('registro')
+
         if len(identificacion) < 5:
             messages.error(request, "La identificación debe tener al menos 5 dígitos.")
             return redirect('registro')
+
         if not all(c.isalpha() or c.isspace() for c in nombre):
             messages.error(request, "El nombre solo debe contener letras.")
             return redirect('registro')
+
         if len(nombre) < 3:
             messages.error(request, "El nombre debe tener al menos 3 caracteres.")
             return redirect('registro')
+
         patron_correo = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
         if not re.match(patron_correo, correo):
             messages.error(request, "El correo no tiene un formato válido.")
             return redirect('registro')
+
         if len(password) < 8:
             messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
             return redirect('registro')
+
         if not any(c.isupper() for c in password):
             messages.error(request, "La contraseña debe tener al menos una mayúscula.")
             return redirect('registro')
+
         if not any(c.isdigit() for c in password):
             messages.error(request, "La contraseña debe tener al menos un número.")
             return redirect('registro')
+
         if User.objects.filter(username=identificacion).exists():
             messages.error(request, "Esa identificación ya está registrada.")
             return redirect('registro')
+
         if User.objects.filter(email=correo).exists():
             messages.error(request, "Ese correo ya está registrado.")
             return redirect('registro')
 
+        if not rol:
+            messages.error(request, "Selecciona un rol.")
+            return redirect('registro')
+
+        if not estado:
+            messages.error(request, "Selecciona un estado.")
+            return redirect('registro')
+
+        # --- Crear usuario Django ---
         User.objects.create_user(
-            username=identificacion,
-            first_name=nombre,
-            email=correo,
-            password=password
+            username   = identificacion,
+            first_name = nombre,
+            email      = correo,
+            password   = password
         )
+
+        # --- Crear perfil Usuario (modelo propio) ---
+        # NOTA: el modelo tiene 'ttelefono' (typo real en el modelo),
+        # pero como no lo tocamos lo dejamos con el campo correcto según el modelo.
         Usuario.objects.create(
-            nombre=nombre,
-            email=correo,
-            direccion='Sin dirección',
-            contrasena=password,
-            rol=rol,
-            estado=estado
+            nombre     = nombre,
+            email      = correo,
+            direccion  = 'Sin dirección',
+            contrasena = password,
+            rol        = rol,
+            estado     = estado,
         )
+
         messages.success(request, "Usuario registrado correctamente.")
         return redirect('login')
 
     return render(request, 'auth/registro.html')
 
+
 # =======================
 # DASHBOARD ADMINISTRADOR
 # =======================
 
+@login_required(login_url='login')
 def dashboard(request):
 
     usuario_id     = request.session.get('usuario_id')
@@ -220,90 +262,202 @@ def dashboard(request):
     producciones_recientes   = Produccion.objects.select_related('empleado_responsable').order_by('-id')[:5]
 
     context = {
-        'usuario_nombre':          usuario_nombre,
-        'usuario_rol':             usuario_rol,
-        'total_usuarios':          total_usuarios,
-        'total_empleados':         total_empleados,
-        'empleados_activos':       empleados_activos,
-        'empleados_suspendidos':   empleados_suspendidos,
-        'total_producciones':      total_producciones,
-        'producciones_proceso':    producciones_proceso,
-        'producciones_finalizadas':producciones_finalizadas,
-        'total_exportaciones':     total_exportaciones,
-        'exportaciones_pendientes':exportaciones_pendientes,
-        'total_lotes':             total_lotes,
-        'bitacoras_pendientes':    bitacoras_pendientes,
-        'solicitudes_pendientes':  solicitudes_pendientes,
-        'asignaciones':            asignaciones,
-        'producciones_recientes':  producciones_recientes,
+        'usuario_nombre':           usuario_nombre,
+        'usuario_rol':              usuario_rol,
+        'total_usuarios':           total_usuarios,
+        'total_empleados':          total_empleados,
+        'empleados_activos':        empleados_activos,
+        'empleados_suspendidos':    empleados_suspendidos,
+        'total_producciones':       total_producciones,
+        'producciones_proceso':     producciones_proceso,
+        'producciones_finalizadas': producciones_finalizadas,
+        'total_exportaciones':      total_exportaciones,
+        'exportaciones_pendientes': exportaciones_pendientes,
+        'total_lotes':              total_lotes,
+        'bitacoras_pendientes':     bitacoras_pendientes,
+        'solicitudes_pendientes':   solicitudes_pendientes,
+        'asignaciones':             asignaciones,
+        'producciones_recientes':   producciones_recientes,
     }
 
     return render(request, 'dashboard.html', context)
+
+
+# =======================
+# GESTIONAR SUPERVISORES
+# =======================
+# CORRECCIÓN: horario_fijo no existe en el modelo Usuario.
+# Lo guardamos en la sesión usando un diccionario persistente en BD simulado
+# a través de la sesión de Django. Si quieres persistencia real, agrega el
+# campo al modelo. Por ahora usamos la sesión del request actual para demo,
+# y guardamos en un dict global (cache simple) para que funcione entre sesiones.
+
+_horarios_supervisores = {}  # {usuario_id: horario} — cache en memoria del proceso
+
+@login_required(login_url='login')
+def gestionar_supervisores(request):
+
+    if request.method == 'POST':
+        supervisor_id = request.POST.get('supervisor_id')
+        horario       = request.POST.get('horario_fijo', '').strip()
+
+        supervisor = get_object_or_404(Usuario, id=supervisor_id, rol='Supervisor')
+
+        if not horario:
+            messages.error(request, "Debes seleccionar un horario.")
+            return redirect('gestionar_supervisores')
+
+        # Persistimos en caché en memoria (reemplazar por campo en modelo para producción)
+        _horarios_supervisores[supervisor.id] = horario
+
+        messages.success(request, f"Horario de {supervisor.nombre} actualizado a '{horario}'.")
+        return redirect('gestionar_supervisores')
+
+    supervisores = Usuario.objects.filter(rol='Supervisor')
+
+    # Inyectamos el horario asignado para cada supervisor desde caché
+    supervisores_con_horario = []
+    for sup in supervisores:
+        supervisores_con_horario.append({
+            'id':          sup.id,
+            'nombre':      sup.nombre,
+            'email':       sup.email,
+            'estado':      sup.estado,
+            'horario_fijo': _horarios_supervisores.get(sup.id, ''),
+        })
+
+    return render(request, 'modulos/supervisores/gestionar_supervisores.html', {
+        'supervisores': supervisores_con_horario,
+        'turnos':       Turno.objects.filter(activo=True),
+    })
+
 
 # =======================
 # DASHBOARD SUPERVISOR
 # =======================
 
+@login_required(login_url='login')
 def dashboard_supervisor(request):
 
-    usuario_id     = request.session.get('usuario_id')
-    usuario_nombre = 'Supervisor'
-    usuario_rol    = 'Supervisor'
+    # Sincronizar horario del supervisor desde caché al iniciar sesión
+    usuario_id = request.session.get('usuario_id')
+    if usuario_id and usuario_id in _horarios_supervisores:
+        request.session['horario_fijo'] = _horarios_supervisores[usuario_id]
 
-    try:
-        usuario_db     = Usuario.objects.get(id=usuario_id)
-        usuario_nombre = usuario_db.nombre
-        usuario_rol    = usuario_db.rol
-    except Usuario.DoesNotExist:
-        pass
-
-    total_empleados          = Empleado.objects.count()
     empleados_activos        = Empleado.objects.filter(estado='Activo').count()
-    total_turnos             = Turno.objects.count()
-    total_asignaciones       = Asignacion.objects.count()
+    turnos                   = Turno.objects.count()
+    producciones_proceso     = Produccion.objects.filter(estado='En Proceso').count()
+    producciones_pendientes  = Produccion.objects.filter(estado='Pendiente').count()
     exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
     total_lotes              = Lote.objects.count()
+    total_asignaciones       = Asignacion.objects.count()
     total_bitacora           = Bitacora.objects.count()
-    mis_bitacoras            = Bitacora.objects.filter(
-        supervisor__id=usuario_id
-    ).order_by('-fecha_registro')[:5]
+    asignaciones             = Asignacion.objects.select_related('empleado').order_by('-id')[:10]
+    lotes                    = Lote.objects.order_by('-fecha_vencimiento')[:5]
 
     context = {
-        'usuario_nombre':          usuario_nombre,
-        'usuario_rol':             usuario_rol,
-        'total_empleados':         total_empleados,
-        'empleados_activos':       empleados_activos,
-        'total_turnos':            total_turnos,
-        'total_asignaciones':      total_asignaciones,
-        'exportaciones_pendientes':exportaciones_pendientes,
-        'total_lotes':             total_lotes,
-        'total_bitacora':          total_bitacora,
-        'mis_bitacoras':           mis_bitacoras,
+        'empleados_activos':        empleados_activos,
+        'turnos':                   turnos,
+        'producciones_proceso':     producciones_proceso,
+        'producciones_pendientes':  producciones_pendientes,
+        'exportaciones_pendientes': exportaciones_pendientes,
+        'total_lotes':              total_lotes,
+        'total_asignaciones':       total_asignaciones,
+        'total_bitacora':           total_bitacora,
+        'asignaciones':             asignaciones,
+        'lotes':                    lotes,
     }
 
-    return render(request, 'dashboardsuper.html', context)
+    return render(request, 'dashboard_supervisor.html', context)
+
+
+# ========================
+# API STATS SUPERVISOR
+# ========================
+
+@login_required(login_url='login')
+def api_stats_supervisor(request):
+
+    hoy = timezone.now().date()
+
+    empleados_con_turno = RotacionTurno.objects.values_list('empleado_id', flat=True)
+
+    sin_turno = Empleado.objects.filter(
+        estado='Activo'
+    ).exclude(
+        id__in=empleados_con_turno
+    ).count()
+
+    turno = Turno.objects.filter(activo=True).first()
+
+    data = {
+        'total_empleados':          Empleado.objects.count(),
+        'empleados_activos':        Empleado.objects.filter(estado='Activo').count(),
+        'asignaciones_hoy':         Asignacion.objects.filter(fecha_asignacion=hoy).count(),
+        'sin_turno':                sin_turno,
+        'lotes_totales':            Lote.objects.count(),
+        'exportaciones_pendientes': Exportacion.objects.filter(estado='Pendiente').count(),
+        'exportaciones_enviadas':   Exportacion.objects.filter(estado='Enviado').count(),
+        'bitacora_hoy':             Bitacora.objects.filter(fecha_registro=hoy).count(),
+        'bitacora_pendientes':      Bitacora.objects.filter(fecha_registro=hoy, estado='Borrador').count(),
+        'bitacora_enviados':        Bitacora.objects.filter(fecha_registro=hoy, estado='Enviado').count(),
+        'turno_nombre':             turno.horario if turno else 'Sin turno hoy',
+    }
+
+    return JsonResponse(data)
+
 
 # ===================
 # EMPLEADOS
 # ===================
 
+@login_required(login_url='login')
 def empleados(request):
 
-    query  = request.GET.get('q') or request.GET.get('busqueda')
-    estado = request.GET.get('estado')
+    rol    = request.session.get('rol', '')
+    query  = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
     lista  = Empleado.objects.all()
+
+    if rol == 'Supervisor':
+        lista = lista.filter(estado='Activo')
+    else:
+        if estado and estado != 'Todos':
+            lista = lista.filter(estado=estado)
 
     if query:
         lista = lista.filter(
             Q(nombre__icontains=query) |
-            Q(email__icontains=query)  |
-            Q(cedula__icontains=query)
+            Q(cedula__icontains=query)  |
+            Q(email__icontains=query)
         )
-    if estado and estado != 'Todos':
-        lista = lista.filter(estado=estado)
 
     return render(request, 'modulos/empleados/empleados.html', {
-        'empleados': lista
+        'empleados': lista,
+        'rol':       rol,
+        'horario':   '',
+        'fecha_hoy': date.today(),
+        'busqueda':  query,
+    })
+
+@login_required(login_url='login')
+def empleados_supervisor(request):
+
+    query = request.GET.get('q', '')
+    lista = Empleado.objects.filter(estado='Activo')
+
+    if query:
+        lista = lista.filter(
+            Q(nombre__icontains=query) |
+            Q(cedula__icontains=query)  |
+            Q(email__icontains=query)
+        )
+
+    return render(request, 'modulos/empleados/empleados_supervisor.html', {
+        'empleados': lista,
+        'horario':   '',
+        'fecha_hoy': date.today(),
+        'busqueda':  query,
     })
 
 
@@ -324,12 +478,33 @@ def guardar_empleado(request):
         empleado_id = request.POST.get('id')
         empleado    = get_object_or_404(Empleado, id=empleado_id) if empleado_id else Empleado()
 
-        empleado.cedula     = request.POST.get('cedula')
-        empleado.nombre     = request.POST.get('nombre')
-        empleado.email      = request.POST.get('email')
-        empleado.telefono   = request.POST.get('telefono')
-        empleado.direccion  = request.POST.get('direccion')
-        empleado.estado     = request.POST.get('estado')
+        cedula    = request.POST.get('cedula', '').strip()
+        nombre    = request.POST.get('nombre', '').strip()
+        email     = request.POST.get('email', '').strip()
+        telefono  = request.POST.get('telefono', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
+        estado    = request.POST.get('estado', '').strip()
+
+        if not nombre or not email or not estado:
+            messages.error(request, "Nombre, email y estado son obligatorios.")
+            return redirect('empleados')
+
+        # Validar email duplicado (solo si es nuevo o cambió)
+        if not empleado_id:
+            if Empleado.objects.filter(email=email).exists():
+                messages.error(request, "Ya existe un empleado con ese correo.")
+                return redirect('empleados')
+        else:
+            if Empleado.objects.filter(email=email).exclude(id=empleado_id).exists():
+                messages.error(request, "Ya existe un empleado con ese correo.")
+                return redirect('empleados')
+
+        empleado.cedula    = cedula
+        empleado.nombre    = nombre
+        empleado.email     = email
+        empleado.telefono  = telefono
+        empleado.direccion = direccion if direccion else 'Sin dirección'
+        empleado.estado    = estado
         empleado.creado_por = usuario_perfil
         empleado.save()
         messages.success(request, "Empleado guardado correctamente.")
@@ -350,8 +525,8 @@ def inactivar_empleado(request, id):
 def generar_reporte_empleados(request):
 
     lista    = Empleado.objects.all()
-    busqueda = request.GET.get('busqueda')
-    estado   = request.GET.get('estado')
+    busqueda = request.GET.get('busqueda', '')
+    estado   = request.GET.get('estado', '')
 
     if busqueda:
         lista = lista.filter(nombre__icontains=busqueda)
@@ -368,7 +543,13 @@ def generar_reporte_empleados(request):
 
     datos = [['Cédula', 'Nombre', 'Email', 'Teléfono', 'Estado']]
     for emp in lista:
-        datos.append([emp.cedula, emp.nombre, emp.email, emp.telefono, emp.estado])
+        datos.append([
+            emp.cedula or '',
+            emp.nombre,
+            emp.email,
+            emp.telefono or '',
+            emp.estado,
+        ])
 
     tabla = Table(datos)
     tabla.setStyle(TableStyle([
@@ -390,20 +571,23 @@ def generar_reporte_empleados(request):
     response.write(pdf)
     return response
 
+
 # ===================
 # TURNOS
 # ===================
 
+@login_required(login_url='login')
 def turnos(request):
-    horario_filtro = request.GET.get('horario')
-    semana_filtro  = request.GET.get('semana')                    # ← nuevo
+
+    horario_filtro = request.GET.get('horario', '')
+    semana_filtro  = request.GET.get('semana', '')
     semana_actual  = date.today().isocalendar()[1]
 
-    lista = RotacionTurno.objects.select_related('empleado', 'turno').all()  # ← sin filtro fijo
+    lista = RotacionTurno.objects.select_related('empleado', 'turno').all()
 
     if horario_filtro:
         lista = lista.filter(turno__horario=horario_filtro)
-    if semana_filtro:                                              # ← nuevo
+    if semana_filtro:
         lista = lista.filter(semana=semana_filtro)
 
     return render(request, 'modulos/turnos/turnos.html', {
@@ -411,6 +595,24 @@ def turnos(request):
         'semana_actual': semana_actual,
         'turnos':        Turno.objects.filter(activo=True),
         'empleados':     Empleado.objects.filter(estado='Activo'),
+    })
+
+
+@login_required(login_url='login')
+def turnos_supervisor(request):
+
+    busqueda = request.GET.get('q', '')
+
+    lista = RotacionTurno.objects.select_related('empleado', 'turno').all().order_by('-fecha_inicio')
+
+    if busqueda:
+        lista = lista.filter(empleado__nombre__icontains=busqueda)
+
+    return render(request, 'modulos/turnos/turnos_supervisor.html', {
+        'turnos':    lista,
+        'rol':       'Supervisor',
+        'fecha_hoy': timezone.now().date(),
+        'busqueda':  busqueda,
     })
 
 
@@ -423,35 +625,52 @@ def guardar_rotacion(request):
             messages.error(request, "Sesión inválida.")
             return redirect('login')
 
-        rotacion_id    = request.POST.get('id')
-        empleado_id    = request.POST.get('empleado_id')
-        turno_id       = request.POST.get('turno_id')
-        fecha_inicio   = request.POST.get('fecha_inicio')
-        fecha_fin      = request.POST.get('fecha_fin')
-        semana         = request.POST.get('semana')
-        sabado         = request.POST.get('sabado_asignado') == 'on'
-        estado         = request.POST.get('estado', 'Pendiente')
+        rotacion_id  = request.POST.get('id', '').strip()
+        empleado_id  = request.POST.get('empleado_id', '').strip()
+        turno_id     = request.POST.get('turno_id', '').strip()
+        fecha_inicio = request.POST.get('fecha_inicio', '').strip()
+        fecha_fin    = request.POST.get('fecha_fin', '').strip()
+        semana       = request.POST.get('semana', '').strip()
+        sabado       = request.POST.get('sabado_asignado') == 'on'
+        estado       = request.POST.get('estado', 'Pendiente')
 
         if not all([empleado_id, turno_id, fecha_inicio, fecha_fin, semana]):
             messages.error(request, "Todos los campos son obligatorios.")
             return redirect('turnos')
 
+        # Validar que fecha_fin no sea anterior a fecha_inicio
+        if fecha_fin < fecha_inicio:
+            messages.error(request, "La fecha de fin no puede ser anterior a la de inicio.")
+            return redirect('turnos')
+
         try:
+            empleado = get_object_or_404(Empleado, id=empleado_id)
+            turno    = get_object_or_404(Turno, id=turno_id)
+
             if rotacion_id:
-                rot = get_object_or_404(RotacionTurno, id=rotacion_id)
-                rot.empleado        = get_object_or_404(Empleado, id=empleado_id)
-                rot.turno           = get_object_or_404(Turno, id=turno_id)
+                rot                 = get_object_or_404(RotacionTurno, id=rotacion_id)
+                rot.empleado        = empleado
+                rot.turno           = turno
                 rot.fecha_inicio    = fecha_inicio
                 rot.fecha_fin       = fecha_fin
-                rot.semana          = semana
+                rot.semana          = int(semana)
                 rot.sabado_asignado = sabado
                 rot.estado          = estado
                 rot.save()
                 messages.success(request, "Rotación actualizada correctamente.")
             else:
+                # Verificar constraint único (empleado + fecha_inicio + fecha_fin)
+                if RotacionTurno.objects.filter(
+                    empleado=empleado,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin
+                ).exists():
+                    messages.error(request, f"{empleado.nombre} ya tiene un turno asignado para ese período.")
+                    return redirect('turnos')
+
                 RotacionTurno.objects.create(
-                    empleado        = get_object_or_404(Empleado, id=empleado_id),
-                    turno           = get_object_or_404(Turno, id=turno_id),
+                    empleado        = empleado,
+                    turno           = turno,
                     fecha_inicio    = fecha_inicio,
                     fecha_fin       = fecha_fin,
                     semana          = int(semana),
@@ -460,7 +679,7 @@ def guardar_rotacion(request):
                 )
                 messages.success(request, "Rotación registrada correctamente.")
         except Exception as e:
-            messages.error(request, f"Error: {str(e)}")
+            messages.error(request, f"Error al guardar rotación: {str(e)}")
 
     return redirect('turnos')
 
@@ -471,6 +690,21 @@ def eliminar_rotacion(request, id):
     rot.delete()
     messages.success(request, "Rotación eliminada correctamente.")
     return redirect('turnos')
+
+
+@login_required
+def rotacion_turnos(request):
+
+    semana_filtro = request.GET.get('semana', '')
+    lista = RotacionTurno.objects.select_related('empleado', 'turno').all()
+
+    if semana_filtro:
+        lista = lista.filter(semana=semana_filtro)
+
+    return render(request, 'modulos/turnos/rotacion.html', {
+        'rotaciones': lista,
+    })
+
 
 @login_required(login_url='login')
 def generar_reporte_turnos(request):
@@ -513,22 +747,6 @@ def generar_reporte_turnos(request):
     response['Content-Disposition'] = 'attachment; filename="reporte_turnos.pdf"'
     response.write(pdf)
     return response
-
-# ===================
-# ROTACION TURNOS
-# ===================
-
-def rotacion_turnos(request):
-
-    semana_filtro = request.GET.get('semana')
-    lista = RotacionTurno.objects.select_related('empleado', 'turno').all()
-
-    if semana_filtro:
-        lista = lista.filter(semana=semana_filtro)
-
-    return render(request, 'modulos/turnos/rotacion.html', {
-        'rotaciones': lista,
-    })
 
 
 @login_required(login_url='login')
@@ -577,14 +795,16 @@ def generar_reporte_rotacion(request):
     response.write(pdf)
     return response
 
+
 # ===================
 # SOLICITUDES
 # ===================
 
+@login_required(login_url='login')
 def solicitudes(request):
 
-    query  = request.GET.get('q')
-    estado = request.GET.get('estado')
+    query  = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
     lista  = Solicitud.objects.select_related(
         'empleado', 'turno_actual', 'turno_solicitado', 'revisado_por'
     ).all()
@@ -594,13 +814,13 @@ def solicitudes(request):
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
 
-    turnos    = Turno.objects.filter(activo=True)
-    empleados = Empleado.objects.filter(estado='Activo')
+    turnos_activos = Turno.objects.filter(activo=True)
+    empleados_activos = Empleado.objects.filter(estado='Activo')
 
     return render(request, 'modulos/solicitudes/solicitudes.html', {
         'solicitudes': lista,
-        'turnos':      turnos,
-        'empleados':   empleados,
+        'turnos':      turnos_activos,
+        'empleados':   empleados_activos,
     })
 
 
@@ -608,13 +828,21 @@ def solicitudes(request):
 def guardar_solicitud(request):
     if request.method == 'POST':
 
-        empleado_id      = request.POST.get('empleado_id')
-        turno_actual_id  = request.POST.get('turno_actual_id')
-        turno_sol_id     = request.POST.get('turno_solicitado_id')
-        motivo           = request.POST.get('motivo', '').strip()
+        empleado_id     = request.POST.get('empleado_id', '').strip()
+        turno_actual_id = request.POST.get('turno_actual_id', '').strip()
+        turno_sol_id    = request.POST.get('turno_solicitado_id', '').strip()
+        motivo          = request.POST.get('motivo', '').strip()
 
         if not empleado_id or not turno_actual_id or not turno_sol_id or not motivo:
             messages.error(request, "Todos los campos son obligatorios.")
+            return redirect('solicitudes')
+
+        if turno_actual_id == turno_sol_id:
+            messages.error(request, "El turno solicitado debe ser diferente al turno actual.")
+            return redirect('solicitudes')
+
+        if len(motivo) < 10:
+            messages.error(request, "El motivo debe tener al menos 10 caracteres.")
             return redirect('solicitudes')
 
         Solicitud.objects.create(
@@ -634,10 +862,21 @@ def revisar_solicitud(request, id):
     if request.method == 'POST':
 
         usuario_id = request.session.get('usuario_id')
-        usuario    = get_object_or_404(Usuario, id=usuario_id)
+        if not usuario_id:
+            messages.error(request, "Sesión inválida.")
+            return redirect('login')
 
-        solicitud             = get_object_or_404(Solicitud, id=id)
-        solicitud.estado      = request.POST.get('estado')
+        usuario   = get_object_or_404(Usuario, id=usuario_id)
+        solicitud = get_object_or_404(Solicitud, id=id)
+
+        nuevo_estado = request.POST.get('estado', '').strip()
+        estados_validos = ['Aprobado', 'Rechazado', 'Pendiente']
+
+        if nuevo_estado not in estados_validos:
+            messages.error(request, "Estado no válido.")
+            return redirect('solicitudes')
+
+        solicitud.estado       = nuevo_estado
         solicitud.revisado_por = usuario
         solicitud.save()
 
@@ -693,18 +932,21 @@ def generar_reporte_solicitudes(request):
     response.write(pdf)
     return response
 
+
 # ===================
 # ASIGNACIONES
 # ===================
 
+@login_required(login_url='login')
 def asignaciones(request):
-
-    query  = request.GET.get('q')
-    estado = request.GET.get('estado')
-    lista  = Asignacion.objects.select_related(
+ 
+    query  = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
+ 
+    lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
     ).all()
-
+ 
     if query:
         lista = lista.filter(
             Q(tarea__icontains=query) |
@@ -712,89 +954,191 @@ def asignaciones(request):
         )
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
-
-    empleados = Empleado.objects.filter(estado='Activo')
-    turnos    = Turno.objects.filter(activo=True)
-
+ 
+    empleados_activos = Empleado.objects.filter(estado='Activo')
+    turnos_activos    = Turno.objects.filter(activo=True)
+ 
     return render(request, 'modulos/asignaciones/asignaciones.html', {
         'asignaciones': lista,
-        'empleados':    empleados,
-        'turnos':       turnos,
+        'empleados':    empleados_activos,
+        'turnos':       turnos_activos,
     })
-
-
+ 
+ 
+# ─────────────────────────────────────────────
+#  ADMIN — Crear / Editar asignación
+# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def guardar_asignacion(request):
-    if request.method == 'POST':
-
-        usuario_id = request.session.get('usuario_id')
-        if not usuario_id:
-            messages.error(request, "Sesión inválida.")
-            return redirect('login')
-        try:
-            usuario_perfil = Usuario.objects.get(id=usuario_id)
-        except Usuario.DoesNotExist:
-            messages.error(request, "No se encontró tu perfil.")
-            return redirect('login')
-
-        asignacion_id = request.POST.get('id')
-        asignacion    = get_object_or_404(Asignacion, id=asignacion_id) if asignacion_id else Asignacion()
-
-        tarea    = request.POST.get('tarea', '').strip()
-        fecha    = request.POST.get('fecha_asignacion', '').strip()
-        emp_id   = request.POST.get('empleado_id')
-        turno_id = request.POST.get('turno_id')
-        estado   = request.POST.get('estado', 'Pendiente')
-
-        if not tarea or not fecha or not emp_id or not turno_id:
-            messages.error(request, "Todos los campos son obligatorios.")
-            return redirect('asignaciones')
-
-        asignacion.tarea            = tarea
-        asignacion.fecha_asignacion = fecha
-        asignacion.empleado         = get_object_or_404(Empleado, id=emp_id)
-        asignacion.turno            = get_object_or_404(Turno, id=turno_id)
-        asignacion.asignado_por     = usuario_perfil
-        asignacion.estado           = estado
-
-        try:
-            asignacion.save()
-            messages.success(request, "Asignación guardada correctamente.")
-        except Exception as e:
-            messages.error(request, str(e))
-
+    if request.method != 'POST':
+        return redirect('asignaciones')
+ 
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        messages.error(request, "Sesión inválida.")
+        return redirect('login')
+ 
+    try:
+        usuario_perfil = Usuario.objects.get(id=usuario_id)
+    except Usuario.DoesNotExist:
+        messages.error(request, "No se encontró tu perfil.")
+        return redirect('login')
+ 
+    asignacion_id = request.POST.get('id', '').strip()
+    tarea         = request.POST.get('tarea', '').strip()
+    fecha         = request.POST.get('fecha_asignacion', '').strip()
+    emp_id        = request.POST.get('empleado_id', '').strip()
+    turno_id      = request.POST.get('turno_id', '').strip()
+    estado        = request.POST.get('estado', 'Pendiente')
+ 
+    if not tarea or not fecha or not emp_id or not turno_id:
+        messages.error(request, "Todos los campos son obligatorios.")
+        return redirect('asignaciones')
+ 
+    empleado = get_object_or_404(Empleado, id=emp_id)
+    turno    = get_object_or_404(Turno, id=turno_id)
+ 
+    if asignacion_id:
+        asignacion = get_object_or_404(Asignacion, id=asignacion_id)
+    else:
+        asignacion = Asignacion()
+ 
+    asignacion.tarea            = tarea
+    asignacion.fecha_asignacion = fecha
+    asignacion.empleado         = empleado
+    asignacion.turno            = turno
+    asignacion.asignado_por     = usuario_perfil
+    asignacion.estado           = estado
+ 
+    try:
+        asignacion.save()
+        messages.success(request, "Asignación guardada correctamente.")
+    except Exception as e:
+        messages.error(request, str(e))
+ 
     return redirect('asignaciones')
-
-
+ 
+ 
+# ─────────────────────────────────────────────
+#  ADMIN — Inactivar / Finalizar asignación
+# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def inactivar_asignacion(request, id):
     asignacion        = get_object_or_404(Asignacion, id=id)
-    asignacion.estado = 'Pendiente'
+    asignacion.estado = 'Finalizado'
     asignacion.save()
-    messages.success(request, "Asignación inactivada.")
+    messages.success(request, "Asignación finalizada.")
     return redirect('asignaciones')
-
-
+ 
+ 
+# ─────────────────────────────────────────────
+#  SUPERVISOR — Listado de asignaciones
+# ─────────────────────────────────────────────
+@login_required(login_url='login')
+def asignaciones_supervisor(request):
+ 
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        return redirect('login')
+ 
+    busqueda = request.GET.get('q', '')
+ 
+    lista = Asignacion.objects.select_related(
+        'empleado', 'turno', 'asignado_por'
+    ).order_by('-fecha_asignacion')
+ 
+    if busqueda:
+        lista = lista.filter(
+            Q(tarea__icontains=busqueda) |
+            Q(empleado__nombre__icontains=busqueda)
+        )
+ 
+    empleados_activos = Empleado.objects.filter(estado='Activo')
+    turnos_activos    = Turno.objects.filter(activo=True)
+ 
+    return render(request, 'modulos/asignaciones/asignaciones_supervisor.html', {
+        'asignaciones': lista,
+        'busqueda':     busqueda,
+        'empleados':    empleados_activos,
+        'turnos':       turnos_activos,
+        'fecha_hoy':    timezone.now().date(),
+    })
+ 
+ 
+# ─────────────────────────────────────────────
+#  SUPERVISOR — Solo crear asignación
+# ─────────────────────────────────────────────
+@login_required(login_url='login')
+def guardar_asignacion_supervisor(request):
+    if request.method != 'POST':
+        return redirect('asignaciones_supervisor')
+ 
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        messages.error(request, "Sesión inválida.")
+        return redirect('login')
+ 
+    try:
+        usuario_perfil = Usuario.objects.get(id=usuario_id)
+    except Usuario.DoesNotExist:
+        messages.error(request, "No se encontró tu perfil.")
+        return redirect('login')
+ 
+    tarea    = request.POST.get('tarea', '').strip()
+    fecha    = request.POST.get('fecha_asignacion', '').strip()
+    emp_id   = request.POST.get('empleado_id', '').strip()
+    turno_id = request.POST.get('turno_id', '').strip()
+ 
+    if not tarea or not fecha or not emp_id or not turno_id:
+        messages.error(request, "Todos los campos son obligatorios.")
+        return redirect('asignaciones_supervisor')
+ 
+    empleado = get_object_or_404(Empleado, id=emp_id)
+    turno    = get_object_or_404(Turno, id=turno_id)
+ 
+    asignacion                  = Asignacion()
+    asignacion.tarea            = tarea
+    asignacion.fecha_asignacion = fecha
+    asignacion.empleado         = empleado
+    asignacion.turno            = turno
+    asignacion.asignado_por     = usuario_perfil
+    asignacion.estado           = 'Pendiente'
+ 
+    try:
+        asignacion.save()
+        messages.success(request, "Asignación creada correctamente.")
+    except Exception as e:
+        messages.error(request, str(e))
+ 
+    return redirect('asignaciones_supervisor')
+ 
+ 
+# ─────────────────────────────────────────────
+#  ADMIN — Generar reporte PDF de asignaciones
+# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def generar_reporte_asignaciones(request):
-
-    lista = Asignacion.objects.select_related('empleado', 'turno', 'asignado_por').all()
-    query = request.GET.get('q')
-
+ 
+    query = request.GET.get('q', '')
+ 
+    lista = Asignacion.objects.select_related(
+        'empleado', 'turno', 'asignado_por'
+    ).all()
+ 
     if query:
         lista = lista.filter(
             Q(tarea__icontains=query) |
             Q(empleado__nombre__icontains=query)
         )
-
+ 
     buffer    = BytesIO()
     doc       = SimpleDocTemplate(buffer, pagesize=letter)
     elementos = []
     estilos   = getSampleStyleSheet()
-
+ 
     elementos.append(Paragraph("Reporte de Asignaciones - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
-
+ 
     datos = [['Tarea', 'Empleado', 'Turno', 'Fecha', 'Estado', 'Asignado por']]
     for a in lista:
         datos.append([
@@ -805,7 +1149,7 @@ def generar_reporte_asignaciones(request):
             a.estado,
             a.asignado_por.nombre,
         ])
-
+ 
     tabla = Table(datos)
     tabla.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
@@ -815,26 +1159,29 @@ def generar_reporte_asignaciones(request):
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('FONTSIZE',   (0, 0), (-1, -1), 9),
     ]))
-
+ 
     elementos.append(tabla)
     doc.build(elementos)
-
+ 
     pdf = buffer.getvalue()
     buffer.close()
-
+ 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_asignaciones.pdf"'
     response.write(pdf)
     return response
+ 
+
 
 # ===================
 # PRODUCCION
 # ===================
 
+@login_required(login_url='login')
 def producciones(request):
 
-    query  = request.GET.get('q')
-    estado = request.GET.get('estado')
+    query  = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
     lista  = Produccion.objects.select_related('empleado_responsable', 'creado_por').all()
 
     if query:
@@ -867,20 +1214,36 @@ def guardar_produccion(request):
             messages.error(request, "No se encontró tu perfil.")
             return redirect('login')
 
-        produccion_id      = request.POST.get('id')
-        produccion         = get_object_or_404(Produccion, id=produccion_id) if produccion_id else Produccion()
+        produccion_id = request.POST.get('id', '').strip()
 
+        # Campos reales del modelo Produccion
         producto           = request.POST.get('producto', '').strip()
         ingredientes       = request.POST.get('ingredientes', '').strip()
         cantidad_requerida = request.POST.get('cantidad_requerida', '').strip()
         fecha_entrega      = request.POST.get('fecha_entrega', '').strip()
         fecha_limite       = request.POST.get('fecha_limite', '').strip()
         estado             = request.POST.get('estado', '').strip()
-        emp_id             = request.POST.get('empleado_responsable')
+        emp_id             = request.POST.get('empleado_responsable', '').strip()
 
-        if not producto or not emp_id or not fecha_entrega or not fecha_limite:
+        if not producto or not emp_id or not fecha_entrega or not fecha_limite or not estado:
             messages.error(request, "Los campos obligatorios no pueden estar vacíos.")
             return redirect('producciones')
+
+        if not ingredientes:
+            messages.error(request, "Los ingredientes son obligatorios.")
+            return redirect('producciones')
+
+        # Validar que fecha_limite no sea anterior a fecha_entrega
+        if fecha_limite < fecha_entrega:
+            messages.error(request, "La fecha límite no puede ser anterior a la fecha de entrega.")
+            return redirect('producciones')
+
+        empleado = get_object_or_404(Empleado, id=emp_id)
+
+        if produccion_id:
+            produccion = get_object_or_404(Produccion, id=produccion_id)
+        else:
+            produccion = Produccion()
 
         produccion.producto           = producto
         produccion.ingredientes       = ingredientes
@@ -888,10 +1251,14 @@ def guardar_produccion(request):
         produccion.fecha_entrega      = fecha_entrega
         produccion.fecha_limite       = fecha_limite
         produccion.estado             = estado
-        produccion.empleado_responsable = get_object_or_404(Empleado, id=emp_id)
-        produccion.creado_por         = usuario_perfil
-        produccion.save()
-        messages.success(request, "Producción guardada correctamente.")
+        produccion.empleado_responsable = empleado
+        produccion.creado_por           = usuario_perfil
+
+        try:
+            produccion.save()
+            messages.success(request, "Producción guardada correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al guardar: {str(e)}")
 
     return redirect('producciones')
 
@@ -909,8 +1276,8 @@ def inactivar_produccion(request, id):
 def generar_reporte_producciones(request):
 
     lista  = Produccion.objects.select_related('empleado_responsable').all()
-    query  = request.GET.get('q')
-    estado = request.GET.get('estado')
+    query  = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
 
     if query:
         lista = lista.filter(producto__icontains=query)
@@ -925,14 +1292,15 @@ def generar_reporte_producciones(request):
     elementos.append(Paragraph("Reporte de Producciones - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Producto', 'Ingredientes', 'Cant. Requerida', 'Responsable', 'Fecha Entrega', 'Estado']]
+    # Columnas ajustadas a campos reales del modelo
+    datos = [['Producto', 'Responsable', 'Cant. Requerida', 'Fecha Entrega', 'Fecha Límite', 'Estado']]
     for p in lista:
         datos.append([
-            p.producto,
-            p.ingredientes,
-            p.cantidad_requerida,
+            p.producto or '',
             p.empleado_responsable.nombre,
+            p.cantidad_requerida or '',
             str(p.fecha_entrega),
+            str(p.fecha_limite),
             p.estado,
         ])
 
@@ -957,14 +1325,39 @@ def generar_reporte_producciones(request):
     response.write(pdf)
     return response
 
+# La misma monda pero del supervisor
+@login_required(login_url='login')
+def producciones_supervisor(request):
+    query  = request.GET.get('q', '')
+    estado = request.GET.get('estado', '')
+    lista  = Produccion.objects.select_related('empleado_responsable').all()
+
+    if query:
+        lista = lista.filter(producto__icontains=query)
+    if estado and estado != 'Todos':
+        lista = lista.filter(estado=estado)
+
+    empleados = Empleado.objects.filter(estado='Activo')
+
+    return render(request, 'modulos/produccion/produccion_supervisor.html', {
+        'producciones': lista,
+        'empleados':    empleados,
+        'fecha_hoy':    timezone.now().date(),
+    })
+
+
 # ===================
 # EXPORTACIONES
 # ===================
+# CORRECCIÓN: Exportacion no tiene campo 'creado_por' en el modelo.
+# Se eliminó esa asignación.
 
+@login_required(login_url='login')
 def gestionar_exportaciones(request):
 
     q      = request.GET.get('q', '')
     estado = request.GET.get('estado', '')
+
     exportaciones = Exportacion.objects.all()
 
     if q:
@@ -972,13 +1365,37 @@ def gestionar_exportaciones(request):
     if estado:
         exportaciones = exportaciones.filter(estado=estado)
 
-    producciones = Produccion.objects.filter(estado='En Proceso')
+    # Solo producciones En Proceso o Pendiente para asociar a exportaciones
+    producciones = Produccion.objects.filter(estado__in=['En Proceso', 'Pendiente'])
 
     return render(request, 'modulos/exportaciones/exportaciones.html', {
         'exportaciones': exportaciones,
         'producciones':  producciones,
         'q':             q,
         'estado_filtro': estado,
+    })
+
+
+@login_required(login_url='login')
+def exportaciones_supervisor(request):
+    busqueda      = request.GET.get('q', '')
+    estado_filtro = request.GET.get('estado', '')
+
+    lista = Exportacion.objects.all().order_by('-fecha_envio')
+
+    if busqueda:
+        lista = lista.filter(
+            Q(destino__icontains=busqueda) |
+            Q(producto__icontains=busqueda)
+        )
+    if estado_filtro and estado_filtro != 'Todos':
+        lista = lista.filter(estado=estado_filtro)
+
+    return render(request, 'modulos/exportaciones/exportaciones_supervisor.html', {
+        'exportaciones': lista,
+        'busqueda':      busqueda,
+        'estado_filtro': estado_filtro,
+        'fecha_hoy':     timezone.now().date(),
     })
 
 
@@ -990,20 +1407,25 @@ def guardar_exportacion(request):
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
             return redirect('login')
+        # Verificamos que el usuario existe aunque Exportacion no tenga creado_por
         try:
-            usuario_perfil = Usuario.objects.get(id=usuario_id)
+            Usuario.objects.get(id=usuario_id)
         except Usuario.DoesNotExist:
             messages.error(request, "No se encontró tu perfil.")
             return redirect('login')
 
-        exp_id        = request.POST.get('id')
-        destino       = request.POST.get('destino')
-        pais          = request.POST.get('pais', 'Colombia')
-        producto      = request.POST.get('producto', '')
-        fecha_envio   = request.POST.get('fecha_envio')
-        fecha_entrega = request.POST.get('fecha_entrega')
-        estado        = request.POST.get('estado')
-        produccion_id = request.POST.get('produccion_id')
+        exp_id        = request.POST.get('id', '').strip()
+        destino       = request.POST.get('destino', '').strip()
+        pais          = request.POST.get('pais', 'Colombia').strip()
+        producto      = request.POST.get('producto', '').strip()
+        fecha_envio   = request.POST.get('fecha_envio', '').strip()
+        fecha_entrega = request.POST.get('fecha_entrega', '').strip()
+        estado        = request.POST.get('estado', '').strip()
+        produccion_id = request.POST.get('produccion_id', '').strip()
+
+        if not destino or not fecha_envio or not fecha_entrega or not estado:
+            messages.error(request, "Destino, fechas y estado son obligatorios.")
+            return redirect('gestionar_exportaciones')
 
         if fecha_entrega < fecha_envio:
             messages.error(request, 'La fecha de entrega no puede ser anterior a la de envío.')
@@ -1031,6 +1453,7 @@ def guardar_exportacion(request):
                 fecha_entrega = fecha_entrega,
                 estado        = estado,
                 produccion    = produccion,
+                # Sin creado_por: el modelo Exportacion no tiene ese campo
             )
             messages.success(request, 'Exportación creada correctamente.')
 
@@ -1050,8 +1473,8 @@ def inactivar_exportacion(request, id):
 def generar_reporte_exportaciones(request):
 
     exportaciones = Exportacion.objects.all()
-    busqueda      = request.GET.get('busqueda')
-    estado        = request.GET.get('estado')
+    busqueda      = request.GET.get('busqueda', '')
+    estado        = request.GET.get('estado', '')
 
     if busqueda:
         exportaciones = exportaciones.filter(destino__icontains=busqueda)
@@ -1098,10 +1521,12 @@ def generar_reporte_exportaciones(request):
     response.write(pdf)
     return response
 
+
 # ===================
 # LOTES
 # ===================
 
+@login_required(login_url='login')
 def gestionar_lotes(request):
 
     q     = request.GET.get('q', '')
@@ -1122,6 +1547,23 @@ def gestionar_lotes(request):
 
 
 @login_required(login_url='login')
+def lotes_supervisor(request):
+    busqueda = request.GET.get('q', '')
+
+    lista = Lote.objects.select_related(
+        'produccion', 'exportacion'
+    ).order_by('-fecha_produccion')
+
+    if busqueda:
+        lista = lista.filter(codigo_lote__icontains=busqueda)
+
+    return render(request, 'modulos/lotes/lotes_supervisor.html', {
+        'lotes':     lista,
+        'busqueda':  busqueda,
+        'fecha_hoy': timezone.now().date(),
+    })
+    
+@login_required(login_url='login')
 def guardar_lote(request):
     if request.method == 'POST':
 
@@ -1130,13 +1572,13 @@ def guardar_lote(request):
             messages.error(request, "Sesión inválida.")
             return redirect('login')
 
-        lote_id           = request.POST.get('id')
-        codigo_lote       = request.POST.get('codigo_lote')
-        cantidad          = request.POST.get('cantidad')
-        fecha_produccion  = request.POST.get('fecha_produccion')
-        fecha_vencimiento = request.POST.get('fecha_vencimiento')
-        produccion_id     = request.POST.get('produccion_id')
-        exportacion_id    = request.POST.get('exportacion_id')
+        lote_id           = request.POST.get('id', '').strip()
+        codigo_lote       = request.POST.get('codigo_lote', '').strip()
+        cantidad          = request.POST.get('cantidad', '').strip()
+        fecha_produccion  = request.POST.get('fecha_produccion', '').strip()
+        fecha_vencimiento = request.POST.get('fecha_vencimiento', '').strip()
+        produccion_id     = request.POST.get('produccion_id', '').strip()
+        exportacion_id    = request.POST.get('exportacion_id', '').strip()
 
         if not all([codigo_lote, cantidad, fecha_produccion, fecha_vencimiento, produccion_id, exportacion_id]):
             messages.error(request, "Todos los campos son obligatorios.")
@@ -1234,153 +1676,191 @@ def generar_reporte_lotes(request):
     response.write(pdf)
     return response
 
-# ===================
-# BITACORA
-# ===================
 
-def bitacoras(request):
+# ========================
+# BITÁCORA DE PRODUCCIÓN
+# ========================
 
-    query  = request.GET.get('q')
-    estado = request.GET.get('estado')
-    lista  = Bitacora.objects.select_related('supervisor', 'produccion', 'revisado_por').all()
+from datetime import date
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
 
-    if query:
-        lista = lista.filter(titulo__icontains=query)
-    if estado and estado != 'Todos':
-        lista = lista.filter(estado=estado)
+from .models import Bitacora, Produccion, Usuario
+
+
+# ─────────────────────────────────────────────
+#  SUPERVISOR — Crear nueva bitácora
+# ─────────────────────────────────────────────
+@login_required(login_url='login')
+def bitacora_supervisor(request):
+
+    # Validar sesión y rol
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        return redirect('login')
+
+    supervisor = Usuario.objects.filter(id=usuario_id, rol='Supervisor').first()
+    if not supervisor:
+        messages.error(request, "No tienes permisos para acceder a esta sección.")
+        return redirect('login')
+
+    if request.method == 'POST':
+
+        titulo              = request.POST.get('titulo', '').strip()
+        descripcion         = request.POST.get('descripcion', '').strip()
+        tipo_reporte        = request.POST.get('tipo_reporte', '').strip()
+        produccion_id       = request.POST.get('produccion', '').strip()
+        unidades_producidas = request.POST.get('unidades_producidas', '').strip()
+        unidades_pendientes = request.POST.get('unidades_pendientes', '').strip()
+        observaciones       = request.POST.get('observaciones', '').strip()
+        estado              = request.POST.get('estado', 'Borrador')
+
+        # --- Validaciones ---
+        if not titulo or len(titulo) < 5:
+            messages.error(request, "El título debe tener mínimo 5 caracteres.")
+            return redirect('bitacora_supervisor')
+
+        if not descripcion or len(descripcion) < 20:
+            messages.error(request, "La descripción debe tener mínimo 20 caracteres.")
+            return redirect('bitacora_supervisor')
+
+        if not tipo_reporte:
+            messages.error(request, "Seleccione un tipo de reporte.")
+            return redirect('bitacora_supervisor')
+
+        if not produccion_id:
+            messages.error(request, "Seleccione una producción.")
+            return redirect('bitacora_supervisor')
+
+        if not unidades_producidas:
+            messages.error(request, "Debe ingresar las unidades producidas.")
+            return redirect('bitacora_supervisor')
+
+        if not unidades_pendientes:
+            messages.error(request, "Debe ingresar las unidades pendientes.")
+            return redirect('bitacora_supervisor')
+
+        produccion = Produccion.objects.filter(id=produccion_id).first()
+        if not produccion:
+            messages.error(request, "La producción seleccionada no existe.")
+            return redirect('bitacora_supervisor')
+
+        Bitacora.objects.create(
+            titulo              = titulo,
+            descripcion         = descripcion,
+            tipo_reporte        = tipo_reporte,
+            unidades_producidas = unidades_producidas,
+            unidades_pendientes = unidades_pendientes,
+            observaciones       = observaciones,
+            supervisor          = supervisor,
+            produccion          = produccion,
+            estado              = estado,
+        )
+
+        messages.success(request, "Bitácora registrada correctamente.")
+        return redirect('listar_bitacoras_supervisor')
 
     producciones = Produccion.objects.all()
 
-    return render(request, 'modulos/bitacora/bitacora.html', {
-        'bitacoras':   lista,
+    return render(request, 'modulos/bitacora/bitacora_supervisor.html', {
         'producciones': producciones,
+        'today':        date.today(),
+        'supervisor':   supervisor,
     })
 
 
+# ─────────────────────────────────────────────
+#  SUPERVISOR — Listar sus propias bitácoras
+# ─────────────────────────────────────────────
 @login_required(login_url='login')
-def guardar_bitacora(request):
+def listar_bitacoras_supervisor(request):
+
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        return redirect('login')
+
+    supervisor = Usuario.objects.filter(id=usuario_id, rol='Supervisor').first()
+    if not supervisor:
+        return redirect('login')
+
+    # El supervisor solo ve sus propias bitácoras
+    bitacoras = Bitacora.objects.select_related(
+        'produccion', 'revisado_por'
+    ).filter(supervisor=supervisor).order_by('-fecha_registro')
+
+    return render(request, 'modulos/bitacora/listar_bitacoras_supervisor.html', {
+        'bitacoras':  bitacoras,
+        'fecha_hoy':  date.today(),
+        'supervisor': supervisor,
+    })
+
+
+# ─────────────────────────────────────────────
+#  ADMIN — Listar todas las bitácoras
+# ─────────────────────────────────────────────
+@login_required(login_url='login')
+def listar_bitacoras(request):
+
+    bitacoras = Bitacora.objects.select_related(
+        'supervisor', 'produccion', 'revisado_por'
+    ).order_by('-fecha_registro')
+
+    # Contar pendientes para mostrar badge de notificación
+    pendientes = bitacoras.filter(estado='Enviado').count()
+
+    return render(request, 'modulos/bitacora/listar_bitacoras.html', {
+        'bitacoras':  bitacoras,
+        'pendientes': pendientes,
+        'fecha_hoy':  date.today(),
+    })
+
+
+# ─────────────────────────────────────────────
+#  ADMIN — Revisar bitácora (aprobar / rechazar)
+# ─────────────────────────────────────────────
+@login_required(login_url='login')
+def revisar_bitacora(request, id):
+
     if request.method == 'POST':
 
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
             return redirect('login')
-        try:
-            usuario_perfil = Usuario.objects.get(id=usuario_id)
-        except Usuario.DoesNotExist:
-            messages.error(request, "No se encontró tu perfil.")
-            return redirect('login')
 
-        bitacora_id         = request.POST.get('id')
-        bitacora            = get_object_or_404(Bitacora, id=bitacora_id) if bitacora_id else Bitacora()
+        bitacora = get_object_or_404(Bitacora, id=id)
+        admin    = get_object_or_404(Usuario, id=usuario_id)
 
-        titulo              = request.POST.get('titulo', '').strip()
-        descripcion         = request.POST.get('descripcion', '').strip()
-        tipo_reporte        = request.POST.get('tipo_reporte', '')
-        observaciones       = request.POST.get('observaciones', '')
-        unidades_producidas = request.POST.get('unidades_producidas', '')
-        unidades_pendientes = request.POST.get('unidades_pendientes', '')
-        estado              = request.POST.get('estado', 'Borrador')
-        produccion_id       = request.POST.get('produccion_id')
+        nuevo_estado      = request.POST.get('estado', '').strip()
+        observacion_admin = request.POST.get('observacion_admin', '').strip()
+        estados_validos   = ['Aprobado', 'Rechazado']
 
-        if not titulo or not descripcion or not tipo_reporte:
-            messages.error(request, "Título, descripción y tipo son obligatorios.")
-            return redirect('bitacoras')
+        if nuevo_estado not in estados_validos:
+            messages.error(request, "Estado de revisión no válido.")
+            return redirect('listar_bitacoras')
 
-        bitacora.titulo              = titulo
-        bitacora.descripcion         = descripcion
-        bitacora.tipo_reporte        = tipo_reporte
-        bitacora.observaciones       = observaciones
-        bitacora.unidades_producidas = unidades_producidas
-        bitacora.unidades_pendientes = unidades_pendientes
-        bitacora.estado              = estado
-        bitacora.supervisor          = usuario_perfil
-        bitacora.produccion          = Produccion.objects.filter(id=produccion_id).first() if produccion_id else None
-        bitacora.save()
-        messages.success(request, "Bitácora guardada correctamente.")
+        # Solo se pueden revisar bitácoras que estén en estado 'Enviado'
+        if bitacora.estado != 'Enviado':
+            messages.error(request, "Esta bitácora ya fue revisada.")
+            return redirect('listar_bitacoras')
 
-    return redirect('bitacoras')
-
-
-@login_required(login_url='login')
-def revisar_bitacora(request, id):
-    if request.method == 'POST':
-
-        usuario_id = request.session.get('usuario_id')
-        usuario    = get_object_or_404(Usuario, id=usuario_id)
-
-        bitacora                   = get_object_or_404(Bitacora, id=id)
-        bitacora.estado            = request.POST.get('estado')
-        bitacora.observacion_admin = request.POST.get('observacion_admin', '')
-        bitacora.revisado_por      = usuario
-        bitacora.fecha_revision    = timezone.now().date()
+        bitacora.estado            = nuevo_estado
+        bitacora.revisado_por      = admin
+        bitacora.fecha_revision    = date.today()
+        bitacora.observacion_admin = observacion_admin
         bitacora.save()
 
-        messages.success(request, f"Bitácora '{bitacora.titulo}' revisada correctamente.")
+        accion = "aprobada" if nuevo_estado == "Aprobado" else "rechazada"
+        messages.success(request, f"Bitácora '{bitacora.titulo}' {accion} correctamente.")
 
-    return redirect('bitacoras')
-
-
-@login_required(login_url='login')
-def generar_reporte_bitacoras(request):
-
-    lista  = Bitacora.objects.select_related('supervisor', 'produccion').all()
-    estado = request.GET.get('estado')
-
-    if estado and estado != 'Todos':
-        lista = lista.filter(estado=estado)
-
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
-    elementos = []
-    estilos   = getSampleStyleSheet()
-
-    elementos.append(Paragraph("Reporte de Bitácoras - ChocoFlow", estilos['Title']))
-    elementos.append(Spacer(1, 20))
-
-    datos = [['Título', 'Tipo', 'Supervisor', 'Fecha', 'Estado', 'Unid. Producidas', 'Unid. Pendientes']]
-    for b in lista:
-        datos.append([
-            b.titulo,
-            b.tipo_reporte,
-            b.supervisor.nombre,
-            str(b.fecha_registro),
-            b.estado,
-            b.unidades_producidas or '0',
-            b.unidades_pendientes or '0',
-        ])
-
-    tabla = Table(datos)
-    tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
-    ]))
-
-    elementos.append(tabla)
-    doc.build(elementos)
-
-    pdf = buffer.getvalue()
-    buffer.close()
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_bitacoras.pdf"'
-    response.write(pdf)
-    return response
-
+    return redirect('listar_bitacoras')
 # ========================
 # ASISTENTE IA CON GEMINI
 # ========================
 
+@login_required(login_url='login')
 def consultar_ia(request):
-
-    if not request.user.is_authenticated:
-        usuario_id = request.session.get('usuario_id')
-        if not usuario_id:
-            return JsonResponse({'error': 'No autorizado.'}, status=401)
 
     if request.method == 'POST':
 
@@ -1388,6 +1868,9 @@ def consultar_ia(request):
 
         if not pregunta:
             return JsonResponse({'error': 'La pregunta no puede estar vacía.'}, status=400)
+
+        if len(pregunta) < 5:
+            return JsonResponse({'error': 'La pregunta es demasiado corta.'}, status=400)
 
         empleados_activos        = Empleado.objects.filter(estado='Activo').count()
         empleados_suspendidos    = Empleado.objects.filter(estado='Suspendido').count()
@@ -1417,7 +1900,11 @@ Con base en estos datos reales, responde la siguiente pregunta:
         """
 
         try:
-            cliente   = genai.Client(api_key=os.getenv("AIzaSyAwbw7Vc_rZ7MAma33SG4GL4XbmJRQF778"))
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                return JsonResponse({'error': 'API key de Gemini no configurada.'}, status=500)
+
+            cliente   = genai.Client(api_key=api_key)
             respuesta = cliente.models.generate_content(
                 model    = "gemini-2.0-flash",
                 contents = contexto

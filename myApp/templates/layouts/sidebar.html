@@ -14,8 +14,11 @@
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
-    <!-- CSS -->
-    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <!-- CSS GLOBAL -->
+    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+
+    <!-- CSS EXTRA -->
+    {% block extra_css %}{% endblock %}
 
 </head>
 
@@ -26,7 +29,6 @@
     <!-- =========================
          SIDEBAR
     ========================== -->
-
     <aside class="sidebar">
 
         <!-- TOP -->
@@ -34,175 +36,234 @@
 
             <!-- LOGO -->
             <div class="logo">
-
                 <div class="logo-icon">
                     <i class="fa-solid fa-cube"></i>
                 </div>
-
                 <div class="logo-texto">
                     <h2>ChocoFlow</h2>
                     <span>Sistema Inteligente</span>
                 </div>
-
             </div>
 
-            <!-- MENÚ -->
-            <ul class="menu">
+        </div>
+        <!-- /sidebar-top -->
 
-                <!-- DASHBOARD -->
+        <!-- MENÚ -->
+        <ul class="menu">
+
+            <!-- =========================
+                 ADMINISTRADOR
+            ========================== -->
+            {% if request.session.rol == 'Administrador' %}
+
                 <li>
                     <a href="{% url 'dashboard' %}"
                        class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-
                         <i class="fa-solid fa-house"></i>
                         <span>Dashboard</span>
-
                     </a>
                 </li>
 
-                <!-- EMPLEADOS -->
                 <li>
                     <a href="{% url 'empleados' %}"
                        class="{% if request.resolver_match.url_name == 'empleados' %}active{% endif %}">
-
                         <i class="fa-solid fa-users"></i>
                         <span>Empleados</span>
-
                     </a>
                 </li>
 
-                <!-- TURNOS -->
                 <li>
                     <a href="{% url 'turnos' %}"
                        class="{% if request.resolver_match.url_name == 'turnos' %}active{% endif %}">
-
                         <i class="fa-solid fa-calendar-days"></i>
                         <span>Turnos</span>
-
                     </a>
                 </li>
 
-                <!-- ASIGNACIONES -->
                 <li>
                     <a href="{% url 'asignaciones' %}"
                        class="{% if request.resolver_match.url_name == 'asignaciones' %}active{% endif %}">
-
                         <i class="fa-solid fa-list-check"></i>
                         <span>Asignaciones</span>
-
                     </a>
                 </li>
 
-                <!-- PRODUCCIÓN -->
                 <li>
                     <a href="{% url 'producciones' %}"
                        class="{% if request.resolver_match.url_name == 'producciones' %}active{% endif %}">
-
                         <i class="fa-solid fa-industry"></i>
                         <span>Producción</span>
-
                     </a>
                 </li>
 
-                <!-- LOTES -->
                 <li>
                     <a href="{% url 'gestionar_lotes' %}"
                        class="{% if request.resolver_match.url_name == 'gestionar_lotes' %}active{% endif %}">
-
                         <i class="fa-solid fa-box"></i>
                         <span>Lotes</span>
-
                     </a>
                 </li>
 
-                <!-- EXPORTACIONES -->
                 <li>
                     <a href="{% url 'gestionar_exportaciones' %}"
                        class="{% if request.resolver_match.url_name == 'gestionar_exportaciones' %}active{% endif %}">
-
                         <i class="fa-solid fa-plane"></i>
                         <span>Exportaciones</span>
-
                     </a>
                 </li>
 
-                <!-- SOLICITUDES -->
                 <li>
                     <a href="{% url 'solicitudes' %}"
                        class="{% if request.resolver_match.url_name == 'solicitudes' %}active{% endif %}">
-
                         <i class="fa-solid fa-right-left"></i>
                         <span>Solicitudes</span>
-
                     </a>
                 </li>
 
-            </ul>
+            {% endif %}
 
-        </div>
+            <!-- =========================
+                 SUPERVISOR
+            ========================== -->
+            {% if request.session.rol == 'Supervisor' %}
+
+                <li>
+                    <a href="{% url 'dashboard_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'dashboard_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'empleados_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'empleados_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Empleados</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'turnos_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'turnos_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-clock"></i>
+                        <span>Turnos</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'asignaciones_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'asignaciones_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Asignaciones</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'producciones_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'producciones_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-industry"></i>
+                        <span>Producción</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'exportaciones_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'exportaciones_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-plane"></i>
+                        <span>Exportaciones</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'lotes_supervisor' %}"
+                       class="{% if request.resolver_match.url_name == 'lotes_supervisor' %}active{% endif %}">
+                        <i class="fa-solid fa-box"></i>
+                        <span>Lotes</span>
+                    </a>
+                </li>
+
+                <!-- BITÁCORA — desplegable inline (sin menú flotante) -->
+                <li class="dropdown-menu-custom {% if request.resolver_match.url_name == 'bitacora_supervisor' or request.resolver_match.url_name == 'listar_bitacoras_supervisor' %}open{% endif %}">
+
+                    <!-- BOTÓN que abre/cierra el submenú -->
+                    <button class="dropdown-btn" onclick="this.parentElement.classList.toggle('open')">
+                        <div class="menu-left">
+                            <i class="fa-solid fa-book"></i>
+                            <span>Bitácora</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                    </button>
+
+                    <!-- SUBMENÚ INLINE -->
+                    <ul class="submenu">
+
+                        <li>
+                            <a href="{% url 'bitacora_supervisor' %}"
+                               class="{% if request.resolver_match.url_name == 'bitacora_supervisor' %}active{% endif %}">
+                                <i class="fa-solid fa-book-open"></i>
+                                <span>Nueva Bitácora</span>
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{% url 'listar_bitacoras_supervisor' %}"
+                               class="{% if request.resolver_match.url_name == 'listar_bitacoras_supervisor' %}active{% endif %}">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                <span>Historial</span>
+                            </a>
+                        </li>
+
+                    </ul>
+
+                </li>
+                <!-- /BITÁCORA -->
+
+            {% endif %}
+
+        </ul>
+        <!-- /menu -->
 
         <!-- =========================
              FOOTER SIDEBAR
         ========================== -->
-
         <div class="sidebar-bottom">
 
             <!-- PERFIL -->
             <div class="perfil-sidebar">
-
                 <div class="perfil-avatar">
                     <i class="fa-solid fa-user"></i>
                 </div>
-
                 <div class="perfil-info">
                     <h4>{{ usuario_nombre }}</h4>
-                    <span>Administrador</span>
+                    <span>{{ request.session.rol }}</span>
                 </div>
-
             </div>
 
             <!-- LOGOUT -->
             <a href="{% url 'logout' %}" class="logout-btn">
-
                 <i class="fa-solid fa-right-from-bracket"></i>
-
                 <span>Cerrar sesión</span>
-
             </a>
 
         </div>
+        <!-- /sidebar-bottom -->
 
     </aside>
+    <!-- /sidebar -->
 
     <!-- =========================
-         CONTENIDO
+         CONTENIDO PRINCIPAL
     ========================== -->
-
     <main class="content">
-
-        <!-- TOPBAR -->
-        <div class="topbar">
-
-            <div>
-                <h1>{% block titulo %}Dashboard{% endblock %}</h1>
-            </div>
-
-            <div class="topbar-perfil">
-                <span>
-                    👋 Bienvenido,
-                    <strong>{{ usuario_nombre }}</strong>
-                </span>
-            </div>
-
-        </div>
-
-        <!-- CONTENIDO DINÁMICO -->
-        {% block content %}
-        {% endblock %}
-
+        {% block content %}{% endblock %}
     </main>
 
 </div>
+<!-- /layout -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
 
 </body>
 </html>

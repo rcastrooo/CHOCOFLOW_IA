@@ -1,24 +1,21 @@
-{% extends 'layouts/modulos.html' %}
+{% extends 'layouts/sidebar.html' %}
 {% load static %}
 
 {% block title %}Gestión de Asignaciones{% endblock %}
 
 {% block content %}
 
-{# ============================================================ #}
-{#  Hoja de estilos específica del módulo de asignaciones       #}
-{# ============================================================ #}
 <link rel="stylesheet" href="{% static 'css/asignaciones.css' %}">
 
 <section class="container mt-5">
 <div class="container-custom shadow">
 
-    {# ----------- Título principal del módulo ----------- #}
+    
     <h2 class="text-center section-title mb-4">
         📋 Gestión de Asignaciones
     </h2>
 
-    {# ----------- Mensajes de alerta (éxito, error, etc.) ----------- #}
+    
     {% if messages %}
         {% for msg in messages %}
             <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
