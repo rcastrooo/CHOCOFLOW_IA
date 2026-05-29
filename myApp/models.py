@@ -18,7 +18,7 @@ class Usuario(models.Model):
 
     nombre = models.CharField(max_length=100)
     email = models.EmailField(unique=True, max_length=255)
-    ttelefono = models.CharField(max_length=10, blank=True, null=True)
+    telefono = models.CharField(max_length=10, blank=True, null=True)
     direccion = models.CharField(max_length=255)
     contrasena = models.CharField(max_length=255)
     rol = models.CharField(max_length=20, choices=ROL_CHOICES)

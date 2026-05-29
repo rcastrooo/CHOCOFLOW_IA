@@ -1,75 +1,86 @@
-{% extends 'layouts/base.html' %}
 {% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión | ChocoFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/login2.css' %}">
+</head>
+<body class="login-page">
 
-{% block title %}
-Login | ChocoFlow
-{% endblock %}
+<div class="login-wrapper">
 
-{% block body_class %}login-page{% endblock %}
+    <!-- ══ PANEL IZQUIERDO ══════════════════════════════════ -->
+    <div class="login-left">
+        <div class="deco-icon">🍫</div>
+        <h1>¡Hola,<br>Bienvenido!</h1>
+        <p>¿No tienes una cuenta?<br>Regístrate y únete a ChocoFlow.</p>
+        <a href="{% url 'registro' %}" class="btn-register">Registrarse</a>
+    </div>
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/login2.css' %}">
-{% endblock %}
+    <!-- ══ PANEL DERECHO ════════════════════════════════════ -->
+    <div class="login-right">
 
-{% block hero %}
-{% endblock %}
+        <h2 class="form-title">Iniciar Sesión</h2>
+        <p class="form-subtitle">Ingresa tus credenciales para continuar</p>
 
-{% block content %}
-<div class="container py-5">
-<div class="row justify-content-center">
-<div class="col-md-6">
-<div class="card login-card shadow">
-<div class="card-body p-5">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert-choco">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
-<h2 class="text-center mb-4 form-title">
-Iniciar Sesión
-</h2>
+        <form method="POST" action="{% url 'login' %}">
+            {% csrf_token %}
 
-{% if messages %}
-{% for message in messages %}
-<div class="alert alert-danger">
-{{ message }}
+            <div class="input-group-custom">
+                <input
+                    type="email"
+                    name="username"
+                    class="form-control-login"
+                    placeholder="Usuario"
+                    required
+                    autocomplete="email"
+                >
+                <span class="input-icon">👤</span>
+            </div>
+
+            <div class="input-group-custom">
+                <input
+                    type="password"
+                    name="password"
+                    class="form-control-login"
+                    placeholder="Password"
+                    required
+                    autocomplete="current-password"
+                >
+                <span class="input-icon">🔒</span>
+            </div>
+
+            <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
+
+            <button type="submit" class="btn-login-main">
+                Iniciar Sesión
+            </button>
+
+        </form>
+
+        <div class="social-divider">
+            <span>a Iniciar Sesión con las Plataformas Sociales</span>
+        </div>
+        <div class="social-buttons">
+            <a href="#" class="btn-social">G</a>
+            <a href="#" class="btn-social">f</a>
+            <a href="#" class="btn-social">&#9711;</a>
+            <a href="#" class="btn-social">in</a>
+        </div>
+
+    </div>
+
 </div>
-{% endfor %}
-{% endif %}
 
-<form method="POST">
-{% csrf_token %}
-
-<div class="mb-3">
-<label class="form-label">
-Correo electrónico
-</label>
-<input
-    type="email"
-    name="username"
-    class="form-control"
-    placeholder="Ingrese su correo"
-    required
->
-</div>
-
-<div class="mb-4">
-<label class="form-label">Contraseña</label>
-<input
-    type="password"
-    name="password"
-    class="form-control"
-    placeholder="Ingrese contraseña"
-    required
->
-</div>
-
-<div class="d-grid">
-<button type="submit" class="btn btn-login">
-Entrar
-</button>
-</div>
-</form>
-
-</div>
-</div>
-</div>
-</div>
-</div>
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
