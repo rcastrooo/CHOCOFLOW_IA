@@ -10,12 +10,10 @@
 <section class="container mt-5">
 <div class="container-custom shadow">
 
-    
     <h2 class="text-center section-title mb-4">
         📋 Gestión de Asignaciones
     </h2>
 
-    
     {% if messages %}
         {% for msg in messages %}
             <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
@@ -25,31 +23,20 @@
         {% endfor %}
     {% endif %}
 
-    {# ============================================================ #}
-    {#  CABECERA: botón nueva asignación + formulario de búsqueda   #}
-    {# ============================================================ #}
     <div class="cabecera-asignaciones">
-
-        {# Botón que abre el modal para crear una nueva asignación #}
         <button class="btn btn-caramel"
             data-bs-toggle="modal"
             data-bs-target="#modalAsignacion">
             + Nueva Asignación
         </button>
-
-        {# Formulario de búsqueda/filtro por tarea o nombre de empleado #}
         <form method="GET" class="form-filtros">
             <input type="text" name="q" class="form-control"
                 placeholder="Buscar tarea o empleado..."
                 value="{{ request.GET.q }}">
             <button class="btn btn-choco">Filtrar</button>
         </form>
-
     </div>
 
-    {# ============================================================ #}
-    {#  TABLA de asignaciones registradas                           #}
-    {# ============================================================ #}
     <div class="table-responsive mt-3">
     <table class="table table-hover align-middle">
         <thead>
@@ -63,20 +50,14 @@
             </tr>
         </thead>
         <tbody>
-
-        {# Iterar sobre cada asignación recibida desde la vista #}
         {% for a in asignaciones %}
         <tr>
             <td>{{ a.tarea }}</td>
             <td>{{ a.empleado.nombre }}</td>
-
-            {# Mostrar el horario del turno (campo actualizado en el modelo) #}
             <td>{{ a.turno.horario }}</td>
-
             <td>{{ a.fecha_asignacion }}</td>
             <td>{{ a.asignado_por.nombre }}</td>
             <td>
-                {# Botón editar: llama a la función JS que pre-carga el modal con los datos de la fila #}
                 <button class="btn btn-sm btn-primary"
                     onclick="editarAsignacion(
                         '{{ a.id }}',
@@ -86,33 +67,24 @@
                         '{{ a.turno.id }}'
                     )">✏️
                 </button>
-
-                {# Botón inactivar: redirige a la vista que cambia el estado a 'Pendiente' #}
                 <a href="{% url 'inactivar_asignacion' a.id %}"
                    class="btn btn-sm btn-danger"
-                   onclick="return confirm('¿Inactivar esta asignación?')">
+                   onclick="return confirm('¿Eliminar esta asignación del listado?')">
                    🗑️
                 </a>
             </td>
         </tr>
-
-        {# Mensaje cuando no existen asignaciones registradas #}
         {% empty %}
         <tr>
-            <td colspan="6" class="text-center">
-                No hay asignaciones registradas
-            </td>
+            <td colspan="6" class="text-center">No hay asignaciones registradas</td>
         </tr>
         {% endfor %}
-
         </tbody>
     </table>
     </div>
 
-    {# ----------- Botón para generar el reporte PDF ----------- #}
     <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
-        <a href="{% url 'reporte_asignaciones' %}"
-           class="btn btn-reporte custom-bottom-btn">
+        <a href="{% url 'reporte_asignaciones' %}" class="btn btn-reporte custom-bottom-btn">
             📄 Generar Reporte
         </a>
     </div>
@@ -124,58 +96,58 @@
 {# ============================================================ #}
 {#  MODAL: Crear / Editar asignación                            #}
 {# ============================================================ #}
-<div class="modal fade" id="modalAsignacion">
+<div class="modal fade" id="modalAsignacion" tabindex="-1">
 <div class="modal-dialog">
 <div class="modal-content">
-
-    {# Formulario que envía datos a la vista guardar_asignacion vía POST #}
     <form method="POST" action="{% url 'guardar_asignacion' %}">
     {% csrf_token %}
-
     <div class="modal-header">
         <h5>Asignación</h5>
     </div>
-
     <div class="modal-body">
 
-        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
-        <input type="hidden" name="id" id="id">
+        <input type="hidden" name="id"     id="id">
+        <input type="hidden" name="forzar" id="forzar" value="0">
 
-        {# Campo: descripción de la tarea a asignar #}
-        <input type="text" name="tarea" id="tarea"
-            class="form-control mb-2"
-            placeholder="Descripción de la tarea">
+        <select name="tarea" id="tarea" class="form-select mb-2" required>
+            <option value="">-- Seleccionar Tarea --</option>
+            <option value="Temperar">Temperar</option>
+            <option value="Mezclado">Mezclado</option>
+            <option value="Moldear">Moldear</option>
+            <option value="Desmoldear">Desmoldear</option>
+            <option value="Picar">Picar</option>
+            <option value="Triturado">Triturado</option>
+            <option value="Molienda">Molienda</option>
+            <option value="Paletear">Paletear</option>
+            <option value="Empacar">Empacar</option>
+            <option value="Sellado">Sellado</option>
+            <option value="Etiquetado">Etiquetado</option>
+            <option value="Limpieza General">Limpieza General</option>
+            <option value="Limpieza de Maquinaria">Limpieza de Maquinaria</option>
+        </select>
 
-        {# Campo: fecha en la que se realiza la asignación #}
         <input type="date" name="fecha_asignacion" id="fecha_asignacion"
-            class="form-control mb-2">
+            class="form-control mb-2" required>
 
-        {# Select: empleados activos disponibles para ser asignados #}
-        <select name="empleado_id" id="empleado_id" class="form-select mb-2">
+        <select name="empleado_id" id="empleado_id" class="form-select mb-2" required>
             <option value="">-- Seleccionar Empleado --</option>
             {% for emp in empleados %}
                 <option value="{{ emp.id }}">{{ emp.nombre }}</option>
             {% endfor %}
         </select>
 
-        {# Select: turnos activos — solo se muestra el horario (campo corregido) #}
-        <select name="turno_id" id="turno_id" class="form-select mb-2">
+        <select name="turno_id" id="turno_id" class="form-select mb-2" required>
             <option value="">-- Seleccionar Turno --</option>
             {% for t in turnos %}
-                {# CORRECCIÓN: se eliminó t.fecha (no existe en el modelo Turno);
-                   ahora solo se muestra t.horario, que es el campo correcto #}
                 <option value="{{ t.id }}">{{ t.horario }}</option>
             {% endfor %}
         </select>
 
     </div>
-
     <div class="modal-footer">
         <button class="btn btn-caramel">Guardar</button>
-        <button type="button" class="btn btn-secondary"
-            data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
     </div>
-
     </form>
 </div>
 </div>
@@ -183,24 +155,81 @@
 
 
 {# ============================================================ #}
-{#  SCRIPT: pre-carga los datos de una asignación en el modal   #}
-{#  para poder editarla                                         #}
+{#  MODAL: Confirmación tarea extra (solo admin)                #}
 {# ============================================================ #}
+<div class="modal fade" id="modalConfirmarExtra" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content">
+    <div class="modal-header bg-warning">
+        <h5 class="modal-title">⚠️ Límite de tareas superado</h5>
+    </div>
+    <div class="modal-body">
+        <p>
+            El empleado <strong id="nombreEmpleadoExtra"></strong>
+            ya tiene <strong>2 o más tareas</strong> asignadas para esa fecha.
+        </p>
+        <p>¿Está seguro de que desea agregar una tarea adicional?</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-danger" onclick="confirmarExtra()">
+            Sí, agregar de todas formas
+        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            No, cancelar
+        </button>
+    </div>
+</div>
+</div>
+</div>
+
+
+{# Formulario oculto que se envía al confirmar la tarea extra #}
+<form method="POST" action="{% url 'guardar_asignacion' %}" id="formForzar" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="forzar"          id="f_forzar"   value="1">
+    <input type="hidden" name="tarea"            id="f_tarea">
+    <input type="hidden" name="fecha_asignacion" id="f_fecha">
+    <input type="hidden" name="empleado_id"      id="f_emp_id">
+    <input type="hidden" name="turno_id"         id="f_turno_id">
+    <input type="hidden" name="estado"           id="f_estado">
+</form>
+
+
 <script>
+// ─── Fecha mínima = hoy en el input de fecha ─────────────────
+document.getElementById('fecha_asignacion').setAttribute(
+    'min', new Date().toISOString().split('T')[0]
+);
+
+// ─── Pre-cargar modal de edición ─────────────────────────────
 function editarAsignacion(id, tarea, fecha, empleadoId, turnoId) {
-    // Asignar los valores recibidos a cada campo del modal
     document.getElementById('id').value               = id;
     document.getElementById('tarea').value            = tarea;
     document.getElementById('fecha_asignacion').value = fecha;
     document.getElementById('empleado_id').value      = empleadoId;
     document.getElementById('turno_id').value         = turnoId;
-
-    // Abrir el modal con Bootstrap
-    var modal = new bootstrap.Modal(
-        document.getElementById('modalAsignacion')
-    );
-    modal.show();
+    document.getElementById('forzar').value           = '0';
+    new bootstrap.Modal(document.getElementById('modalAsignacion')).show();
 }
+
+// ─── Enviar formulario oculto con forzar=1 ───────────────────
+function confirmarExtra() {
+    document.getElementById('formForzar').submit();
+}
+
+// ─── Abrir modal de confirmación si el backend lo indica ─────
+// Se usa setTimeout para asegurar que Bootstrap esté listo
+{% if confirmar_extra %}
+setTimeout(function () {
+    document.getElementById('f_tarea').value            = "{{ extra_tarea }}";
+    document.getElementById('f_fecha').value            = "{{ extra_fecha }}";
+    document.getElementById('f_emp_id').value           = "{{ extra_emp_id }}";
+    document.getElementById('f_turno_id').value         = "{{ extra_turno_id }}";
+    document.getElementById('f_estado').value           = "{{ extra_estado }}";
+    document.getElementById('nombreEmpleadoExtra').textContent = "{{ extra_emp_nombre }}";
+    new bootstrap.Modal(document.getElementById('modalConfirmarExtra')).show();
+}, 300);
+{% endif %}
 </script>
 
 {% endblock %}

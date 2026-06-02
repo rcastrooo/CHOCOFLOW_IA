@@ -16,8 +16,7 @@
     <div class="login-left">
         <div class="deco-icon">🍫</div>
         <h1>¡Hola,<br>Bienvenido!</h1>
-        <p>¿No tienes una cuenta?<br>Regístrate y únete a ChocoFlow.</p>
-        <a href="{% url 'registro' %}" class="btn-register">Registrarse</a>
+        <p>Inicia Sesión<br>Para Entrar a ChocoFlow</p>
     </div>
 
     <!-- ══ PANEL DERECHO ════════════════════════════════════ -->
@@ -47,16 +46,24 @@
                 <span class="input-icon">👤</span>
             </div>
 
+            <!-- Contraseña -->
             <div class="input-group-custom">
                 <input
                     type="password"
                     name="password"
+                    id="password-login"
                     class="form-control-login"
                     placeholder="Password"
                     required
                     autocomplete="current-password"
                 >
-                <span class="input-icon">🔒</span>
+                <span class="input-icon toggle-password" onclick="togglePassword('password-login', this)" title="Mostrar/ocultar contraseña">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c49a6c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path class="eye-top" d="M2 12 C6 6, 18 6, 22 12"/>
+                        <path class="eye-bot" d="M2 12 C6 18, 18 18, 22 12"/>
+                        <circle class="eye-pupil" cx="12" cy="12" r="2.8" fill="#c49a6c" stroke="none"/>
+                    </svg>
+                </span>
             </div>
 
             <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
@@ -78,9 +85,27 @@
         </div>
 
     </div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function togglePassword(inputId, iconEl) {
+    const input    = document.getElementById(inputId);
+    const eyeTop   = iconEl.querySelector('.eye-top');
+    const eyeBot   = iconEl.querySelector('.eye-bot');
+    const eyePupil = iconEl.querySelector('.eye-pupil');
+
+    const OPEN  = { top: "M2 12 C6 6, 18 6, 22 12",  bot: "M2 12 C6 18, 18 18, 22 12" };
+    const CLOSE = { top: "M2 12 C6 11, 18 11, 22 12", bot: "M2 12 C6 13, 18 13, 22 12" };
+
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+
+    eyeTop.setAttribute('d',   isPassword ? OPEN.top  : CLOSE.top);
+    eyeBot.setAttribute('d',   isPassword ? OPEN.bot  : CLOSE.bot);
+    eyePupil.style.opacity   = isPassword ? '1' : '0';
+    eyePupil.style.transform = isPassword ? 'scale(1)' : 'scale(0)';
+}
+</script>
 </body>
 </html>

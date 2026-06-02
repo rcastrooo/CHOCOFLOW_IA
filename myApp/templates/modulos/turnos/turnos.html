@@ -32,34 +32,40 @@
     {% endif %}
 
     {# ============================================================ #}
-    {#  CABECERA: botón nueva rotación + filtro por horario         #}
+    {#  CABECERA: botón nueva rotación + filtro por horario/semana  #}
     {# ============================================================ #}
     <div class="cabecera-turnos">
 
-        {# Abre el modal para crear una nueva rotación de turno #}
         <button class="btn btn-caramel"
                 data-bs-toggle="modal"
-                data-bs-target="#modalRotacion">
+                data-bs-target="#modalRotacion"
+                onclick="limpiarModalRotacion()">
             + Nueva Rotación
         </button>
 
-        {# Filtro por horario del turno #}
         <form method="GET" class="form-filtros">
-    <input type="number" name="semana" class="form-control"
-           placeholder="Semana..." min="1" max="53"
-           value="{{ request.GET.semana }}">
-    <select name="horario" class="form-select">
+            {# Select de semanas generadas en la vista #}
+            <select name="semana" class="form-select">
+                <option value="">Todas las semanas</option>
+                {% for s in semanas %}
+                    <option value="{{ s.numero }}"
+                        {% if request.GET.semana == s.numero|stringformat:"s" %}selected{% endif %}>
+                        {{ s.label }}
+                    </option>
+                {% endfor %}
+            </select>
+            <select name="horario" class="form-select">
                 <option value="">Todos los horarios</option>
-                <option value="Mañana 6:00am - 2:00pm"        {% if request.GET.horario == 'Mañana 6:00am - 2:00pm'        %}selected{% endif %}>Mañana 6:00am - 2:00pm</option>
-                <option value="Tarde 2:00pm - 10:00pm"         {% if request.GET.horario == 'Tarde 2:00pm - 10:00pm'         %}selected{% endif %}>Tarde 2:00pm - 10:00pm</option>
-               </select>
+                <option value="Mañana 6:00am - 2:00pm" {% if request.GET.horario == 'Mañana 6:00am - 2:00pm' %}selected{% endif %}>Mañana 6:00am - 2:00pm</option>
+                <option value="Tarde 2:00pm - 10:00pm"  {% if request.GET.horario == 'Tarde 2:00pm - 10:00pm'  %}selected{% endif %}>Tarde 2:00pm - 10:00pm</option>
+            </select>
             <button class="btn btn-choco">Filtrar</button>
         </form>
 
     </div>
 
     {# ============================================================ #}
-    {#  TABLA de rotaciones de la semana actual (RotacionTurno)     #}
+    {#  TABLA de rotaciones — todos los campos del modelo           #}
     {# ============================================================ #}
     <div class="table-responsive">
     <table class="table table-hover align-middle">
@@ -71,6 +77,7 @@
                 <th>Fecha Inicio</th>
                 <th>Fecha Fin</th>
                 <th>Sábado</th>
+                <th>Horario Sábado</th>
                 <th>Estado</th>
                 <th>Acciones</th>
             </tr>
@@ -79,20 +86,12 @@
 
         {% for rot in rotaciones %}
         <tr>
-            {# FK empleado → Empleado.nombre #}
             <td>{{ rot.empleado.nombre }}</td>
-
-            {# FK turno → Turno.horario #}
             <td>{{ rot.turno.horario }}</td>
-
-            {# Número de semana ISO #}
             <td>{{ rot.semana }}</td>
-
-            {# Rango de fechas de la rotación #}
             <td>{{ rot.fecha_inicio }}</td>
             <td>{{ rot.fecha_fin }}</td>
 
-            {# BooleanField sabado_asignado #}
             <td>
                 {% if rot.sabado_asignado %}
                     <span class="badge bg-success">Sí</span>
@@ -101,7 +100,15 @@
                 {% endif %}
             </td>
 
-            {# Estado según ESTADO_CHOICES de RotacionTurno #}
+            {# Horario del sábado — solo aplica si sabado_asignado es True #}
+            <td>
+                {% if rot.sabado_asignado and rot.horario_sabado %}
+                    <span class="badge bg-info text-dark">{{ rot.horario_sabado }}</span>
+                {% else %}
+                    <span class="text-muted">—</span>
+                {% endif %}
+            </td>
+
             <td>
                 {% if rot.estado == 'Completado' %}
                     <span class="badge bg-success">{{ rot.estado }}</span>
@@ -113,7 +120,6 @@
             </td>
 
             <td>
-                {# Botón editar: pre-carga el modal con los datos de la rotación #}
                 <button class="btn btn-sm btn-primary"
                     onclick="editarRotacion(
                         '{{ rot.id }}',
@@ -123,11 +129,11 @@
                         '{{ rot.fecha_fin|date:"Y-m-d" }}',
                         '{{ rot.semana }}',
                         {{ rot.sabado_asignado|yesno:'true,false' }},
+                        '{{ rot.horario_sabado|default:"" }}',
                         '{{ rot.estado }}'
                     )">✏️
                 </button>
 
-                {# Botón eliminar: borra la rotación definitivamente #}
                 <a href="{% url 'eliminar_rotacion' rot.id %}"
                    class="btn btn-sm btn-danger"
                    onclick="return confirm('¿Eliminar esta rotación?')">
@@ -138,7 +144,7 @@
 
         {% empty %}
         <tr>
-            <td colspan="8" class="text-center text-muted fst-italic">
+            <td colspan="9" class="text-center text-muted fst-italic">
                 No hay rotaciones registradas para la semana {{ semana_actual }}
             </td>
         </tr>
@@ -167,69 +173,112 @@
 <div class="modal-dialog">
 <div class="modal-content">
 
-    <form method="POST" action="{% url 'guardar_rotacion' %}">
+    <form method="POST" action="{% url 'guardar_rotacion' %}" id="formRotacion" novalidate>
     {% csrf_token %}
 
     <div class="modal-header">
-        <h5>Rotación de Turno</h5>
+        <h5 id="modalRotTitulo">Rotación de Turno</h5>
     </div>
 
     <div class="modal-body">
 
-        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
         <input type="hidden" name="id" id="rot_id">
 
-        {# Select: empleados activos disponibles #}
-        <select name="empleado_id" id="rot_empleado" class="form-select mb-2">
-            <option value="">-- Seleccionar Empleado --</option>
-            {% for emp in empleados %}
-                <option value="{{ emp.id }}">{{ emp.nombre }}</option>
-            {% endfor %}
-        </select>
+        {# ── Empleado ── #}
+        <div class="mb-2">
+            <label class="form-label">Empleado <span class="text-danger">*</span></label>
+            <select name="empleado_id" id="rot_empleado" class="form-select">
+                <option value="">-- Seleccionar Empleado --</option>
+                {% for emp in empleados %}
+                    <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback" id="err-rot_empleado"></div>
+        </div>
 
-        {# Select: turnos activos disponibles según HORARIO_CHOICES #}
-        <select name="turno_id" id="rot_turno" class="form-select mb-2">
-            <option value="">-- Seleccionar Turno --</option>
-            {% for t in turnos %}
-                <option value="{{ t.id }}">{{ t.horario }}</option>
-            {% endfor %}
-        </select>
+        {# ── Turno / Horario ── #}
+        <div class="mb-2">
+            <label class="form-label">Turno <span class="text-danger">*</span></label>
+            <select name="turno_id" id="rot_turno" class="form-select">
+                <option value="">-- Seleccionar Turno --</option>
+                {% for t in turnos %}
+                    <option value="{{ t.id }}">{{ t.horario }}</option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback" id="err-rot_turno"></div>
+        </div>
 
-        {# Número de semana ISO — el usuario lo ingresa manualmente #}
-        <input type="number" name="semana" id="rot_semana"
-               class="form-control mb-2"
-               placeholder="Número de semana (ej: 21)" min="1" max="53">
+        {# ── Semana — select con lunes de cada semana, auto-rellena fechas ── #}
+        <div class="mb-2">
+            <label class="form-label">Semana <span class="text-danger">*</span></label>
+            <select name="semana" id="rot_semana" class="form-select"
+                    onchange="autoRellenarFechas(this)">
+                <option value="">-- Seleccionar semana --</option>
+                {% for s in semanas %}
+                    <option value="{{ s.numero }}"
+                            data-inicio="{{ s.lunes }}"
+                            data-fin="{{ s.domingo }}">
+                        {{ s.label }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="form-text text-muted">Al seleccionar la semana se completan las fechas automáticamente.</div>
+            <div class="invalid-feedback" id="err-rot_semana"></div>
+        </div>
 
-        {# Fecha de inicio de la rotación #}
-        <label class="form-label mb-0">Fecha Inicio</label>
-        <input type="date" name="fecha_inicio" id="rot_fecha_inicio"
-               class="form-control mb-2">
+        {# ── Fecha Inicio — mínimo hoy ── #}
+        <div class="mb-2">
+            <label class="form-label">Fecha Inicio <span class="text-danger">*</span></label>
+            <input type="date" name="fecha_inicio" id="rot_fecha_inicio"
+                   class="form-control"
+                   min="{{ fecha_hoy }}">
+            <div class="invalid-feedback" id="err-rot_fecha_inicio"></div>
+        </div>
 
-        {# Fecha de fin de la rotación #}
-        <label class="form-label mb-0">Fecha Fin</label>
-        <input type="date" name="fecha_fin" id="rot_fecha_fin"
-               class="form-control mb-2">
+        {# ── Fecha Fin — mínimo = fecha inicio ── #}
+        <div class="mb-2">
+            <label class="form-label">Fecha Fin <span class="text-danger">*</span></label>
+            <input type="date" name="fecha_fin" id="rot_fecha_fin"
+                   class="form-control"
+                   min="{{ fecha_hoy }}">
+            <div class="invalid-feedback" id="err-rot_fecha_fin"></div>
+        </div>
 
-        {# Select: estado de la rotación según ESTADO_CHOICES #}
-        <select name="estado" id="rot_estado" class="form-select mb-2">
-            <option value="Pendiente">Pendiente</option>
-            <option value="Asignado">Asignado</option>
-            <option value="Completado">Completado</option>
-        </select>
+        {# ── Estado ── #}
+        <div class="mb-2">
+            <label class="form-label">Estado <span class="text-danger">*</span></label>
+            <select name="estado" id="rot_estado" class="form-select">
+                <option value="Pendiente">Pendiente</option>
+                <option value="Asignado">Asignado</option>
+                <option value="Completado">Completado</option>
+            </select>
+        </div>
 
-        {# Checkbox: indica si el empleado tiene turno el sábado #}
-        <div class="form-check mt-2">
+        {# ── ¿Tiene turno el sábado? ── #}
+        <div class="form-check mt-2 mb-2">
             <input type="checkbox" name="sabado_asignado" id="rot_sabado"
-                   class="form-check-input">
+                   class="form-check-input"
+                   onchange="toggleHorarioSabado(this.checked)">
             <label class="form-check-label" for="rot_sabado">
                 ¿Tiene turno el sábado?
             </label>
         </div>
 
+        {# ── Horario del sábado — visible solo si sábado está marcado ── #}
+        <div class="mb-2" id="bloque_horario_sabado" style="display:none;">
+            <label class="form-label">Horario del sábado <span class="text-danger">*</span></label>
+            <select name="horario_sabado" id="rot_horario_sabado" class="form-select">
+                <option value="">-- Seleccionar horario --</option>
+                <option value="Mañana 6:00am - 12:00pm">Mañana 6:00am - 12:00pm</option>
+                <option value="Tarde 12:00pm - 6:00pm">Tarde 12:00pm - 6:00pm</option>
+            </select>
+            <div class="invalid-feedback" id="err-rot_horario_sabado"></div>
+        </div>
+
     </div>
 
     <div class="modal-footer">
-        <button class="btn btn-caramel">Guardar</button>
+        <button type="submit" class="btn btn-caramel">Guardar</button>
         <button type="button" class="btn btn-secondary"
             data-bs-dismiss="modal">Cancelar</button>
     </div>
@@ -241,22 +290,176 @@
 
 
 {# ============================================================ #}
-{#  SCRIPT: pre-carga los datos de una rotación en el modal     #}
+{#  SCRIPTS: validaciones JS + pre-carga del modal              #}
 {# ============================================================ #}
 <script>
-function editarRotacion(id, empleadoId, turnoId, fechaInicio, fechaFin, semana, sabado, estado) {
+// Semana mínima permitida (inyectada desde Django)
+const SEMANA_MINIMA = {{ semana_actual }};
+const HOY           = '{{ fecha_hoy }}';   // 'YYYY-MM-DD'
+
+// ── Auto-rellenar fechas al elegir semana ─────────────────────────
+function autoRellenarFechas(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const fi  = document.getElementById('rot_fecha_inicio');
+    const ff  = document.getElementById('rot_fecha_fin');
+
+    if (opt && opt.dataset.inicio) {
+        fi.value = opt.dataset.inicio;
+        ff.value = opt.dataset.fin;
+        ff.min   = opt.dataset.inicio;
+        // limpiar errores de fecha si los había
+        [fi, ff].forEach(el => el.classList.remove('is-invalid'));
+    } else {
+        fi.value = '';
+        ff.value = '';
+    }
+}
+
+// ── Mostrar/ocultar bloque horario sábado ─────────────────────────
+function toggleHorarioSabado(marcado) {
+    const bloque = document.getElementById('bloque_horario_sabado');
+    const select = document.getElementById('rot_horario_sabado');
+    bloque.style.display = marcado ? 'block' : 'none';
+    if (!marcado) {
+        select.value = '';
+        select.classList.remove('is-invalid');
+    }
+}
+
+// ── Actualizar min de fecha_fin cuando el usuario cambia fecha_inicio manualmente ──
+document.getElementById('rot_fecha_inicio').addEventListener('change', function () {
+    const ff = document.getElementById('rot_fecha_fin');
+    ff.min = this.value || HOY;
+    if (ff.value && ff.value < this.value) ff.value = '';
+});
+
+// ── Helpers de validación ─────────────────────────────────────────
+function marcarError(id, msg) {
+    const el  = document.getElementById(id);
+    const err = document.getElementById('err-' + id);
+    if (!el) return false;
+    el.classList.add('is-invalid');
+    el.classList.remove('is-valid');
+    if (err) err.textContent = msg;
+    return false;
+}
+
+function marcarOk(id) {
+    const el  = document.getElementById(id);
+    const err = document.getElementById('err-' + id);
+    if (!el) return true;
+    el.classList.remove('is-invalid');
+    el.classList.add('is-valid');
+    if (err) err.textContent = '';
+    return true;
+}
+
+// ── Validación global al enviar ───────────────────────────────────
+document.getElementById('formRotacion').addEventListener('submit', function (e) {
+    let valido = true;
+
+    // Empleado
+    if (!document.getElementById('rot_empleado').value) {
+        marcarError('rot_empleado', 'Selecciona un empleado.');
+        valido = false;
+    } else marcarOk('rot_empleado');
+
+    // Turno
+    if (!document.getElementById('rot_turno').value) {
+        marcarError('rot_turno', 'Selecciona un turno.');
+        valido = false;
+    } else marcarOk('rot_turno');
+
+    // Semana — ahora es select
+    const semanaEl = document.getElementById('rot_semana');
+    const semana   = parseInt(semanaEl.value, 10);
+    if (!semana) {
+        marcarError('rot_semana', 'Selecciona una semana.');
+        valido = false;
+    } else if (semana < SEMANA_MINIMA) {
+        marcarError('rot_semana', 'No se permiten semanas anteriores a la actual.');
+        valido = false;
+    } else marcarOk('rot_semana');
+
+    // Fecha inicio
+    const fi = document.getElementById('rot_fecha_inicio').value;
+    if (!fi) {
+        marcarError('rot_fecha_inicio', 'La fecha de inicio es obligatoria.');
+        valido = false;
+    } else if (fi < HOY) {
+        marcarError('rot_fecha_inicio', 'La fecha de inicio no puede ser anterior a hoy.');
+        valido = false;
+    } else marcarOk('rot_fecha_inicio');
+
+    // Fecha fin
+    const ff = document.getElementById('rot_fecha_fin').value;
+    if (!ff) {
+        marcarError('rot_fecha_fin', 'La fecha de fin es obligatoria.');
+        valido = false;
+    } else if (fi && ff < fi) {
+        marcarError('rot_fecha_fin', 'La fecha de fin no puede ser anterior a la de inicio.');
+        valido = false;
+    } else marcarOk('rot_fecha_fin');
+
+    // Horario sábado (solo si checkbox está marcado)
+    if (document.getElementById('rot_sabado').checked) {
+        const hs = document.getElementById('rot_horario_sabado').value;
+        if (!hs) {
+            marcarError('rot_horario_sabado', 'Selecciona el horario del sábado.');
+            valido = false;
+        } else marcarOk('rot_horario_sabado');
+    }
+
+    if (!valido) e.preventDefault();
+});
+
+// ── Limpiar modal al crear nueva rotación ─────────────────────────
+function limpiarModalRotacion() {
+    document.getElementById('modalRotTitulo').textContent = 'Nueva Rotación';
+
+    ['rot_id', 'rot_fecha_inicio', 'rot_fecha_fin'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.value = ''; el.classList.remove('is-invalid', 'is-valid'); }
+    });
+    document.getElementById('rot_empleado').value       = '';
+    document.getElementById('rot_turno').value          = '';
+    document.getElementById('rot_semana').value         = '';
+    document.getElementById('rot_estado').value         = 'Pendiente';
+    document.getElementById('rot_sabado').checked       = false;
+    document.getElementById('rot_horario_sabado').value = '';
+    document.getElementById('rot_fecha_inicio').min     = HOY;
+    document.getElementById('rot_fecha_fin').min        = HOY;
+    toggleHorarioSabado(false);
+
+    ['rot_empleado', 'rot_turno', 'rot_semana', 'rot_estado', 'rot_horario_sabado'].forEach(id => {
+        document.getElementById(id).classList.remove('is-invalid', 'is-valid');
+    });
+}
+
+// ── Pre-cargar datos en el modal para edición ─────────────────────
+function editarRotacion(id, empleadoId, turnoId, fechaInicio, fechaFin, semana, sabado, horarioSabado, estado) {
+    limpiarModalRotacion();
+    document.getElementById('modalRotTitulo').textContent = 'Editar Rotación';
+
     document.getElementById('rot_id').value           = id;
     document.getElementById('rot_empleado').value     = empleadoId;
     document.getElementById('rot_turno').value        = turnoId;
-    document.getElementById('rot_semana').value       = semana;
+    document.getElementById('rot_semana').value       = semana;   // número ISO → selecciona la option correcta
     document.getElementById('rot_fecha_inicio').value = fechaInicio;
     document.getElementById('rot_fecha_fin').value    = fechaFin;
     document.getElementById('rot_estado').value       = estado;
     document.getElementById('rot_sabado').checked     = sabado;
 
-    var modal = new bootstrap.Modal(
-        document.getElementById('modalRotacion')
-    );
+    // Al editar, quitar restricción de fechas para no bloquear registros existentes
+    document.getElementById('rot_fecha_inicio').min = '';
+    document.getElementById('rot_fecha_fin').min    = fechaInicio;
+
+    if (sabado) {
+        toggleHorarioSabado(true);
+        document.getElementById('rot_horario_sabado').value = horarioSabado;
+    }
+
+    var modal = new bootstrap.Modal(document.getElementById('modalRotacion'));
     modal.show();
 }
 </script>

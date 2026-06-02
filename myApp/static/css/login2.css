@@ -1,9 +1,3 @@
-/* ============================================================
-   ChocoFlow — login2.css
-   Layout: panel izquierdo (bienvenida) + panel derecho (form)
-   Paleta: #603C1C, #8a5118, #D88C51, #3E2723
-   ============================================================ */
-
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 
 /* ── Reset de body para login ─────────────────────────────── */
@@ -30,6 +24,14 @@ body.login-page {
                 0 8px 24px rgba(96, 60, 28, 0.15);
 }
 
+/* ── FIX registro: wrapper se adapta al contenido ── */
+.login-wrapper.registro {
+    height: auto;
+    min-height: 540px;
+    max-height: 90vh;
+    align-items: stretch;
+}
+
 /* ══ PANEL IZQUIERDO — bienvenida ════════════════════════════ */
 .login-left {
     width: 42%;
@@ -42,6 +44,19 @@ body.login-page {
     position: relative;
     overflow: hidden;
 }
+
+/* ── FIX registro: panel izquierdo que acompaña al derecho ── */
+.login-wrapper.registro .login-left {
+    position: sticky;
+    top: 0;
+    align-self: stretch;
+    justify-content: center;
+    min-height: 100%;
+}
+
+/* Transición del ojito */
+#eyeTop, #eyeBot, .eye-top, .eye-bot { transition: d 0.35s cubic-bezier(.4,0,.2,1); }
+#pupil, .eye-pupil { transition: opacity 0.2s, transform 0.35s; transform-origin: 12px 12px; }
 
 /* Decoración de fondo — círculos sutiles */
 .login-left::before {
@@ -74,8 +89,8 @@ body.login-page {
 }
 
 @keyframes floatIcon {
-    0%, 100% { transform: translateY(0px);   }
-    50%       { transform: translateY(-8px);  }
+    0%, 100% { transform: translateY(0px);  }
+    50%       { transform: translateY(-8px); }
 }
 
 .login-left h1 {
@@ -132,6 +147,14 @@ body.login-page {
     padding: 52px 52px 52px 48px;
 }
 
+/* ── FIX registro: panel derecho scrolleable ── */
+.login-wrapper.registro .login-right {
+    overflow-y: auto;
+    max-height: 90vh;
+    padding: 36px 52px;
+    justify-content: flex-start;
+}
+
 .login-right .form-title {
     font-family: 'Playfair Display', serif;
     font-size: 30px;
@@ -160,6 +183,14 @@ body.login-page {
     color: #c49a6c;
     font-size: 16px;
     pointer-events: none;
+    display: flex;
+    align-items: center;
+}
+
+/* Ojito toggle — habilitar clicks */
+.login-right .input-icon.toggle-password {
+    pointer-events: all;
+    cursor: pointer;
 }
 
 .login-right .form-control-login {
@@ -183,6 +214,14 @@ body.login-page {
     border-color: #8a5118;
     box-shadow: 0 0 0 3px rgba(138, 81, 24, 0.10);
     background: #fff;
+}
+
+/* ── FIX select alineado con los inputs ── */
+.login-right select.form-control-login {
+    padding-left: 14px;
+    appearance: auto;
+    -webkit-appearance: auto;
+    cursor: pointer;
 }
 
 /* Link ¿Olvidaste? */
@@ -285,10 +324,41 @@ body.login-page {
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
-    body.login-page { overflow: auto; align-items: flex-start; padding: 20px; }
-    .login-wrapper   { width: 100%; height: auto; flex-direction: column; }
-    .login-left,
-    .login-right     { width: 100%; }
-    .login-left      { padding: 40px 30px; }
-    .login-right     { padding: 36px 28px; }
+    body.login-page {
+        overflow: auto;
+        align-items: flex-start;
+        padding: 20px;
+        height: auto;
+        min-height: 100vh;
+    }
+    .login-wrapper {
+        width: 100%;
+        height: auto;
+        flex-direction: column;
+        border-radius: 20px;
+    }
+    .login-wrapper.registro {
+        max-height: none;
+    }
+    .login-left {
+        width: 100%;
+        min-height: auto;
+        padding: 36px 28px;
+        position: relative;
+    }
+    .login-wrapper.registro .login-left {
+        position: relative;
+        min-height: auto;
+        align-self: auto;
+    }
+    .login-right {
+        width: 100%;
+        padding: 32px 24px;
+        justify-content: flex-start;
+    }
+    .login-wrapper.registro .login-right {
+        overflow-y: visible;
+        max-height: none;
+        padding: 32px 24px;
+    }
 }

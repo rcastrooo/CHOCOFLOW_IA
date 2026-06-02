@@ -8,7 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/login2.css' %}">
     <style>
-        /* Ajuste para formulario más largo en registro */
         .login-wrapper { height: auto; min-height: 540px; }
         .login-left    { min-height: 580px; }
         .login-right   { padding: 36px 52px; justify-content: flex-start; overflow-y: auto; }
@@ -16,13 +15,13 @@
 </head>
 <body class="login-page">
 
-<div class="login-wrapper">
+<div class="login-wrapper registro">
 
     <!-- ══ PANEL IZQUIERDO ══════════════════════════════════ -->
     <div class="login-left">
         <div class="deco-icon">🍫</div>
         <h1>¡Únete a<br>ChocoFlow!</h1>
-        <p>¿Ya tienes una cuenta?<br>Inicia sesión y continúa.</p>
+        <p>Aquí podras Registrar<br>Nuevos Empleados</p>
         <a href="{% url 'dashboard' %}" class="btn-register">Volver al Dashboard</a>
     </div>
 
@@ -43,75 +42,51 @@
 
             <!-- ID / Documento -->
             <div class="input-group-custom">
-                <input
-                    type="text"
-                    name="identificacion"
-                    class="form-control-login"
-                    placeholder="ID / Documento"
-                    required
-                >
+                <input type="text" name="identificacion" class="form-control-login" placeholder="ID / Documento" required>
                 <span class="input-icon">🪪</span>
             </div>
 
             <!-- Nombre -->
             <div class="input-group-custom">
-                <input
-                    type="text"
-                    name="nombre"
-                    class="form-control-login"
-                    placeholder="Nombre completo"
-                    required
-                >
+                <input type="text" name="nombre" class="form-control-login" placeholder="Nombre completo" required>
                 <span class="input-icon">👤</span>
             </div>
 
             <!-- Correo -->
             <div class="input-group-custom">
-                <input
-                    type="email"
-                    name="correo"
-                    class="form-control-login"
-                    placeholder="Correo electrónico"
-                    required
-                >
+                <input type="email" name="correo" class="form-control-login" placeholder="Correo electrónico" required>
                 <span class="input-icon">✉️</span>
             </div>
 
-              <!-- Telefono -->
+            <!-- Teléfono -->
             <div class="input-group-custom">
-                <input
-                    type="telefono"
-                    name="telefono"
-                    class="form-control-login"
-                    placeholder="Telefono"
-                    required
-                >
+                <input type="tel" name="telefono" class="form-control-login" placeholder="Teléfono" required>
                 <span class="input-icon">📞</span>
             </div>
 
-            <!-- Direccion -->
+            <!-- Dirección -->
             <div class="input-group-custom">
-                <input
-                    type="text"
-                    name="direccion"
-                    class="form-control-login"
-                    placeholder="Direccion"
-                    required
-                >
+                <input type="text" name="direccion" class="form-control-login" placeholder="Dirección" required>
                 <span class="input-icon">📍</span>
             </div>
-            
 
             <!-- Contraseña -->
             <div class="input-group-custom">
                 <input
                     type="password"
                     name="password"
+                    id="password-registro"
                     class="form-control-login"
                     placeholder="Contraseña"
                     required
                 >
-                <span class="input-icon">🔒</span>
+                <span class="input-icon toggle-password" onclick="togglePassword('password-registro', this)" title="Mostrar/ocultar contraseña">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c49a6c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path class="eye-top" d="M2 12 C6 6, 18 6, 22 12"/>
+                        <path class="eye-bot" d="M2 12 C6 18, 18 18, 22 12"/>
+                        <circle class="eye-pupil" cx="12" cy="12" r="2.8" fill="#c49a6c" stroke="none"/>
+                    </svg>
+                </span>
             </div>
 
             <!-- Rol -->
@@ -121,19 +96,33 @@
                     <option value="admin">Administrador</option>
                     <option value="Supervisor">Supervisor</option>
                 </select>
-                <span class="input-icon">🏷️</span>
             </div>
 
-            <button type="submit" class="btn-login-main">
-                Registrarse
-            </button>
+            <button type="submit" class="btn-login-main">Registrarse</button>
 
         </form>
-
     </div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function togglePassword(inputId, iconEl) {
+    const input    = document.getElementById(inputId);
+    const eyeTop   = iconEl.querySelector('.eye-top');
+    const eyeBot   = iconEl.querySelector('.eye-bot');
+    const eyePupil = iconEl.querySelector('.eye-pupil');
+
+    const OPEN  = { top: "M2 12 C6 6, 18 6, 22 12",   bot: "M2 12 C6 18, 18 18, 22 12"  };
+    const CLOSE = { top: "M2 12 C6 11, 18 11, 22 12",  bot: "M2 12 C6 13, 18 13, 22 12"  };
+
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+
+    eyeTop.setAttribute('d',     isPassword ? OPEN.top  : CLOSE.top);
+    eyeBot.setAttribute('d',     isPassword ? OPEN.bot  : CLOSE.bot);
+    eyePupil.style.opacity     = isPassword ? '1' : '0';
+    eyePupil.style.transform   = isPassword ? 'scale(1)' : 'scale(0)';
+}
+</script>
 </body>
 </html>

@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
-
+from datetime import date, timedelta
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
@@ -411,6 +411,22 @@ def api_stats_supervisor(request):
 # EMPLEADOS
 # ===================
 
+import re
+from datetime import date
+from io import BytesIO
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+
 @login_required(login_url='login')
 def empleados(request):
 
@@ -440,6 +456,7 @@ def empleados(request):
         'busqueda':  query,
     })
 
+
 @login_required(login_url='login')
 def empleados_supervisor(request):
 
@@ -465,6 +482,7 @@ def empleados_supervisor(request):
 def guardar_empleado(request):
     if request.method == 'POST':
 
+        # ── Verificar sesión ──────────────────────────────────────────
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
@@ -475,36 +493,74 @@ def guardar_empleado(request):
             messages.error(request, "No se encontró tu perfil.")
             return redirect('login')
 
+        # ── Obtener o crear instancia ─────────────────────────────────
         empleado_id = request.POST.get('id')
         empleado    = get_object_or_404(Empleado, id=empleado_id) if empleado_id else Empleado()
 
-        cedula    = request.POST.get('cedula', '').strip()
-        nombre    = request.POST.get('nombre', '').strip()
-        email     = request.POST.get('email', '').strip()
-        telefono  = request.POST.get('telefono', '').strip()
+        # ── Leer campos ───────────────────────────────────────────────
+        cedula    = request.POST.get('cedula',    '').strip()
+        nombre    = request.POST.get('nombre',    '').strip()
+        email     = request.POST.get('email',     '').strip()
+        telefono  = request.POST.get('telefono',  '').strip()
         direccion = request.POST.get('direccion', '').strip()
-        estado    = request.POST.get('estado', '').strip()
+        estado    = request.POST.get('estado',    '').strip()
 
-        if not nombre or not email or not estado:
-            messages.error(request, "Nombre, email y estado son obligatorios.")
+        # ── Validaciones ──────────────────────────────────────────────
+
+        # 1. Campos obligatorios
+        if not cedula or not nombre or not email or not estado:
+            messages.error(request, "Cédula, nombre, email y estado son obligatorios.")
             return redirect('empleados')
 
-        # Validar email duplicado (solo si es nuevo o cambió)
-        if not empleado_id:
-            if Empleado.objects.filter(email=email).exists():
-                messages.error(request, "Ya existe un empleado con ese correo.")
-                return redirect('empleados')
-        else:
-            if Empleado.objects.filter(email=email).exclude(id=empleado_id).exists():
-                messages.error(request, "Ya existe un empleado con ese correo.")
-                return redirect('empleados')
+        # 2. Cédula: solo dígitos, entre 6 y 12 caracteres
+        if not re.fullmatch(r'\d{6,12}', cedula):
+            messages.error(request, "La cédula debe contener solo números (6–12 dígitos).")
+            return redirect('empleados')
 
-        empleado.cedula    = cedula
-        empleado.nombre    = nombre
-        empleado.email     = email
-        empleado.telefono  = telefono
-        empleado.direccion = direccion if direccion else 'Sin dirección'
-        empleado.estado    = estado
+        # 3. Nombre: solo letras (incluyendo tildes), espacios y guiones
+        if not re.fullmatch(r"[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s\-']{2,80}", nombre):
+            messages.error(request, "El nombre solo puede contener letras, espacios y guiones.")
+            return redirect('empleados')
+
+        # 4. Email: formato válido
+        if not re.fullmatch(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', email):
+            messages.error(request, "El correo electrónico no tiene un formato válido.")
+            return redirect('empleados')
+
+        # 5. Teléfono: solo dígitos, solo 10 caracteres (si se ingresa)
+        if telefono and not re.fullmatch(r'\d{10}', telefono):
+            messages.error(request, "El teléfono debe contener solo números (10 dígitos).")
+            return redirect('empleados')
+
+        # 6. Estado: debe ser uno de los valores permitidos
+        estados_validos = ['Activo', 'Inactivo', 'Suspendido', 'Incapacitado']
+        if estado not in estados_validos:
+            messages.error(request, "El estado seleccionado no es válido.")
+            return redirect('empleados')
+
+        # 7. Email duplicado
+        qs_email = Empleado.objects.filter(email=email)
+        if empleado_id:
+            qs_email = qs_email.exclude(id=empleado_id)
+        if qs_email.exists():
+            messages.error(request, "Ya existe un empleado con ese correo.")
+            return redirect('empleados')
+
+        # 8. Cédula duplicada
+        qs_cedula = Empleado.objects.filter(cedula=cedula)
+        if empleado_id:
+            qs_cedula = qs_cedula.exclude(id=empleado_id)
+        if qs_cedula.exists():
+            messages.error(request, "Ya existe un empleado con esa cédula.")
+            return redirect('empleados')
+
+        # ── Guardar ───────────────────────────────────────────────────
+        empleado.cedula     = cedula
+        empleado.nombre     = nombre
+        empleado.email      = email
+        empleado.telefono   = telefono
+        empleado.direccion  = direccion if direccion else 'Sin dirección'
+        empleado.estado     = estado
         empleado.creado_por = usuario_perfil
         empleado.save()
         messages.success(request, "Empleado guardado correctamente.")
@@ -541,13 +597,14 @@ def generar_reporte_empleados(request):
     elementos.append(Paragraph("Reporte de Empleados - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Cédula', 'Nombre', 'Email', 'Teléfono', 'Estado']]
+    datos = [['Cédula', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Estado']]
     for emp in lista:
         datos.append([
-            emp.cedula or '',
+            emp.cedula    or '',
             emp.nombre,
             emp.email,
-            emp.telefono or '',
+            emp.telefono  or '',
+            emp.direccion or '',
             emp.estado,
         ])
 
@@ -571,7 +628,7 @@ def generar_reporte_empleados(request):
     response.write(pdf)
     return response
 
-
+# Imports necesarios: from datetime import date, timedelta
 # ===================
 # TURNOS
 # ===================
@@ -581,7 +638,8 @@ def turnos(request):
 
     horario_filtro = request.GET.get('horario', '')
     semana_filtro  = request.GET.get('semana', '')
-    semana_actual  = date.today().isocalendar()[1]
+    hoy            = date.today()
+    semana_actual  = hoy.isocalendar()[1]
 
     lista = RotacionTurno.objects.select_related('empleado', 'turno').all()
 
@@ -590,11 +648,29 @@ def turnos(request):
     if semana_filtro:
         lista = lista.filter(semana=semana_filtro)
 
+    # ── Generar las semanas del año desde la semana actual hasta la 53 ──
+    # Cada semana se representa como el lunes de esa semana ISO.
+    # Se pasan al template para el select del filtro y del modal.
+    semanas = []
+    # Lunes de la semana actual
+    lunes_actual = hoy - timedelta(days=hoy.weekday())
+    for i in range(0, 53 - semana_actual + 1):
+        lunes = lunes_actual + timedelta(weeks=i)
+        domingo = lunes + timedelta(days=6)
+        semanas.append({
+            'numero':      lunes.isocalendar()[1],
+            'lunes':       lunes.isoformat(),
+            'domingo':     domingo.isoformat(),
+            'label':       f"Semana del {lunes.day} {lunes.strftime('%b')} · {lunes.day}-{domingo.day} {domingo.strftime('%b')}",
+        })
+
     return render(request, 'modulos/turnos/turnos.html', {
         'rotaciones':    lista,
         'semana_actual': semana_actual,
         'turnos':        Turno.objects.filter(activo=True),
         'empleados':     Empleado.objects.filter(estado='Activo'),
+        'fecha_hoy':     hoy.isoformat(),
+        'semanas':       semanas,
     })
 
 
@@ -620,6 +696,7 @@ def turnos_supervisor(request):
 def guardar_rotacion(request):
     if request.method == 'POST':
 
+        # ── Verificar sesión ──────────────────────────────────────────
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
@@ -632,17 +709,73 @@ def guardar_rotacion(request):
         fecha_fin    = request.POST.get('fecha_fin', '').strip()
         semana       = request.POST.get('semana', '').strip()
         sabado       = request.POST.get('sabado_asignado') == 'on'
+        horario_sabado = request.POST.get('horario_sabado', '').strip() or None
         estado       = request.POST.get('estado', 'Pendiente')
 
+        # ── 1. Campos obligatorios ────────────────────────────────────
         if not all([empleado_id, turno_id, fecha_inicio, fecha_fin, semana]):
             messages.error(request, "Todos los campos son obligatorios.")
             return redirect('turnos')
 
-        # Validar que fecha_fin no sea anterior a fecha_inicio
-        if fecha_fin < fecha_inicio:
+        # ── 2. Si sábado está marcado, horario_sabado es obligatorio ──
+        if sabado and not horario_sabado:
+            messages.error(request, "Debes seleccionar el horario del sábado.")
+            return redirect('turnos')
+
+        # ── 3. Validar semana (1–53) ──────────────────────────────────
+        try:
+            semana_int = int(semana)
+            if not (1 <= semana_int <= 53):
+                raise ValueError
+        except ValueError:
+            messages.error(request, "El número de semana debe estar entre 1 y 53.")
+            return redirect('turnos')
+
+        # ── 4. No permitir semanas pasadas ────────────────────────────
+        hoy            = date.today()
+        semana_actual  = hoy.isocalendar()[1]
+        anio_actual    = hoy.isocalendar()[0]
+
+        if semana_int < semana_actual:
+            messages.error(request, f"No puedes asignar turnos en semanas anteriores. Semana actual: {semana_actual}.")
+            return redirect('turnos')
+
+        # ── 5. Validar formato y lógica de fechas ─────────────────────
+        try:
+            fi = date.fromisoformat(fecha_inicio)
+            ff = date.fromisoformat(fecha_fin)
+        except ValueError:
+            messages.error(request, "El formato de fecha no es válido.")
+            return redirect('turnos')
+
+        # No permitir fechas de inicio en el pasado (solo para creación)
+        if not rotacion_id and fi < hoy:
+            messages.error(request, "La fecha de inicio no puede ser anterior a hoy.")
+            return redirect('turnos')
+
+        if ff < fi:
             messages.error(request, "La fecha de fin no puede ser anterior a la de inicio.")
             return redirect('turnos')
 
+        # La fecha_inicio debe pertenecer a la semana indicada
+        semana_de_fi = fi.isocalendar()[1]
+        if semana_de_fi != semana_int:
+            messages.error(request, f"La fecha de inicio pertenece a la semana {semana_de_fi}, no a la semana {semana_int}.")
+            return redirect('turnos')
+
+        # ── 6. Validar estado permitido ───────────────────────────────
+        estados_validos = ['Asignado', 'Completado', 'Pendiente']
+        if estado not in estados_validos:
+            messages.error(request, "Estado no válido.")
+            return redirect('turnos')
+
+        # ── 7. Validar horario_sabado si aplica ───────────────────────
+        horarios_sabado_validos = ['Mañana 6:00am - 12:00pm', 'Tarde 12:00pm - 6:00pm']
+        if horario_sabado and horario_sabado not in horarios_sabado_validos:
+            messages.error(request, "Horario de sábado no válido.")
+            return redirect('turnos')
+
+        # ── Guardar ───────────────────────────────────────────────────
         try:
             empleado = get_object_or_404(Empleado, id=empleado_id)
             turno    = get_object_or_404(Turno, id=turno_id)
@@ -651,10 +784,11 @@ def guardar_rotacion(request):
                 rot                 = get_object_or_404(RotacionTurno, id=rotacion_id)
                 rot.empleado        = empleado
                 rot.turno           = turno
-                rot.fecha_inicio    = fecha_inicio
-                rot.fecha_fin       = fecha_fin
-                rot.semana          = int(semana)
+                rot.fecha_inicio    = fi
+                rot.fecha_fin       = ff
+                rot.semana          = semana_int
                 rot.sabado_asignado = sabado
+                rot.horario_sabado  = horario_sabado if sabado else None
                 rot.estado          = estado
                 rot.save()
                 messages.success(request, "Rotación actualizada correctamente.")
@@ -662,8 +796,8 @@ def guardar_rotacion(request):
                 # Verificar constraint único (empleado + fecha_inicio + fecha_fin)
                 if RotacionTurno.objects.filter(
                     empleado=empleado,
-                    fecha_inicio=fecha_inicio,
-                    fecha_fin=fecha_fin
+                    fecha_inicio=fi,
+                    fecha_fin=ff
                 ).exists():
                     messages.error(request, f"{empleado.nombre} ya tiene un turno asignado para ese período.")
                     return redirect('turnos')
@@ -671,10 +805,11 @@ def guardar_rotacion(request):
                 RotacionTurno.objects.create(
                     empleado        = empleado,
                     turno           = turno,
-                    fecha_inicio    = fecha_inicio,
-                    fecha_fin       = fecha_fin,
-                    semana          = int(semana),
+                    fecha_inicio    = fi,
+                    fecha_fin       = ff,
+                    semana          = semana_int,
                     sabado_asignado = sabado,
+                    horario_sabado  = horario_sabado if sabado else None,
                     estado          = estado,
                 )
                 messages.success(request, "Rotación registrada correctamente.")
@@ -709,7 +844,7 @@ def rotacion_turnos(request):
 @login_required(login_url='login')
 def generar_reporte_turnos(request):
 
-    lista = Turno.objects.select_related('creado_por').filter(activo=True)
+    lista = Turno.objects.filter(activo=True)  # ← sin select_related
 
     buffer    = BytesIO()
     doc       = SimpleDocTemplate(buffer, pagesize=letter)
@@ -719,12 +854,11 @@ def generar_reporte_turnos(request):
     elementos.append(Paragraph("Reporte de Turnos - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Horario', 'Estado', 'Creado por']]
+    datos = [['Horario', 'Estado']]  # ← sin columna "Creado por"
     for t in lista:
         datos.append([
             t.horario,
             'Activo' if t.activo else 'Inactivo',
-            t.creado_por.nombre,
         ])
 
     tabla = Table(datos)
@@ -762,7 +896,7 @@ def generar_reporte_rotacion(request):
     elementos.append(Paragraph("Reporte de Rotación de Turnos - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Empleado', 'Turno', 'Semana', 'Fecha Inicio', 'Fecha Fin', 'Sábado', 'Estado']]
+    datos = [['Empleado', 'Turno', 'Semana', 'Fecha Inicio', 'Fecha Fin', 'Sábado', 'Horario Sábado', 'Estado']]
     for r in lista:
         datos.append([
             r.empleado.nombre,
@@ -771,6 +905,7 @@ def generar_reporte_rotacion(request):
             str(r.fecha_inicio),
             str(r.fecha_fin),
             'Sí' if r.sabado_asignado else 'No',
+            r.horario_sabado or '—',
             r.estado,
         ])
 
@@ -794,7 +929,6 @@ def generar_reporte_rotacion(request):
     response['Content-Disposition'] = 'attachment; filename="reporte_rotacion.pdf"'
     response.write(pdf)
     return response
-
 
 # ===================
 # SOLICITUDES
@@ -932,6 +1066,7 @@ def generar_reporte_solicitudes(request):
     response.write(pdf)
     return response
 
+from datetime import date
 
 # ===================
 # ASIGNACIONES
@@ -939,14 +1074,14 @@ def generar_reporte_solicitudes(request):
 
 @login_required(login_url='login')
 def asignaciones(request):
- 
+
     query  = request.GET.get('q', '')
     estado = request.GET.get('estado', '')
- 
+
     lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
-    ).all()
- 
+    ).exclude(estado='Finalizado')  # Las "borradas" no aparecen en el listado
+
     if query:
         lista = lista.filter(
             Q(tarea__icontains=query) |
@@ -954,71 +1089,143 @@ def asignaciones(request):
         )
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
- 
+
     empleados_activos = Empleado.objects.filter(estado='Activo')
     turnos_activos    = Turno.objects.filter(activo=True)
- 
+
     return render(request, 'modulos/asignaciones/asignaciones.html', {
         'asignaciones': lista,
         'empleados':    empleados_activos,
         'turnos':       turnos_activos,
     })
- 
- 
+
+
+# ─────────────────────────────────────────────────────────────────
+#  Función auxiliar: valida que el turno seleccionado coincida
+#  con la rotación activa del empleado para la fecha dada.
+#  Retorna (True, None) si es válido, o (False, mensaje) si no.
+# ─────────────────────────────────────────────────────────────────
+def _validar_turno_empleado(empleado, turno, fecha):
+    rotacion = RotacionTurno.objects.filter(
+        empleado=empleado,
+        fecha_inicio__lte=fecha,
+        fecha_fin__gte=fecha,
+    ).select_related('turno').first()
+
+    if not rotacion:
+        return False, f"El empleado {empleado.nombre} no tiene un turno asignado para esa fecha."
+
+    if rotacion.turno.id != turno.id:
+        return False, (
+            f"El empleado {empleado.nombre} está en el turno "
+            f"'{rotacion.turno.horario}' para esa fecha. "
+            f"No se puede asignar una tarea en el turno '{turno.horario}'."
+        )
+
+    return True, None
+
+
 # ─────────────────────────────────────────────
 #  ADMIN — Crear / Editar asignación
+#  Validaciones:
+#   1. Fecha no anterior a hoy
+#   2. Turno debe coincidir con la rotación del empleado
+#   3. Si ya tiene 2+ tareas ese día → modal de confirmación
 # ─────────────────────────────────────────────
 @login_required(login_url='login')
 def guardar_asignacion(request):
     if request.method != 'POST':
         return redirect('asignaciones')
- 
+
     usuario_id = request.session.get('usuario_id')
     if not usuario_id:
         messages.error(request, "Sesión inválida.")
         return redirect('login')
- 
+
     try:
         usuario_perfil = Usuario.objects.get(id=usuario_id)
     except Usuario.DoesNotExist:
         messages.error(request, "No se encontró tu perfil.")
         return redirect('login')
- 
+
     asignacion_id = request.POST.get('id', '').strip()
     tarea         = request.POST.get('tarea', '').strip()
     fecha         = request.POST.get('fecha_asignacion', '').strip()
     emp_id        = request.POST.get('empleado_id', '').strip()
     turno_id      = request.POST.get('turno_id', '').strip()
     estado        = request.POST.get('estado', 'Pendiente')
- 
+    forzar        = request.POST.get('forzar', '0').strip()
+
     if not tarea or not fecha or not emp_id or not turno_id:
         messages.error(request, "Todos los campos son obligatorios.")
         return redirect('asignaciones')
- 
+
+    # ── 1. Fecha no anterior a hoy ────────────────────────────────
+    fecha_ingresada = date.fromisoformat(fecha)
+    if fecha_ingresada < date.today():
+        messages.error(request, "No se pueden asignar tareas en fechas anteriores a la actual.")
+        return redirect('asignaciones')
+
     empleado = get_object_or_404(Empleado, id=emp_id)
     turno    = get_object_or_404(Turno, id=turno_id)
- 
+
+    # ── 2. Turno debe coincidir con la rotación del empleado ──────
+    valido, error_turno = _validar_turno_empleado(empleado, turno, fecha_ingresada)
+    if not valido:
+        messages.error(request, error_turno)
+        return redirect('asignaciones')
+
+    # ── 3. Límite de tareas diarias (solo en creaciones nuevas) ───
+    es_nueva = not asignacion_id
+    if es_nueva and forzar != '1':
+        tareas_del_dia = Asignacion.objects.filter(
+            empleado=empleado,
+            fecha_asignacion=fecha
+        ).count()
+
+        if tareas_del_dia >= 2:
+            lista = Asignacion.objects.select_related(
+                'empleado', 'turno', 'asignado_por'
+            ).exclude(estado='Finalizado')  # Las "borradas" no aparecen en el listado
+            empleados_activos = Empleado.objects.filter(estado='Activo')
+            turnos_activos    = Turno.objects.filter(activo=True)
+
+            return render(request, 'modulos/asignaciones/asignaciones.html', {
+                'asignaciones':     lista,
+                'empleados':        empleados_activos,
+                'turnos':           turnos_activos,
+                # Señal para que el JS abra el modal de confirmación
+                'confirmar_extra':  True,
+                'extra_tarea':      tarea,
+                'extra_fecha':      fecha,
+                'extra_emp_id':     emp_id,
+                'extra_turno_id':   turno_id,
+                'extra_estado':     estado,
+                'extra_emp_nombre': empleado.nombre,
+            })
+
+    # ── Guardar ───────────────────────────────────────────────────
     if asignacion_id:
         asignacion = get_object_or_404(Asignacion, id=asignacion_id)
     else:
         asignacion = Asignacion()
- 
+
     asignacion.tarea            = tarea
     asignacion.fecha_asignacion = fecha
     asignacion.empleado         = empleado
     asignacion.turno            = turno
     asignacion.asignado_por     = usuario_perfil
     asignacion.estado           = estado
- 
+
     try:
         asignacion.save()
         messages.success(request, "Asignación guardada correctamente.")
     except Exception as e:
         messages.error(request, str(e))
- 
+
     return redirect('asignaciones')
- 
- 
+
+
 # ─────────────────────────────────────────────
 #  ADMIN — Inactivar / Finalizar asignación
 # ─────────────────────────────────────────────
@@ -1029,33 +1236,33 @@ def inactivar_asignacion(request, id):
     asignacion.save()
     messages.success(request, "Asignación finalizada.")
     return redirect('asignaciones')
- 
- 
+
+
 # ─────────────────────────────────────────────
 #  SUPERVISOR — Listado de asignaciones
 # ─────────────────────────────────────────────
 @login_required(login_url='login')
 def asignaciones_supervisor(request):
- 
+
     usuario_id = request.session.get('usuario_id')
     if not usuario_id:
         return redirect('login')
- 
+
     busqueda = request.GET.get('q', '')
- 
+
     lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
     ).order_by('-fecha_asignacion')
- 
+
     if busqueda:
         lista = lista.filter(
             Q(tarea__icontains=busqueda) |
             Q(empleado__nombre__icontains=busqueda)
         )
- 
+
     empleados_activos = Empleado.objects.filter(estado='Activo')
     turnos_activos    = Turno.objects.filter(activo=True)
- 
+
     return render(request, 'modulos/asignaciones/asignaciones_supervisor.html', {
         'asignaciones': lista,
         'busqueda':     busqueda,
@@ -1063,39 +1270,68 @@ def asignaciones_supervisor(request):
         'turnos':       turnos_activos,
         'fecha_hoy':    timezone.now().date(),
     })
- 
- 
+
+
 # ─────────────────────────────────────────────
 #  SUPERVISOR — Solo crear asignación
+#  Validaciones:
+#   1. Fecha no anterior a hoy
+#   2. Turno debe coincidir con la rotación del empleado
+#   3. Límite duro de 2 tareas diarias
 # ─────────────────────────────────────────────
 @login_required(login_url='login')
 def guardar_asignacion_supervisor(request):
     if request.method != 'POST':
         return redirect('asignaciones_supervisor')
- 
+
     usuario_id = request.session.get('usuario_id')
     if not usuario_id:
         messages.error(request, "Sesión inválida.")
         return redirect('login')
- 
+
     try:
         usuario_perfil = Usuario.objects.get(id=usuario_id)
     except Usuario.DoesNotExist:
         messages.error(request, "No se encontró tu perfil.")
         return redirect('login')
- 
+
     tarea    = request.POST.get('tarea', '').strip()
     fecha    = request.POST.get('fecha_asignacion', '').strip()
     emp_id   = request.POST.get('empleado_id', '').strip()
     turno_id = request.POST.get('turno_id', '').strip()
- 
+
     if not tarea or not fecha or not emp_id or not turno_id:
         messages.error(request, "Todos los campos son obligatorios.")
         return redirect('asignaciones_supervisor')
- 
+
+    # ── 1. Fecha no anterior a hoy ────────────────────────────────
+    fecha_ingresada = date.fromisoformat(fecha)
+    if fecha_ingresada < date.today():
+        messages.error(request, "No se pueden asignar tareas en fechas anteriores a la actual.")
+        return redirect('asignaciones_supervisor')
+
     empleado = get_object_or_404(Empleado, id=emp_id)
     turno    = get_object_or_404(Turno, id=turno_id)
- 
+
+    # ── 2. Turno debe coincidir con la rotación del empleado ──────
+    valido, error_turno = _validar_turno_empleado(empleado, turno, fecha_ingresada)
+    if not valido:
+        messages.error(request, error_turno)
+        return redirect('asignaciones_supervisor')
+
+    # ── 3. Límite duro de 2 tareas diarias para el supervisor ─────
+    tareas_del_dia = Asignacion.objects.filter(
+        empleado=empleado,
+        fecha_asignacion=fecha
+    ).count()
+
+    if tareas_del_dia >= 2:
+        messages.error(
+            request,
+            f"El empleado {empleado.nombre} ya tiene 2 tareas asignadas para esa fecha."
+        )
+        return redirect('asignaciones_supervisor')
+
     asignacion                  = Asignacion()
     asignacion.tarea            = tarea
     asignacion.fecha_asignacion = fecha
@@ -1103,42 +1339,42 @@ def guardar_asignacion_supervisor(request):
     asignacion.turno            = turno
     asignacion.asignado_por     = usuario_perfil
     asignacion.estado           = 'Pendiente'
- 
+
     try:
         asignacion.save()
         messages.success(request, "Asignación creada correctamente.")
     except Exception as e:
         messages.error(request, str(e))
- 
+
     return redirect('asignaciones_supervisor')
- 
- 
+
+
 # ─────────────────────────────────────────────
 #  ADMIN — Generar reporte PDF de asignaciones
 # ─────────────────────────────────────────────
 @login_required(login_url='login')
 def generar_reporte_asignaciones(request):
- 
+
     query = request.GET.get('q', '')
- 
+
     lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
-    ).all()
- 
+    ).exclude(estado='Finalizado')  # Las "borradas" no aparecen en el listado
+
     if query:
         lista = lista.filter(
             Q(tarea__icontains=query) |
             Q(empleado__nombre__icontains=query)
         )
- 
+
     buffer    = BytesIO()
     doc       = SimpleDocTemplate(buffer, pagesize=letter)
     elementos = []
     estilos   = getSampleStyleSheet()
- 
+
     elementos.append(Paragraph("Reporte de Asignaciones - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
- 
+
     datos = [['Tarea', 'Empleado', 'Turno', 'Fecha', 'Estado', 'Asignado por']]
     for a in lista:
         datos.append([
@@ -1149,7 +1385,7 @@ def generar_reporte_asignaciones(request):
             a.estado,
             a.asignado_por.nombre,
         ])
- 
+
     tabla = Table(datos)
     tabla.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
@@ -1159,20 +1395,18 @@ def generar_reporte_asignaciones(request):
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('FONTSIZE',   (0, 0), (-1, -1), 9),
     ]))
- 
+
     elementos.append(tabla)
     doc.build(elementos)
- 
+
     pdf = buffer.getvalue()
     buffer.close()
- 
+
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_asignaciones.pdf"'
     response.write(pdf)
     return response
  
-
-
 # ===================
 # PRODUCCION
 # ===================

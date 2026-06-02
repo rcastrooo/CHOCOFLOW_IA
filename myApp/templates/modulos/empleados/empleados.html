@@ -5,12 +5,10 @@
 
 {% block content %}
 
-
 <link rel="stylesheet" href="{% static 'css/empleados.css' %}">
 
 <section class="container mt-5">
 <div class="container-custom shadow">
-
 
     <h2 class="text-center section-title mb-4">
         👨‍💼 Gestión de Empleados
@@ -30,20 +28,18 @@
     {# ============================================================ #}
     <div class="cabecera-empleados">
 
-        {# Botón que abre el modal para crear un nuevo empleado #}
         <button class="btn btn-caramel"
             data-bs-toggle="modal"
-            data-bs-target="#modalEmpleado">
+            data-bs-target="#modalEmpleado"
+            onclick="limpiarModal()">
             + Nuevo Empleado
         </button>
 
-        {# Formulario de búsqueda y filtro por nombre/estado #}
         <form method="GET" class="form-filtros">
             <input type="text" name="q" class="form-control"
                 placeholder="Buscar empleado..."
                 value="{{ request.GET.q }}">
 
-            {# Select para filtrar por estado del empleado #}
             <select name="estado" class="form-select">
                 <option value="">Todos</option>
                 <option value="Activo"       {% if request.GET.estado == 'Activo'       %}selected{% endif %}>Activo</option>
@@ -58,7 +54,7 @@
     </div>
 
     {# ============================================================ #}
-    {#  TABLA de empleados registrados                              #}
+    {#  TABLA de empleados — incluye Dirección                      #}
     {# ============================================================ #}
     <div class="table-responsive">
     <table class="table table-hover align-middle">
@@ -68,47 +64,41 @@
                 <th>Nombre</th>
                 <th>Email</th>
                 <th>Teléfono</th>
+                <th>Dirección</th>
                 <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
-
-        {# Iterar sobre cada empleado recibido desde la vista #}
         {% for e in empleados %}
         <tr>
             <td>{{ e.cedula }}</td>
             <td>{{ e.nombre }}</td>
             <td>{{ e.email }}</td>
             <td>{{ e.telefono }}</td>
-
-            {# Badge de color según el estado del empleado #}
+            <td>{{ e.direccion }}</td>
             <td>
                 {% if e.estado == 'Activo' %}
                     <span class="badge bg-success">{{ e.estado }}</span>
                 {% elif e.estado == 'Inactivo' %}
                     <span class="badge bg-secondary">{{ e.estado }}</span>
                 {% else %}
-                    {# Cubre: Suspendido e Incapacitado #}
                     <span class="badge bg-warning text-dark">{{ e.estado }}</span>
                 {% endif %}
             </td>
-
             <td>
-                {# Botón editar: pre-carga el modal con los datos del empleado #}
                 <button class="btn btn-sm btn-primary"
                     onclick="editarEmpleado(
                         '{{ e.id }}',
                         '{{ e.cedula }}',
-                        '{{ e.nombre }}',
+                        '{{ e.nombre|escapejs }}',
                         '{{ e.email }}',
                         '{{ e.telefono }}',
-                        '{{ e.direccion }}',
+                        '{{ e.direccion|escapejs }}',
                         '{{ e.estado }}'
                     )">✏️
                 </button>
 
-                {# Botón inactivar: cambia el estado del empleado a 'Inactivo' #}
                 <a href="{% url 'inactivar_empleado' e.id %}"
                    class="btn btn-sm btn-danger"
                    onclick="return confirm('¿Inactivar este empleado?')">
@@ -116,38 +106,31 @@
                 </a>
             </td>
         </tr>
-
-        {# Mensaje cuando no existen empleados registrados #}
         {% empty %}
         <tr>
-            <td colspan="6" class="text-center">
+            <td colspan="7" class="text-center">
                 No hay empleados registrados
             </td>
         </tr>
         {% endfor %}
-
         </tbody>
     </table>
     </div>
 
     {# ============================================================ #}
-    {#  BOTONES INFERIORES: carga masiva y reporte PDF              #}
+    {#  BOTONES INFERIORES                                          #}
     {# ============================================================ #}
     <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
 
-        {# Botón carga masiva: activa el input de archivo CSV oculto #}
         <div>
             <button type="button"
                 class="btn btn-masiva custom-bottom-btn"
                 onclick="document.getElementById('csvInput').click()">
                 📂 Carga Masiva
             </button>
-
-            {# Input oculto que recibe el archivo CSV #}
             <input type="file" id="csvInput" accept=".csv" style="display:none">
         </div>
 
-        {# Botón para generar el reporte PDF de empleados #}
         <a href="{% url 'reporte_empleados' %}"
            class="btn btn-reporte custom-bottom-btn">
             📄 Generar Reporte
@@ -166,56 +149,83 @@
 <div class="modal-dialog">
 <div class="modal-content">
 
-    {# Formulario que envía datos a la vista guardar_empleado vía POST #}
-    <form method="POST" action="{% url 'guardar_empleado' %}">
+    <form method="POST" action="{% url 'guardar_empleado' %}" id="formEmpleado" novalidate>
     {% csrf_token %}
 
     <div class="modal-header">
-        <h5>Empleado</h5>
+        <h5 id="modalTitulo">Empleado</h5>
     </div>
 
     <div class="modal-body">
 
-        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
         <input type="hidden" name="id" id="id">
 
-        {# Campo: número de cédula del empleado #}
-        <input type="text" name="cedula" id="cedula"
-            class="form-control mb-2"
-            placeholder="Cédula">
+        {# ── Cédula: solo números 6–12 dígitos ── #}
+        <div class="mb-2">
+            <label class="form-label">Cédula <span class="text-danger">*</span></label>
+            <input type="text" name="cedula" id="cedula"
+                class="form-control"
+                placeholder="Ej: 1012345678"
+                maxlength="12"
+                inputmode="numeric">
+            <div class="invalid-feedback" id="err-cedula"></div>
+        </div>
 
-        {# Campo: nombre completo del empleado #}
-        <input type="text" name="nombre" id="nombre"
-            class="form-control mb-2"
-            placeholder="Nombre">
+        {# ── Nombre: solo letras y espacios ── #}
+        <div class="mb-2">
+            <label class="form-label">Nombre completo <span class="text-danger">*</span></label>
+            <input type="text" name="nombre" id="nombre"
+                class="form-control"
+                placeholder="Ej: Juan Pérez"
+                maxlength="80">
+            <div class="invalid-feedback" id="err-nombre"></div>
+        </div>
 
-        {# Campo: correo electrónico (único en el modelo) #}
-        <input type="email" name="email" id="email"
-            class="form-control mb-2"
-            placeholder="Correo">
+        {# ── Email ── #}
+        <div class="mb-2">
+            <label class="form-label">Correo electrónico <span class="text-danger">*</span></label>
+            <input type="email" name="email" id="email"
+                class="form-control"
+                placeholder="Ej: juan@empresa.com"
+                maxlength="100">
+            <div class="invalid-feedback" id="err-email"></div>
+        </div>
 
-        {# Campo: teléfono (máx. 10 caracteres según el modelo) #}
-        <input type="number" name="telefono" id="telefono"
-            class="form-control mb-2"
-            placeholder="Teléfono">
+        {# ── Teléfono: solo números 7–15 dígitos ── #}
+        <div class="mb-2">
+            <label class="form-label">Teléfono</label>
+            <input type="text" name="telefono" id="telefono"
+                class="form-control"
+                placeholder="Ej: 3001234567"
+                maxlength="15"
+                inputmode="numeric">
+            <div class="invalid-feedback" id="err-telefono"></div>
+        </div>
 
-        {# Campo: dirección del empleado #}
-        <input type="text" name="direccion" id="direccion"
-            class="form-control mb-2"
-            placeholder="Dirección">
+        {# ── Dirección ── #}
+        <div class="mb-2">
+            <label class="form-label">Dirección</label>
+            <input type="text" name="direccion" id="direccion"
+                class="form-control"
+                placeholder="Ej: Calle 123 #45-67"
+                maxlength="150">
+        </div>
 
-        {# Select: estado del empleado según ESTADO_CHOICES del modelo #}
-        <select name="estado" id="estado" class="form-select">
-            <option value="Activo">Activo</option>
-            <option value="Inactivo">Inactivo</option>
-            <option value="Suspendido">Suspendido</option>
-            <option value="Incapacitado">Incapacitado</option>
-        </select>
+        {# ── Estado ── #}
+        <div class="mb-2">
+            <label class="form-label">Estado <span class="text-danger">*</span></label>
+            <select name="estado" id="estado" class="form-select">
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+                <option value="Suspendido">Suspendido</option>
+                <option value="Incapacitado">Incapacitado</option>
+            </select>
+        </div>
 
     </div>
 
     <div class="modal-footer">
-        <button class="btn btn-caramel">Guardar</button>
+        <button type="submit" class="btn btn-caramel" id="btnGuardar">Guardar</button>
         <button type="button" class="btn btn-secondary"
             data-bs-dismiss="modal">Cancelar</button>
     </div>
@@ -227,12 +237,100 @@
 
 
 {# ============================================================ #}
-{#  SCRIPT: pre-carga los datos de un empleado en el modal      #}
-{#  para poder editarlo                                         #}
+{#  SCRIPTS: pre-carga del modal + validaciones en tiempo real  #}
 {# ============================================================ #}
 <script>
+// ── Regex de validación ────────────────────────────────────────────
+const RX = {
+    cedula:   /^\d{6,12}$/,
+    nombre:   /^[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s\-']{2,80}$/,
+    email:    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/,
+    telefono: /^\d{7,15}$/,
+};
+
+const MSGS = {
+    cedula:   'Solo números, entre 6 y 12 dígitos.',
+    nombre:   'Solo letras, espacios y guiones (2–80 caracteres).',
+    email:    'Ingresa un correo válido. Ej: usuario@correo.com',
+    telefono: 'Solo números, entre 7 y 15 dígitos.',
+};
+
+// ── Bloquear teclas no numéricas en cédula y teléfono ─────────────
+['cedula', 'telefono'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('keypress', e => {
+        if (!/\d/.test(e.key) && e.key !== 'Backspace') e.preventDefault();
+    });
+    // Eliminar cualquier carácter no numérico al pegar
+    el.addEventListener('input', () => {
+        el.value = el.value.replace(/\D/g, '');
+    });
+});
+
+// ── Bloquear números y caracteres especiales en el nombre ─────────
+document.getElementById('nombre').addEventListener('keypress', e => {
+    const permitido = /[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s\-']/;
+    if (!permitido.test(e.key)) e.preventDefault();
+});
+
+// ── Validación individual al salir del campo ──────────────────────
+function validarCampo(id) {
+    const el  = document.getElementById(id);
+    const err = document.getElementById('err-' + id);
+    if (!el || !RX[id]) return true;          // dirección / estado no tienen regex
+    const val = el.value.trim();
+
+    // El teléfono es opcional; solo validar si tiene contenido
+    if (id === 'telefono' && val === '') {
+        el.classList.remove('is-invalid');
+        return true;
+    }
+
+    if (!RX[id].test(val)) {
+        el.classList.add('is-invalid');
+        el.classList.remove('is-valid');
+        if (err) err.textContent = MSGS[id];
+        return false;
+    }
+
+    el.classList.remove('is-invalid');
+    el.classList.add('is-valid');
+    if (err) err.textContent = '';
+    return true;
+}
+
+['cedula', 'nombre', 'email', 'telefono'].forEach(id => {
+    document.getElementById(id).addEventListener('blur', () => validarCampo(id));
+});
+
+// ── Validación global al enviar el formulario ─────────────────────
+document.getElementById('formEmpleado').addEventListener('submit', function(e) {
+    const campos   = ['cedula', 'nombre', 'email', 'telefono'];
+    const validos  = campos.map(validarCampo);
+
+    // Campos obligatorios vacíos
+    ['cedula', 'nombre', 'email', 'estado'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el.value.trim()) {
+            el.classList.add('is-invalid');
+            const err = document.getElementById('err-' + id);
+            if (err) err.textContent = 'Este campo es obligatorio.';
+        }
+    });
+
+    if (validos.includes(false) ||
+        !document.getElementById('cedula').value.trim() ||
+        !document.getElementById('nombre').value.trim() ||
+        !document.getElementById('email').value.trim()) {
+        e.preventDefault();
+    }
+});
+
+// ── Pre-cargar datos del empleado en el modal para edición ────────
 function editarEmpleado(id, cedula, nombre, email, telefono, direccion, estado) {
-    // Asignar los valores recibidos a cada campo del modal
+    limpiarModal();
+
+    document.getElementById('modalTitulo').textContent = 'Editar Empleado';
     document.getElementById('id').value        = id;
     document.getElementById('cedula').value    = cedula;
     document.getElementById('nombre').value    = nombre;
@@ -241,11 +339,21 @@ function editarEmpleado(id, cedula, nombre, email, telefono, direccion, estado) 
     document.getElementById('direccion').value = direccion;
     document.getElementById('estado').value    = estado;
 
-    // Abrir el modal con Bootstrap
-    var modal = new bootstrap.Modal(
-        document.getElementById('modalEmpleado')
-    );
+    var modal = new bootstrap.Modal(document.getElementById('modalEmpleado'));
     modal.show();
+}
+
+// ── Limpiar el modal al crear un nuevo empleado ───────────────────
+function limpiarModal() {
+    document.getElementById('modalTitulo').textContent = 'Nuevo Empleado';
+    ['id', 'cedula', 'nombre', 'email', 'telefono', 'direccion'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = '';
+            el.classList.remove('is-invalid', 'is-valid');
+        }
+    });
+    document.getElementById('estado').value = 'Activo';
 }
 </script>
 
