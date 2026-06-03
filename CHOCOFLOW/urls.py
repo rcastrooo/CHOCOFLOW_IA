@@ -75,8 +75,9 @@ urlpatterns = [
     path('supervisor/lotes/', views.lotes_supervisor, name='lotes_supervisor'),
 
     # BITACORA
-    path('bitacora/nueva/', views.bitacora_supervisor,name='bitacora_supervisor'),
-    path('bitacora/mis-bitacoras/', views.listar_bitacoras_supervisor,  name='listar_bitacoras_supervisor'),
-    path('bitacora/', views.listar_bitacoras, name='listar_bitacoras'),
+    path('bitacora/crear/', views.bitacora_supervisor, name='bitacora_supervisor'),
+    path('bitacora/mis-bitacoras/', views.listar_bitacoras_supervisor, name='listar_bitacoras_supervisor'),
+    path('bitacora/enviar/<int:id>/', views.enviar_bitacora, name='enviar_bitacora'),
+    path('bitacora/admin/', views.listar_bitacoras, name='listar_bitacoras'),
     path('bitacora/revisar/<int:id>/', views.revisar_bitacora, name='revisar_bitacora'),
 ]

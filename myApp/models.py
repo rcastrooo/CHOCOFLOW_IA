@@ -237,8 +237,8 @@ class Lote(models.Model):
     fecha_produccion  = models.DateField()
     fecha_vencimiento = models.DateField()
     nombre_producto  = models.CharField(max_length=100, null=True, blank=True)
-    produccion       = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id')
-    exportacion      = models.ForeignKey(Exportacion, on_delete=models.CASCADE, db_column='exportacion_id')
+    produccion  = models.ForeignKey(Produccion, on_delete=models.CASCADE)
+    exportacion = models.ForeignKey(Exportacion, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return self.codigo_lote

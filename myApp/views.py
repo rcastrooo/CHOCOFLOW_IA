@@ -940,7 +940,7 @@ def solicitudes(request):
     query  = request.GET.get('q', '')
     estado = request.GET.get('estado', '')
     lista  = Solicitud.objects.select_related(
-        'empleado', 'turno_actual', 'turno_solicitado', 'revisado_por'
+        'empleado', 'turno_actual', 'turno_solicitado'
     ).all()
 
     if query:
@@ -1929,7 +1929,6 @@ from .models import Bitacora, Produccion, Usuario
 @login_required(login_url='login')
 def bitacora_supervisor(request):
 
-    # Validar sesión y rol
     usuario_id = request.session.get('usuario_id')
     if not usuario_id:
         return redirect('login')
@@ -1938,6 +1937,8 @@ def bitacora_supervisor(request):
     if not supervisor:
         messages.error(request, "No tienes permisos para acceder a esta sección.")
         return redirect('login')
+
+    producciones = Produccion.objects.all()
 
     if request.method == 'POST':
 
@@ -1950,35 +1951,52 @@ def bitacora_supervisor(request):
         observaciones       = request.POST.get('observaciones', '').strip()
         estado              = request.POST.get('estado', 'Borrador')
 
-        # --- Validaciones ---
+        # Contexto para re-renderizar sin perder lo escrito
+        ctx = {
+            'producciones':       producciones,
+            'today':              date.today(),
+            'supervisor':         supervisor,
+            'form_titulo':        titulo,
+            'form_descripcion':   descripcion,
+            'form_tipo':          tipo_reporte,
+            'form_produccion':    produccion_id,
+            'form_uds_prod':      unidades_producidas,
+            'form_uds_pend':      unidades_pendientes,
+            'form_observaciones': observaciones,
+            'form_estado':        estado,
+        }
+
         if not titulo or len(titulo) < 5:
             messages.error(request, "El título debe tener mínimo 5 caracteres.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
 
         if not descripcion or len(descripcion) < 20:
             messages.error(request, "La descripción debe tener mínimo 20 caracteres.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
 
         if not tipo_reporte:
             messages.error(request, "Seleccione un tipo de reporte.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
 
         if not produccion_id:
             messages.error(request, "Seleccione una producción.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
 
         if not unidades_producidas:
             messages.error(request, "Debe ingresar las unidades producidas.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
 
         if not unidades_pendientes:
             messages.error(request, "Debe ingresar las unidades pendientes.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
 
         produccion = Produccion.objects.filter(id=produccion_id).first()
         if not produccion:
             messages.error(request, "La producción seleccionada no existe.")
-            return redirect('bitacora_supervisor')
+            return render(request, 'modulos/bitacora/bitacora_supervisor.html', ctx)
+
+        if estado not in ['Borrador', 'Enviado']:
+            estado = 'Borrador'
 
         Bitacora.objects.create(
             titulo              = titulo,
@@ -1992,16 +2010,46 @@ def bitacora_supervisor(request):
             estado              = estado,
         )
 
-        messages.success(request, "Bitácora registrada correctamente.")
-        return redirect('listar_bitacoras_supervisor')
+        if estado == 'Enviado':
+            messages.success(request, "Bitácora enviada al administrador correctamente.")
+        else:
+            messages.success(request, "Bitácora guardada como borrador.")
 
-    producciones = Produccion.objects.all()
+        return redirect('listar_bitacoras_supervisor')
 
     return render(request, 'modulos/bitacora/bitacora_supervisor.html', {
         'producciones': producciones,
         'today':        date.today(),
         'supervisor':   supervisor,
     })
+
+
+# ─────────────────────────────────────────────
+#  SUPERVISOR — Enviar borrador existente
+# ─────────────────────────────────────────────
+@login_required(login_url='login')
+def enviar_bitacora(request, id):
+
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        return redirect('login')
+
+    supervisor = Usuario.objects.filter(id=usuario_id, rol='Supervisor').first()
+    if not supervisor:
+        return redirect('login')
+
+    # Solo puede enviar sus propias bitácoras
+    bitacora = get_object_or_404(Bitacora, id=id, supervisor=supervisor)
+
+    if bitacora.estado != 'Borrador':
+        messages.error(request, "Solo puedes enviar bitácoras en estado Borrador.")
+        return redirect('listar_bitacoras_supervisor')
+
+    bitacora.estado = 'Enviado'
+    bitacora.save()
+
+    messages.success(request, f"Bitácora '{bitacora.titulo}' enviada al administrador.")
+    return redirect('listar_bitacoras_supervisor')
 
 
 # ─────────────────────────────────────────────
@@ -2018,9 +2066,8 @@ def listar_bitacoras_supervisor(request):
     if not supervisor:
         return redirect('login')
 
-    # El supervisor solo ve sus propias bitácoras
     bitacoras = Bitacora.objects.select_related(
-        'produccion', 'revisado_por'
+        'produccion'
     ).filter(supervisor=supervisor).order_by('-fecha_registro')
 
     return render(request, 'modulos/bitacora/listar_bitacoras_supervisor.html', {
@@ -2037,10 +2084,9 @@ def listar_bitacoras_supervisor(request):
 def listar_bitacoras(request):
 
     bitacoras = Bitacora.objects.select_related(
-        'supervisor', 'produccion', 'revisado_por'
+        'supervisor', 'produccion'
     ).order_by('-fecha_registro')
 
-    # Contar pendientes para mostrar badge de notificación
     pendientes = bitacoras.filter(estado='Enviado').count()
 
     return render(request, 'modulos/bitacora/listar_bitacoras.html', {
@@ -2063,24 +2109,19 @@ def revisar_bitacora(request, id):
             messages.error(request, "Sesión inválida.")
             return redirect('login')
 
-        bitacora = get_object_or_404(Bitacora, id=id)
-        admin    = get_object_or_404(Usuario, id=usuario_id)
-
+        bitacora          = get_object_or_404(Bitacora, id=id)
         nuevo_estado      = request.POST.get('estado', '').strip()
         observacion_admin = request.POST.get('observacion_admin', '').strip()
-        estados_validos   = ['Aprobado', 'Rechazado']
 
-        if nuevo_estado not in estados_validos:
+        if nuevo_estado not in ['Aprobado', 'Rechazado']:
             messages.error(request, "Estado de revisión no válido.")
             return redirect('listar_bitacoras')
 
-        # Solo se pueden revisar bitácoras que estén en estado 'Enviado'
         if bitacora.estado != 'Enviado':
             messages.error(request, "Esta bitácora ya fue revisada.")
             return redirect('listar_bitacoras')
 
         bitacora.estado            = nuevo_estado
-        bitacora.revisado_por      = admin
         bitacora.fecha_revision    = date.today()
         bitacora.observacion_admin = observacion_admin
         bitacora.save()
@@ -2089,6 +2130,7 @@ def revisar_bitacora(request, id):
         messages.success(request, f"Bitácora '{bitacora.titulo}' {accion} correctamente.")
 
     return redirect('listar_bitacoras')
+
 # ========================
 # ASISTENTE IA CON GEMINI
 # ========================

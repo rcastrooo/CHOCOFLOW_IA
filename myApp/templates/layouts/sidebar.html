@@ -36,8 +36,6 @@
 
         <!-- TOP -->
         <div class="sidebar-top">
-
-            <!-- LOGO -->
             <div class="logo">
                 <div class="logo-icon">
                     <i class="fa-solid fa-cube"></i>
@@ -47,9 +45,7 @@
                     <span>Sistema Inteligente</span>
                 </div>
             </div>
-
         </div>
-        <!-- /sidebar-top -->
 
         <!-- MENÚ -->
         <ul class="menu">
@@ -186,10 +182,9 @@
                     </a>
                 </li>
 
-                <!-- BITÁCORA — desplegable inline (sin menú flotante) -->
+                <!-- BITÁCORA — desplegable inline -->
                 <li class="dropdown-menu-custom {% if request.resolver_match.url_name == 'bitacora_supervisor' or request.resolver_match.url_name == 'listar_bitacoras_supervisor' %}open{% endif %}">
 
-                    <!-- BOTÓN que abre/cierra el submenú -->
                     <button class="dropdown-btn" onclick="this.parentElement.classList.toggle('open')">
                         <div class="menu-left">
                             <i class="fa-solid fa-book"></i>
@@ -198,9 +193,7 @@
                         <i class="fa-solid fa-chevron-down chevron-icon"></i>
                     </button>
 
-                    <!-- SUBMENÚ INLINE -->
                     <ul class="submenu">
-
                         <li>
                             <a href="{% url 'bitacora_supervisor' %}"
                                class="{% if request.resolver_match.url_name == 'bitacora_supervisor' %}active{% endif %}">
@@ -208,7 +201,6 @@
                                 <span>Nueva Bitácora</span>
                             </a>
                         </li>
-
                         <li>
                             <a href="{% url 'listar_bitacoras_supervisor' %}"
                                class="{% if request.resolver_match.url_name == 'listar_bitacoras_supervisor' %}active{% endif %}">
@@ -216,7 +208,6 @@
                                 <span>Historial</span>
                             </a>
                         </li>
-
                     </ul>
 
                 </li>
@@ -227,12 +218,8 @@
         </ul>
         <!-- /menu -->
 
-        <!-- =========================
-             FOOTER SIDEBAR
-        ========================== -->
+        <!-- FOOTER SIDEBAR -->
         <div class="sidebar-bottom">
-
-            <!-- PERFIL -->
             <div class="perfil-sidebar">
                 <div class="perfil-avatar">
                     <i class="fa-solid fa-user"></i>
@@ -242,15 +229,11 @@
                     <span>{{ request.session.rol }}</span>
                 </div>
             </div>
-
-            <!-- LOGOUT -->
             <a href="{% url 'logout' %}" class="logout-btn">
                 <i class="fa-solid fa-right-from-bracket"></i>
                 <span>Cerrar sesión</span>
             </a>
-
         </div>
-        <!-- /sidebar-bottom -->
 
     </aside>
     <!-- /sidebar -->
@@ -263,12 +246,50 @@
         <!-- TOPBAR -->
         <div class="topbar">
             {% if request.session.rol == 'Administrador' %}
+
+            <!-- AGREGAR PERSONA -->
             <a href="{% url 'registro' %}" class="topbar-btn" title="Agregar persona">
                 <i class="bi bi-person-fill-add"></i>
             </a>
-            <a href="{% url 'empleados' %}" class="topbar-btn" title="Notificaciones">
-                <i class="bi bi-bell-fill"></i>
-            </a>
+
+            <!-- CAMPANITA CON DROPDOWN -->
+            <div class="notif-wrapper" id="notifWrapper">
+                <button class="topbar-btn notif-btn" id="notifBtn" title="Notificaciones">
+                    <i class="bi bi-bell-fill"></i>
+                    {% if bitacoras_pendientes > 0 %}
+                    <span class="notif-badge">{{ bitacoras_pendientes }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        <span>Notificaciones</span>
+                        {% if bitacoras_pendientes > 0 %}
+                        <span class="notif-count-label">{{ bitacoras_pendientes }} pendiente{{ bitacoras_pendientes|pluralize }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="notif-body">
+                        {% if bitacoras_pendientes > 0 %}
+                        <a href="{% url 'listar_bitacoras' %}" class="notif-item">
+                            <div class="notif-icon-wrap">
+                                <i class="fa-solid fa-book"></i>
+                            </div>
+                            <div class="notif-texto">
+                                <strong>Bitácoras pendientes</strong>
+                                <span>Tienes {{ bitacoras_pendientes }} bitácora{{ bitacoras_pendientes|pluralize }} por revisar</span>
+                            </div>
+                        </a>
+                        {% else %}
+                        <div class="notif-empty">
+                            <i class="bi bi-check-circle"></i>
+                            <span>Sin notificaciones</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <!-- /CAMPANITA -->
+
             {% endif %}
         </div>
         <!-- /TOPBAR -->
@@ -280,6 +301,28 @@
 <!-- /layout -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- NOTIFICACIONES JS -->
+<script>
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+
+    if (notifBtn) {
+        notifBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('show');
+        });
+
+        document.addEventListener('click', () => {
+            notifDropdown.classList.remove('show');
+        });
+
+        notifDropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+</script>
+
 {% block scripts %}{% endblock %}
 
 </body>

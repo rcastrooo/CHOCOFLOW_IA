@@ -1,7 +1,7 @@
 {% extends 'layouts/sidebar.html' %}
 {% load static %}
 
-{% block titulo %}Revisión de Bitácoras - Admin{% endblock %}
+{% block titulo %}Revisión de Bitácoras - Administrador{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
@@ -50,8 +50,8 @@
          style="background:#fff3e0; border:1.5px solid #D88C51; border-radius:12px; color:#603C1C; font-size:0.88rem;">
       <i class="bi bi-bell-fill" style="font-size:1.1rem; color:#D88C51;"></i>
       <span>
-        Tienes <strong>{{ pendientes }} bitácora{{ pendientes|pluralize }}</strong> enviada{{ pendientes|pluralize }}
-        esperando revisión.
+        Tienes <strong>{{ pendientes }} bitácora{{ pendientes|pluralize }}</strong>
+        enviada{{ pendientes|pluralize }} esperando revisión.
       </span>
     </div>
   {% endif %}
@@ -105,25 +105,26 @@
               <span class="badge bg-success">{{ b.estado }}</span>
             {% elif b.estado == 'Rechazado' %}
               <span class="badge bg-danger">{{ b.estado }}</span>
-            {% else %}
-              <span class="badge bg-warning text-dark">{{ b.estado }}</span>
             {% endif %}
           </td>
           <td>
             <!-- Botón ver detalle -->
             <button class="btn btn-sm btn-outline-secondary me-1"
                     style="border-radius:8px;"
+                    title="Ver detalle"
                     onclick="verDetalle(
                       '{{ b.titulo|escapejs }}',
                       '{{ b.supervisor.nombre|escapejs }}',
                       '{{ b.tipo_reporte }}',
-                      '{{ b.produccion }}',
+                      '{{ b.produccion|escapejs }}',
                       '{{ b.fecha_registro }}',
                       '{{ b.unidades_producidas }}',
                       '{{ b.unidades_pendientes }}',
                       '{{ b.descripcion|escapejs }}',
                       '{{ b.observaciones|escapejs }}',
-                      '{{ b.estado }}'
+                      '{{ b.estado }}',
+                      '{{ b.observacion_admin|escapejs }}',
+                      '{{ b.fecha_revision }}'
                     )">
               <i class="bi bi-eye"></i>
             </button>
@@ -136,9 +137,9 @@
                 <i class="bi bi-check2-square"></i> Revisar
               </button>
             {% else %}
-              {% if b.revisado_por %}
+              {% if b.fecha_revision %}
                 <small class="text-muted d-block" style="font-size:0.75rem;">
-                  Por {{ b.revisado_por.nombre }}<br>{{ b.fecha_revision }}
+                  Revisado el {{ b.fecha_revision }}
                 </small>
               {% endif %}
             {% endif %}
@@ -159,7 +160,8 @@
   <!-- PIE -->
   <p class="text-muted mt-3" style="font-size:12px;">
     <i class="bi bi-info-circle"></i>
-    Solo puedes revisar bitácoras en estado <strong>Enviado</strong>. Los borradores son visibles pero no revisables.
+    Solo puedes revisar bitácoras en estado <strong>Enviado</strong>.
+    Los borradores son visibles pero no revisables.
   </p>
 
 </div>
@@ -177,50 +179,64 @@
       </div>
       <div class="modal-body" style="background:#fdf9f6;">
         <div class="row g-3">
+
           <div class="col-md-8">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Título</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Título</small>
             <p id="det_titulo" style="font-weight:600; color:#333; margin:0;"></p>
           </div>
           <div class="col-md-4">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Estado</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Estado</small>
             <p id="det_estado" style="margin:0;"></p>
           </div>
           <div class="col-md-4">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Supervisor</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Supervisor</small>
             <p id="det_supervisor" style="margin:0; font-size:0.88rem; color:#555;"></p>
           </div>
           <div class="col-md-4">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Tipo</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Tipo</small>
             <p id="det_tipo" style="margin:0; font-size:0.88rem; color:#555;"></p>
           </div>
           <div class="col-md-4">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Fecha registro</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Fecha registro</small>
             <p id="det_fecha" style="margin:0; font-size:0.88rem; color:#555;"></p>
           </div>
           <div class="col-md-6">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Producción</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Producción</small>
             <p id="det_produccion" style="margin:0; font-size:0.88rem; color:#555;"></p>
           </div>
           <div class="col-md-3">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Uds. producidas</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Uds. producidas</small>
             <p id="det_uds_prod" style="margin:0; font-size:0.88rem; color:#555;"></p>
           </div>
           <div class="col-md-3">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Uds. pendientes</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Uds. pendientes</small>
             <p id="det_uds_pend" style="margin:0; font-size:0.88rem; color:#555;"></p>
           </div>
           <div class="col-12">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Descripción</small>
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Descripción</small>
             <p id="det_descripcion" style="margin:0; font-size:0.88rem; color:#444; line-height:1.6; white-space:pre-line;"></p>
           </div>
-          <div class="col-12" id="det_obs_wrap">
-            <small style="color:#999; font-size:0.75rem; text-transform:uppercase;">Observaciones</small>
+          <div class="col-12">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Observaciones del supervisor</small>
             <p id="det_observaciones" style="margin:0; font-size:0.88rem; color:#444; white-space:pre-line;"></p>
           </div>
+
+          <!-- Respuesta del admin: solo si existe -->
+          <div class="col-12" id="det_admin_wrap" style="display:none;">
+            <hr style="border-color:#e8ddd5;">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">
+              <i class="bi bi-person-check"></i> Observación del administrador
+            </small>
+            <p id="det_obs_admin" style="margin:4px 0 0; font-size:0.88rem; color:#444; white-space:pre-line;"></p>
+            <small id="det_fecha_revision" class="text-muted" style="font-size:0.78rem;"></small>
+          </div>
+
         </div>
       </div>
       <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
-        <button type="button" class="btn-caramel" style="border-radius:10px; padding:8px 18px;" data-bs-dismiss="modal">
+        <button type="button" class="btn-caramel"
+                style="border-radius:10px; padding:8px 18px;"
+                data-bs-dismiss="modal">
           Cerrar
         </button>
       </div>
@@ -235,7 +251,6 @@
 <div class="modal fade" id="modalRevision" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content" style="border-radius:16px; overflow:hidden;">
-
       <form method="POST" id="formRevision" action="">
         {% csrf_token %}
 
@@ -250,7 +265,6 @@
             Revisando: <strong id="rev_titulo"></strong>
           </p>
 
-          <!-- Decisión -->
           <div class="mb-3">
             <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
               <i class="bi bi-toggle2-on"></i> Decisión
@@ -264,7 +278,6 @@
             </select>
           </div>
 
-          <!-- Observación del admin -->
           <div class="mb-1">
             <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
               <i class="bi bi-chat-left-text"></i> Observación
@@ -283,7 +296,9 @@
           <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
             <i class="bi bi-send-fill"></i> Confirmar revisión
           </button>
-          <button type="button" class="btn-caramel" style="border-radius:10px; padding:8px 16px;" data-bs-dismiss="modal">
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px; padding:8px 16px;"
+                  data-bs-dismiss="modal">
             Cancelar
           </button>
         </div>
@@ -302,14 +317,14 @@ function abrirRevision(id, titulo) {
   new bootstrap.Modal(document.getElementById('modalRevision')).show();
 }
 
-function verDetalle(titulo, supervisor, tipo, produccion, fecha, udsProd, udsPend, descripcion, observaciones, estado) {
+function verDetalle(titulo, supervisor, tipo, produccion, fecha, udsProd, udsPend, descripcion, observaciones, estado, obsAdmin, fechaRevision) {
   document.getElementById('det_titulo').textContent       = titulo;
   document.getElementById('det_supervisor').textContent   = supervisor;
   document.getElementById('det_tipo').textContent         = tipo;
   document.getElementById('det_produccion').textContent   = produccion;
   document.getElementById('det_fecha').textContent        = fecha;
-  document.getElementById('det_uds_prod').textContent     = udsProd;
-  document.getElementById('det_uds_pend').textContent     = udsPend;
+  document.getElementById('det_uds_prod').textContent     = udsProd || '—';
+  document.getElementById('det_uds_pend').textContent     = udsPend || '—';
   document.getElementById('det_descripcion').textContent  = descripcion;
   document.getElementById('det_observaciones').textContent = observaciones || '—';
 
@@ -321,6 +336,17 @@ function verDetalle(titulo, supervisor, tipo, produccion, fecha, udsProd, udsPen
   };
   document.getElementById('det_estado').innerHTML =
     `<span class="badge ${badgeMap[estado] || 'bg-warning text-dark'}">${estado}</span>`;
+
+  // Mostrar sección admin solo si hay observación
+  const adminWrap = document.getElementById('det_admin_wrap');
+  if (obsAdmin && obsAdmin.trim() !== '') {
+    document.getElementById('det_obs_admin').textContent = obsAdmin;
+    document.getElementById('det_fecha_revision').textContent =
+      fechaRevision ? 'Revisado el ' + fechaRevision : '';
+    adminWrap.style.display = 'block';
+  } else {
+    adminWrap.style.display = 'none';
+  }
 
   new bootstrap.Modal(document.getElementById('modalDetalle')).show();
 }

@@ -13,23 +13,20 @@
 
 <div class="main-content">
 
-  <!-- TOPBAR -->
   <div class="topbar">
     <span class="topbar-title">
       <i class="bi bi-journal-check"></i> Mis Bitácoras
     </span>
   </div>
 
-  <!-- BIENVENIDA -->
   <div class="bienvenida">
     <h5><i class="bi bi-list-check"></i> Bitácoras — Supervisor</h5>
     <p>
-      Historial de reportes de producción enviados y su estado de revisión —
+      Historial de tus reportes de producción y su estado de revisión —
       <strong>{{ fecha_hoy }}</strong>.
     </p>
   </div>
 
-  <!-- MENSAJES -->
   {% if messages %}
     {% for msg in messages %}
       <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
@@ -39,7 +36,6 @@
     {% endfor %}
   {% endif %}
 
-  <!-- BOTÓN NUEVA BITÁCORA -->
   <div class="mb-3">
     <a href="{% url 'bitacora_supervisor' %}"
        class="btn-choco"
@@ -48,12 +44,10 @@
     </a>
   </div>
 
-  <!-- LABEL SECCIÓN -->
   <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
     Historial de bitácoras
   </h6>
 
-  <!-- TABLA -->
   <div class="table-responsive"
        style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
     <table class="table table-hover align-middle mb-0">
@@ -62,10 +56,10 @@
           <th>Título</th>
           <th>Tipo</th>
           <th>Producción</th>
-          <th>Fecha registro</th>
+          <th>Fecha</th>
           <th>Estado</th>
-          <th>Revisado por</th>
           <th>Observación admin</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -91,25 +85,52 @@
               <span class="badge bg-success">{{ b.estado }}</span>
             {% elif b.estado == 'Rechazado' %}
               <span class="badge bg-danger">{{ b.estado }}</span>
-            {% else %}
-              <span class="badge bg-warning text-dark">{{ b.estado }}</span>
             {% endif %}
           </td>
-          <td style="font-size:0.85rem; color:#666;">
-            {% if b.revisado_por %}
-              {{ b.revisado_por.nombre }}
+          <td style="font-size:0.85rem; color:#444; max-width:200px;">
+            {% if b.observacion_admin %}
+              <span style="white-space:normal; line-height:1.4;">{{ b.observacion_admin }}</span>
               {% if b.fecha_revision %}
                 <br><small class="text-muted">{{ b.fecha_revision }}</small>
               {% endif %}
             {% else %}
-              <span class="text-muted fst-italic">Pendiente</span>
+              <span class="text-muted fst-italic">—</span>
             {% endif %}
           </td>
-          <td style="font-size:0.85rem; color:#666; max-width:200px;">
-            {% if b.observacion_admin %}
-              <span style="display:block; white-space:normal; line-height:1.4;">{{ b.observacion_admin }}</span>
-            {% else %}
-              <span class="text-muted fst-italic">—</span>
+          <td>
+            <!-- Ver detalle -->
+            <button class="btn btn-sm btn-outline-secondary me-1"
+                    style="border-radius:8px;"
+                    title="Ver detalle"
+                    onclick="verDetalle(
+                      '{{ b.titulo|escapejs }}',
+                      '{{ b.tipo_reporte }}',
+                      '{{ b.produccion|escapejs }}',
+                      '{{ b.fecha_registro }}',
+                      '{{ b.unidades_producidas }}',
+                      '{{ b.unidades_pendientes }}',
+                      '{{ b.descripcion|escapejs }}',
+                      '{{ b.observaciones|escapejs }}',
+                      '{{ b.estado }}',
+                      '{{ b.observacion_admin|escapejs }}',
+                      '{{ b.fecha_revision }}'
+                    )">
+              <i class="bi bi-eye"></i>
+            </button>
+
+            <!-- Enviar borrador -->
+            {% if b.estado == 'Borrador' %}
+              <form method="POST" action="{% url 'enviar_bitacora' b.id %}"
+                    style="display:inline;"
+                    onsubmit="return confirm('¿Enviar esta bitácora al administrador?')">
+                {% csrf_token %}
+                <button type="submit"
+                        class="btn btn-sm btn-primary"
+                        style="border-radius:8px; font-size:0.8rem;"
+                        title="Enviar al administrador">
+                  <i class="bi bi-send-fill"></i> Enviar
+                </button>
+              </form>
             {% endif %}
           </td>
         </tr>
@@ -125,13 +146,113 @@
     </table>
   </div>
 
-  <!-- PIE -->
   <p class="text-muted mt-3" style="font-size:12px;">
     <i class="bi bi-info-circle"></i>
-    Solo ves tus propias bitácoras. El administrador las revisa y puede aprobarlas o rechazarlas con observaciones.
+    Los borradores solo los ves tú. Usa el botón <strong>Enviar</strong> para notificar al administrador.
   </p>
 
 </div>
 
+
+<!-- MODAL: Detalle de bitácora -->
+<div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+        <h5 class="modal-title"><i class="bi bi-journal-text"></i> Detalle de Bitácora</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="background:#fdf9f6;">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Título</small>
+            <p id="det_titulo" style="font-weight:600; color:#333; margin:0;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Estado</small>
+            <p id="det_estado" style="margin:0;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Tipo</small>
+            <p id="det_tipo" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Producción</small>
+            <p id="det_produccion" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-4">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Fecha registro</small>
+            <p id="det_fecha" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-6">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Uds. producidas</small>
+            <p id="det_uds_prod" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-md-6">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Uds. pendientes</small>
+            <p id="det_uds_pend" style="margin:0; font-size:0.88rem; color:#555;"></p>
+          </div>
+          <div class="col-12">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Descripción</small>
+            <p id="det_descripcion" style="margin:0; font-size:0.88rem; color:#444; line-height:1.6; white-space:pre-line;"></p>
+          </div>
+          <div class="col-12">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">Observaciones del supervisor</small>
+            <p id="det_observaciones" style="margin:0; font-size:0.88rem; color:#444; white-space:pre-line;"></p>
+          </div>
+          <!-- Sección admin: solo visible si hay respuesta -->
+          <div class="col-12" id="det_admin_wrap" style="display:none;">
+            <hr style="border-color:#e8ddd5;">
+            <small style="color:#999;font-size:0.75rem;text-transform:uppercase;">
+              <i class="bi bi-person-check"></i> Respuesta del administrador
+            </small>
+            <p id="det_obs_admin" style="margin:4px 0 0; font-size:0.88rem; color:#444; white-space:pre-line;"></p>
+            <small id="det_fecha_revision" class="text-muted"></small>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+        <button type="button" class="btn-caramel" style="border-radius:10px; padding:8px 18px;" data-bs-dismiss="modal">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function verDetalle(titulo, tipo, produccion, fecha, udsProd, udsPend, descripcion, observaciones, estado, obsAdmin, fechaRevision) {
+  document.getElementById('det_titulo').textContent      = titulo;
+  document.getElementById('det_tipo').textContent        = tipo;
+  document.getElementById('det_produccion').textContent  = produccion;
+  document.getElementById('det_fecha').textContent       = fecha;
+  document.getElementById('det_uds_prod').textContent    = udsProd || '—';
+  document.getElementById('det_uds_pend').textContent    = udsPend || '—';
+  document.getElementById('det_descripcion').textContent = descripcion;
+  document.getElementById('det_observaciones').textContent = observaciones || '—';
+
+  const badgeMap = {
+    'Borrador':  'bg-secondary',
+    'Enviado':   'bg-primary',
+    'Aprobado':  'bg-success',
+    'Rechazado': 'bg-danger',
+  };
+  document.getElementById('det_estado').innerHTML =
+    `<span class="badge ${badgeMap[estado] || 'bg-warning text-dark'}">${estado}</span>`;
+
+  // Mostrar respuesta del admin solo si existe
+  const adminWrap = document.getElementById('det_admin_wrap');
+  if (obsAdmin && obsAdmin.trim() !== '') {
+    document.getElementById('det_obs_admin').textContent = obsAdmin;
+    document.getElementById('det_fecha_revision').textContent =
+      fechaRevision ? 'Revisado el ' + fechaRevision : '';
+    adminWrap.style.display = 'block';
+  } else {
+    adminWrap.style.display = 'none';
+  }
+
+  new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+}
+</script>
 {% endblock %}

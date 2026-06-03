@@ -13,23 +13,20 @@
 
 <div class="main-content">
 
-  <!-- TOPBAR -->
   <div class="topbar">
     <span class="topbar-title">
       <i class="bi bi-journal-text"></i> Bitácora de Producción
     </span>
   </div>
 
-  <!-- BIENVENIDA -->
   <div class="bienvenida">
     <h5><i class="bi bi-pencil-square"></i> Nueva Bitácora — Supervisor</h5>
     <p>
-      Registra el reporte diario de producción. Una vez enviado, el administrador
-      podrá aprobarlo o rechazarlo con observaciones — <strong>{{ today }}</strong>.
+      Registra el reporte diario de producción. Puedes guardarlo como borrador
+      o enviarlo directamente al administrador — <strong>{{ today }}</strong>.
     </p>
   </div>
 
-  <!-- MENSAJES -->
   {% if messages %}
     {% for msg in messages %}
       <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
@@ -39,7 +36,6 @@
     {% endfor %}
   {% endif %}
 
-  <!-- BOTÓN VER MIS BITÁCORAS -->
   <div class="mb-3">
     <a href="{% url 'listar_bitacoras_supervisor' %}"
        class="btn-caramel"
@@ -48,19 +44,15 @@
     </a>
   </div>
 
-  <!-- LABEL SECCIÓN -->
   <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
     Formulario de reporte
   </h6>
 
-  <!-- FORMULARIO -->
   <div style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); padding:28px 32px;">
     <form method="POST" action="{% url 'bitacora_supervisor' %}">
       {% csrf_token %}
-
       <div class="row g-3">
 
-        <!-- Título -->
         <div class="col-12">
           <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
             <i class="bi bi-type"></i> Título del reporte
@@ -69,11 +61,11 @@
                  name="titulo"
                  class="form-control"
                  placeholder="Ej: Reporte turno mañana - Línea 1"
+                 value="{{ form_titulo|default:'' }}"
                  style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;"
                  required>
         </div>
 
-        <!-- Tipo de reporte + Producción -->
         <div class="col-md-6">
           <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
             <i class="bi bi-bookmark"></i> Tipo de reporte
@@ -83,11 +75,12 @@
                   style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;"
                   required>
             <option value="">-- Seleccionar tipo --</option>
-            <option value="Diario">Diario</option>
-            <option value="Incidencia">Incidencia</option>
-            <option value="Mantenimiento">Mantenimiento</option>
-            <option value="Calidad">Calidad</option>
-            <option value="Otro">Otro</option>
+            {% for value, label in tipo_choices %}
+              <option value="{{ value }}" {% if form_tipo == value %}selected{% endif %}>{{ label }}</option>
+            {% empty %}
+              <option value="Diario"       {% if form_tipo == 'Diario' %}selected{% endif %}>Diario</option>
+              <option value="Semanal"      {% if form_tipo == 'Semanal' %}selected{% endif %}>Semanal</option>
+            {% endfor %}
           </select>
         </div>
 
@@ -101,12 +94,13 @@
                   required>
             <option value="">-- Seleccionar producción --</option>
             {% for p in producciones %}
-              <option value="{{ p.id }}">{{ p }}</option>
+              <option value="{{ p.id }}" {% if form_produccion == p.id|stringformat:"s" %}selected{% endif %}>
+                {{ p }}
+              </option>
             {% endfor %}
           </select>
         </div>
 
-        <!-- Unidades producidas + pendientes -->
         <div class="col-md-6">
           <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
             <i class="bi bi-check2-circle"></i> Unidades producidas
@@ -116,6 +110,7 @@
                  class="form-control"
                  placeholder="Ej: 500"
                  min="0"
+                 value="{{ form_uds_prod|default:'' }}"
                  style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;"
                  required>
         </div>
@@ -129,11 +124,11 @@
                  class="form-control"
                  placeholder="Ej: 50"
                  min="0"
+                 value="{{ form_uds_pend|default:'' }}"
                  style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;"
                  required>
         </div>
 
-        <!-- Descripción -->
         <div class="col-12">
           <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
             <i class="bi bi-card-text"></i> Descripción
@@ -143,10 +138,9 @@
                     rows="4"
                     placeholder="Describe detalladamente lo ocurrido durante el turno (mínimo 20 caracteres)..."
                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; resize:vertical;"
-                    required></textarea>
+                    required>{{ form_descripcion|default:'' }}</textarea>
         </div>
 
-        <!-- Observaciones -->
         <div class="col-12">
           <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
             <i class="bi bi-chat-left-text"></i> Observaciones adicionales
@@ -156,10 +150,9 @@
                     class="form-control"
                     rows="3"
                     placeholder="Novedades, incidentes o comentarios adicionales..."
-                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; resize:vertical;"></textarea>
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; resize:vertical;">{{ form_observaciones|default:'' }}</textarea>
         </div>
 
-        <!-- Estado -->
         <div class="col-md-6">
           <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
             <i class="bi bi-send"></i> Estado al guardar
@@ -167,8 +160,12 @@
           <select name="estado"
                   class="form-select"
                   style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
-            <option value="Borrador">Borrador (guardar sin enviar)</option>
-            <option value="Enviado">Enviado (notificar al administrador)</option>
+            <option value="Borrador" {% if form_estado != 'Enviado' %}selected{% endif %}>
+              Borrador (guardar sin enviar)
+            </option>
+            <option value="Enviado" {% if form_estado == 'Enviado' %}selected{% endif %}>
+              Enviado (notificar al administrador)
+            </option>
           </select>
           <small class="text-muted" style="font-size:0.78rem; margin-top:4px; display:block;">
             <i class="bi bi-info-circle"></i>
@@ -178,11 +175,8 @@
 
       </div>
 
-      <!-- BOTONES -->
       <div class="d-flex gap-2 mt-4">
-        <button type="submit"
-                class="btn-choco"
-                style="border-radius:10px; padding:10px 28px;">
+        <button type="submit" class="btn-choco" style="border-radius:10px; padding:10px 28px;">
           <i class="bi bi-send-fill"></i> Guardar bitácora
         </button>
         <a href="{% url 'listar_bitacoras_supervisor' %}"
@@ -195,7 +189,6 @@
     </form>
   </div>
 
-  <!-- PIE -->
   <p class="text-muted mt-3" style="font-size:12px;">
     <i class="bi bi-info-circle"></i>
     Una vez enviada, el administrador revisará tu bitácora y podrá aprobarla o rechazarla con observaciones.
