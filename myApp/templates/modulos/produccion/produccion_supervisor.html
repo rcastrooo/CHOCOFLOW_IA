@@ -1,0 +1,284 @@
+{% extends 'layouts/sidebar.html' %}
+{% load static %}
+
+{% block titulo %}Producción - Supervisor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="main-content">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="topbar-title">
+      <i class="bi bi-gear-wide-connected"></i> Gestión de Producción
+    </span>
+  </div>
+
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-clipboard2-pulse"></i> Producción — Supervisor</h5>
+    <p>Consulta las producciones del sistema y registra nuevas. Las ediciones y cancelaciones las gestiona el administrador.</p>
+  </div>
+
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- CABECERA: nueva producción + búsqueda -->
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+
+    <button class="btn-caramel"
+            style="border-radius:12px; padding:9px 20px; font-size:0.875rem; font-weight:600; border:none; cursor:pointer; white-space:nowrap;"
+            data-bs-toggle="modal"
+            data-bs-target="#modalProduccion">
+      <i class="bi bi-plus-lg"></i> Nueva Producción
+    </button>
+
+    <form method="GET" class="d-flex gap-2 flex-grow-1">
+      <input type="text"
+             name="q"
+             value="{{ request.GET.q }}"
+             placeholder="Buscar producto..."
+             class="form-control"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:#fdf9f6;">
+
+      <select name="estado" class="form-select"
+              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:#fdf9f6; max-width:160px;">
+        <option value="">Todos</option>
+        <option value="Pendiente"  {% if request.GET.estado == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
+        <option value="En Proceso" {% if request.GET.estado == 'En Proceso' %}selected{% endif %}>En Proceso</option>
+        <option value="Finalizado" {% if request.GET.estado == 'Finalizado' %}selected{% endif %}>Finalizado</option>
+        <option value="Cancelado"  {% if request.GET.estado == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
+      </select>
+
+      <button type="submit" class="btn-choco"
+              style="border-radius:12px; padding:8px 20px; white-space:nowrap;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+
+      {% if request.GET.q or request.GET.estado %}
+        <a href="{% url 'producciones_supervisor' %}"
+           class="btn-caramel"
+           style="border-radius:12px; padding:8px 14px; text-decoration:none; display:flex; align-items:center;">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      {% endif %}
+    </form>
+
+  </div>
+
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Producciones registradas
+  </h6>
+
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Ingredientes</th>
+          <th>Cant. requerida</th>
+          <th>Responsable</th>
+          <th>Fecha entrega</th>
+          <th>Fecha límite</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in producciones %}
+        <tr>
+          <td style="font-weight:600; color:#333; font-size:0.88rem;">
+            <i class="bi bi-box2" style="color:#D88C51;"></i>
+            {{ p.producto }}
+          </td>
+          <td style="font-size:0.83rem; color:#666; max-width:180px;">
+            <span title="{{ p.ingredientes }}">
+              {{ p.ingredientes|truncatechars:40 }}
+            </span>
+          </td>
+          <td style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+            {{ p.cantidad_requerida }}
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-person-fill" style="color:white;font-size:0.72rem;"></i>
+              </div>
+              <span style="font-size:0.85rem;">{{ p.empleado_responsable.nombre }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.83rem; color:#666;">{{ p.fecha_entrega }}</td>
+          <td style="font-size:0.83rem; color:#666;">{{ p.fecha_limite }}</td>
+          <td>
+            {% if p.estado == 'Finalizado' %}
+              <span class="badge bg-success">{{ p.estado }}</span>
+            {% elif p.estado == 'En Proceso' %}
+              <span class="badge bg-warning text-dark">{{ p.estado }}</span>
+            {% elif p.estado == 'Pendiente' %}
+              <span class="badge bg-info text-dark">{{ p.estado }}</span>
+            {% else %}
+              <span class="badge bg-danger">{{ p.estado }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            {% if request.GET.q %}
+              No se encontraron producciones para "{{ request.GET.q }}"
+            {% else %}
+              No hay producciones registradas
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Las producciones que crees aquí serán visibles para el administrador inmediatamente.
+    Solo el administrador puede editar o cancelar.
+  </p>
+
+</div>
+
+<!-- ═══════════════════════════════
+     MODAL: Nueva Producción
+═══════════════════════════════ -->
+<div class="modal fade" id="modalProduccion">
+<div class="modal-dialog modal-lg">
+<div class="modal-content" style="border-radius:16px; overflow:hidden;">
+
+  <form method="POST" action="{% url 'guardar_produccion' %}">
+  {% csrf_token %}
+
+  <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#7a4e28); color:white; border:none;">
+    <h5 class="modal-title" style="font-weight:700; font-size:1rem;">
+      <i class="bi bi-plus-circle me-2"></i>Nueva Producción
+    </h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+  </div>
+
+  <div class="modal-body" style="padding:1.5rem; background:#fdf9f6;">
+
+    <!-- Sin ID oculto: siempre es creación desde el supervisor -->
+
+    <div class="row g-3">
+
+      <div class="col-md-6">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Producto <span class="text-danger">*</span>
+        </label>
+        <input type="text" name="producto"
+               class="form-control"
+               placeholder="Nombre del producto"
+               style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;"
+               required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Ingredientes <span class="text-danger">*</span>
+        </label>
+        <input type="text" name="ingredientes"
+               class="form-control"
+               placeholder="Ej: Cacao, azúcar, leche..."
+               style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;"
+               required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Cantidad requerida <span class="text-danger">*</span>
+        </label>
+        <input type="text" name="cantidad_requerida"
+               class="form-control"
+               placeholder="Ej: 500 kg"
+               style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Estado
+        </label>
+        <select name="estado" class="form-select"
+                style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;">
+          <option value="Pendiente">Pendiente</option>
+          <option value="En Proceso">En Proceso</option>
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Fecha de entrega <span class="text-danger">*</span>
+        </label>
+        <input type="date" name="fecha_entrega"
+               class="form-control"
+               style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;"
+               required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Fecha límite <span class="text-danger">*</span>
+        </label>
+        <input type="date" name="fecha_limite"
+               class="form-control"
+               style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;"
+               required>
+      </div>
+
+      <div class="col-md-12">
+        <label class="form-label" style="font-size:0.82rem; font-weight:600; color:#603C1C;">
+          Responsable <span class="text-danger">*</span>
+        </label>
+        <select name="empleado_responsable" class="form-select"
+                style="border-radius:10px; border:1.5px solid #e8ddd5; background:white; font-size:0.88rem;"
+                required>
+          <option value="">-- Seleccionar responsable --</option>
+          {% for emp in empleados %}
+            <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="modal-footer" style="border:none; background:#fdf9f6; padding:1rem 1.5rem;">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+            style="border-radius:10px; font-size:0.875rem;">
+      Cancelar
+    </button>
+    <button type="submit" class="btn-caramel"
+            style="border-radius:10px; padding:9px 24px; font-size:0.875rem; font-weight:600; border:none; cursor:pointer;">
+      <i class="bi bi-check-lg me-1"></i> Guardar producción
+    </button>
+  </div>
+
+  </form>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

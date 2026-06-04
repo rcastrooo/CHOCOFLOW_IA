@@ -1,5 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+
+
 # -------------------------
 # Usuario
 # -------------------------
@@ -8,7 +10,6 @@ class Usuario(models.Model):
         ('Administrador', 'Administrador'),
         ('Supervisor', 'Supervisor'),
     ]
-
     ESTADO_CHOICES = [
         ('Activo', 'Activo'),
         ('Inactivo', 'Inactivo'),
@@ -16,21 +17,18 @@ class Usuario(models.Model):
         ('Suspendido', 'Suspendido'),
     ]
 
-    HORARIO_CHOICES = [
-        ('Mañana 6:00am - 2:00pm', 'Mañana 6:00am - 2:00pm'),
-        ('Tarde 2:00pm - 10:00pm', 'Tarde 2:00pm - 10:00pm'),
-    ]
+    nombre    = models.CharField(max_length=100)
+    email     = models.EmailField(unique=True, max_length=255)
+    telefono  = models.CharField(max_length=10, blank=True, null=True)
+    direccion = models.CharField(max_length=255)
+    contrasena = models.CharField(max_length=255)
+    rol       = models.CharField(max_length=20, choices=ROL_CHOICES)
+    estado    = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
-    nombre       = models.CharField(max_length=100)
-    email        = models.EmailField(unique=True, max_length=255)
-    ttelefono    = models.CharField(max_length=10, blank=True, null=True)
-    direccion    = models.CharField(max_length=255)
-    contrasena   = models.CharField(max_length=255)
-    rol          = models.CharField(max_length=20, choices=ROL_CHOICES)
-    estado       = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-   
     def __str__(self):
         return self.nombre
+
+
 # -------------------------
 # Empleado
 # -------------------------
@@ -42,13 +40,12 @@ class Empleado(models.Model):
         ('Suspendido', 'Suspendido'),
     ]
 
-    cedula = models.CharField(max_length=20, null=True, blank=True)
-    nombre = models.CharField(max_length=100)
-    email = models.EmailField(unique=True, max_length=255)
-    telefono = models.CharField(max_length=10, blank=True, null=True)
+    cedula    = models.CharField(max_length=20, null=True, blank=True)
+    nombre    = models.CharField(max_length=100)
+    email     = models.EmailField(unique=True, max_length=255)
+    telefono  = models.CharField(max_length=10, blank=True, null=True)
     direccion = models.CharField(max_length=255)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-
+    estado    = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     creado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='creado_por')
 
     def __str__(self):
@@ -64,21 +61,16 @@ class Turno(models.Model):
         ('Tarde 2:00pm - 10:00pm', 'Tarde 2:00pm - 10:00pm'),
     ]
 
-    horario  = models.CharField(max_length=50, choices=HORARIO_CHOICES)
-    activo   = models.BooleanField(default=True)
-    creado_por = models.ForeignKey(
-        Usuario,
-        on_delete=models.CASCADE,
-        db_column='creado_por',
-        related_name='turnos_creados'  # ← esto resuelve el conflicto E303
-    )
+    # SQL solo tiene: horario, activo
+    horario = models.CharField(max_length=50, choices=HORARIO_CHOICES)
+    activo  = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.horario}"
 
 
 # -------------------------
-# Rotacion Turno
+# RotacionTurno
 # -------------------------
 class RotacionTurno(models.Model):
     ESTADO_CHOICES = [
@@ -86,29 +78,34 @@ class RotacionTurno(models.Model):
         ('Completado', 'Completado'),
         ('Pendiente', 'Pendiente'),
     ]
+    HORARIO_SABADO_CHOICES = [
+        ('Mañana 6:00am - 12:00pm', 'Mañana 6:00am - 12:00pm'),
+        ('Tarde 12:00pm - 6:00pm', 'Tarde 12:00pm - 6:00pm'),
+    ]
 
-    fecha_inicio = models.DateField()
-    fecha_fin = models.DateField()
-    semana = models.IntegerField()
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
-    sabado_asignado = models.BooleanField(default=False)
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
-    turno = models.ForeignKey(Turno, on_delete=models.CASCADE)
-    
-    # Esto es lo que evita que los empleados tengan doble turno en la misma semana
+    fecha_inicio     = models.DateField()
+    fecha_fin        = models.DateField()
+    semana           = models.IntegerField()
+    estado           = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    sabado_asignado  = models.BooleanField(default=False)
+    horario_sabado   = models.CharField(max_length=50, choices=HORARIO_SABADO_CHOICES, null=True, blank=True)
+    empleado         = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    turno            = models.ForeignKey(Turno, on_delete=models.CASCADE)
+
     class Meta:
         constraints = [
-        models.UniqueConstraint(
-            fields=['empleado', 'fecha_inicio', 'fecha_fin'],
-            name='unique_turno_semanal'
-        )
-    ]
+            models.UniqueConstraint(
+                fields=['empleado', 'fecha_inicio', 'fecha_fin'],
+                name='unique_turno_semanal'
+            )
+        ]
 
     def __str__(self):
         return f"{self.empleado} - {self.turno} - Semana {self.semana}"
 
+
 # -------------------------
-# Solicitud Cambio de Turno
+# Solicitud
 # -------------------------
 class Solicitud(models.Model):
     ESTADO_CHOICES = [
@@ -117,16 +114,17 @@ class Solicitud(models.Model):
         ('Rechazado', 'Rechazado'),
     ]
 
-    turno_actual = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_actual')
-    turno_solicitado = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_solicitado')
-    motivo = models.TextField()
-    fecha_solicitud = models.DateField(auto_now_add=True)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
-    revisado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+    turno_actual      = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_actual')
+    turno_solicitado  = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='turno_solicitado')
+    motivo            = models.TextField()
+    fecha_solicitud   = models.DateField(auto_now_add=True)
+    estado            = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    empleado          = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    observacion_admin = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.empleado} - {self.estado}"
+
 
 # -------------------------
 # Asignacion
@@ -136,42 +134,47 @@ class Asignacion(models.Model):
         ('Pendiente', 'Pendiente'),
         ('En Proceso', 'En Proceso'),
         ('Finalizado', 'Finalizado'),
-
     ]
-    
-    tarea = models.CharField(max_length=255)
-    fecha_asignacion = models.DateField()
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    TAREA_CHOICES = [
+        ('Temperar', 'Temperar'),
+        ('Mezclado', 'Mezclado'),
+        ('Moldear', 'Moldear'),
+        ('Desmoldear', 'Desmoldear'),
+        ('Picar', 'Picar'),
+        ('Triturado', 'Triturado'),
+        ('Molienda', 'Molienda'),
+        ('Paletear', 'Paletear'),
+        ('Empacar', 'Empacar'),
+        ('Sellado', 'Sellado'),
+        ('Etiquetado', 'Etiquetado'),
+        ('Limpieza General', 'Limpieza General'),
+        ('Limpieza de Maquinaria', 'Limpieza de Maquinaria'),
+    ]
 
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id')
-    turno = models.ForeignKey(Turno, on_delete=models.CASCADE, db_column='turno_id')
-    asignado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='asignado_por')
-    
-      # VALIDACIÓN
-    def clean(self):
+    tarea             = models.CharField(max_length=255, choices=TAREA_CHOICES)
+    descripcion_tarea = models.TextField(null=True, blank=True)
+    fecha_asignacion  = models.DateField()
+    estado            = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
+    empleado          = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id')
+    turno             = models.ForeignKey(Turno, on_delete=models.CASCADE, db_column='turno_id')
+    asignado_por      = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='asignado_por')
 
-        tareas_diarias = Asignacion.objects.filter(
-            empleado=self.empleado,
-            fecha_asignacion=self.fecha_asignacion
-        ).exclude(id=self.id).count()
-
-        if tareas_diarias >= 2:
-            raise ValidationError(
-                "El empleado ya tiene el máximo de 2 tareas diarias."
-            )
-
-    # GUARDA VALIDANDO
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+    # ✅ Se eliminó clean() y save() con el límite duro.
+    # El límite de 2 tareas ahora se maneja en la view del supervisor (duro)
+    # y en la view del admin (advertencia con confirmación).
 
     def __str__(self):
         return f"{self.tarea} - {self.empleado}"
+
+
+from django.core.exceptions import ValidationError
+import re
 
 # -------------------------
 # Produccion
 # -------------------------
 class Produccion(models.Model):
+
     ESTADO_CHOICES = [
         ('Pendiente', 'Pendiente'),
         ('En Proceso', 'En Proceso'),
@@ -182,18 +185,37 @@ class Produccion(models.Model):
     producto = models.CharField(max_length=255, null=True, blank=True)
     ingredientes = models.CharField(max_length=255)
     cantidad_requerida = models.CharField(max_length=255, null=True, blank=True)
+
     fecha_entrega = models.DateField()
     fecha_limite = models.DateField()
+
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
-    empleado_responsable = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_responsable')
-    creado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='creado_por')
+    empleado_responsable = models.ForeignKey(
+        Empleado, on_delete=models.CASCADE, db_column='empleado_responsable'
+    )
+    creado_por = models.ForeignKey(
+        Usuario, on_delete=models.CASCADE, db_column='creado_por'
+    )
+
+    def clean(self):
+        if self.producto and any(char.isdigit() for char in self.producto):
+            raise ValidationError("El producto no puede contener números.")
+
+        if self.fecha_limite and self.fecha_entrega:
+            if self.fecha_limite < self.fecha_entrega:
+                raise ValidationError("La fecha límite no puede ser menor que la fecha de entrega.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.producto} - {self.estado}"
 
+
 # -------------------------
-# Exportacion
+# EXPORTACION
 # -------------------------
 class Exportacion(models.Model):
     ESTADO_CHOICES = [
@@ -203,44 +225,94 @@ class Exportacion(models.Model):
         ('Cancelado', 'Cancelado'),
     ]
 
-    destino = models.CharField(max_length=255)
-    pais = models.CharField(max_length=255, default='Sin producto')
-    fecha_envio = models.DateField()
-    fecha_entrega = models.DateField()
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    destino              = models.CharField(max_length=255)
+    pais                 = models.CharField(max_length=255, default='Sin producto')
+    fecha_envio          = models.DateField()
+    fecha_entrega        = models.DateField()
+    estado               = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
-    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id', null=True,      # ← permite nulo
-        blank=True)
-    producto = models.CharField(max_length=255)
+    produccion = models.ForeignKey(
+        Produccion,
+        on_delete=models.CASCADE,
+        db_column='produccion_id',
+        null=True,
+        blank=True
+    )
+
+    # DATOS DE EXPORTACIÓN
+    nombre_producto      = models.CharField(max_length=100, null=True, blank=True)
+    cantidad_cajas       = models.IntegerField(null=True, blank=True)
+    unidades_por_caja    = models.IntegerField(null=True, blank=True)
+    peso_caja            = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    peso_total           = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    empresa_exportadora  = models.CharField(max_length=100, null=True, blank=True)
+    numero_contenedor    = models.CharField(max_length=100, null=True, blank=True)
+    observaciones        = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.destino} - {self.estado}"
 
+    # ACCESO DIRECTO A LOTES (MUY IMPORTANTE)
+    def lotes(self):
+        return self.lote_set.all()
+
+
 # -------------------------
-# Lote
+# LOTE
 # -------------------------
 class Lote(models.Model):
-    codigo_lote = models.CharField(max_length=100, unique=True)
-    cantidad = models.CharField(max_length=255)
-    fecha_produccion = models.DateField()
-    fecha_vencimiento = models.DateField()
 
-    produccion = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id')
-    exportacion = models.ForeignKey(Exportacion, on_delete=models.CASCADE, db_column='exportacion_id')
-    
+    UNIDAD_CHOICES = [
+        ('Kilogramos', 'Kilogramos'),
+        ('Gramos', 'Gramos'),
+    ]
+
+    ESTADO_LOTE = [
+        ('Disponible', 'Disponible'),
+        ('Reservado', 'Reservado'),
+        ('Exportado', 'Exportado'),
+    ]
+
+    codigo_lote       = models.CharField(max_length=100, unique=True)
+    origen_cacao      = models.CharField(max_length=100, null=True, blank=True)
+    cantidad          = models.CharField(max_length=255)
+    unidad            = models.CharField(max_length=20, choices=UNIDAD_CHOICES, null=True, blank=True)
+    fecha_produccion  = models.DateField()
+    fecha_vencimiento = models.DateField()
+    nombre_producto   = models.CharField(max_length=100, null=True, blank=True)
+
+    produccion = models.ForeignKey(
+        Produccion,
+        on_delete=models.CASCADE,
+        db_column='produccion_id'
+    )
+
+    # RELACIÓN CORRECTA CON EXPORTACIÓN (1 A MUCHOS)
+    exportacion = models.ForeignKey(
+        Exportacion,
+        on_delete=models.SET_NULL,
+        db_column='exportacion_id',
+        null=True,
+        blank=True,
+        related_name='lotes'
+    )
+
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_LOTE,
+        default='Disponible'
+    )
+
     def __str__(self):
         return self.codigo_lote
-    
-# ---------------------
+# -------------------------
 # Bitacora
-# ---------------------
+# -------------------------
 class Bitacora(models.Model):
-
     TIPO_CHOICES = [
         ('Diario', 'Diario'),
         ('Semanal', 'Semanal'),
     ]
-
     ESTADO_CHOICES = [
         ('Borrador', 'Borrador'),
         ('Enviado', 'Enviado'),
@@ -256,67 +328,11 @@ class Bitacora(models.Model):
     observaciones       = models.TextField(blank=True, null=True)
     unidades_producidas = models.CharField(max_length=255, null=True, blank=True)
     unidades_pendientes = models.CharField(max_length=255, null=True, blank=True)
-
-    supervisor = models.ForeignKey(
-        Usuario,
-        on_delete=models.CASCADE,
-        db_column='supervisor_id',
-        related_name='bitacoras_creadas'
-    )
-
-    produccion = models.ForeignKey(
-        Produccion,
-        on_delete=models.CASCADE,
-        db_column='produccion_id',
-        null=True,
-        blank=True
-    )
-
-    revisado_por = models.ForeignKey(
-        Usuario,
-        on_delete=models.SET_NULL,
-        db_column='revisado_por',
-        null=True,
-        blank=True,
-        related_name='bitacoras_revisadas'
-    )
-
-    fecha_revision = models.DateField(
-        null=True,
-        blank=True
-    )
-
-    observacion_admin = models.TextField(
-        blank=True,
-        null=True
-    )
-
-    def clean(self):
-
-        if not self.titulo:
-            raise ValidationError(
-                {'titulo': 'El título es obligatorio.'}
-            )
-
-        if len(self.titulo.strip()) < 5:
-            raise ValidationError(
-                {'titulo': 'El título debe tener mínimo 5 caracteres.'}
-            )
-
-        if not self.descripcion:
-            raise ValidationError(
-                {'descripcion': 'La descripción es obligatoria.'}
-            )
-
-        if len(self.descripcion.strip()) < 20:
-            raise ValidationError(
-                {'descripcion': 'La descripción debe tener mínimo 20 caracteres.'}
-            )
-
-        if not self.tipo_reporte:
-            raise ValidationError(
-                {'tipo_reporte': 'Seleccione un tipo de reporte.'}
-            )
+    supervisor          = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column='supervisor_id', related_name='bitacoras_creadas')
+    produccion          = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id', null=True, blank=True)
+    fecha_revision      = models.DateField(null=True, blank=True)
+    observacion_admin   = models.TextField(blank=True, null=True)
+    
 
     def __str__(self):
         return f"{self.titulo} - {self.fecha_registro}"

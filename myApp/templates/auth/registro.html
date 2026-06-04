@@ -1,157 +1,128 @@
-{% extends 'layouts/base.html' %}
 {% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro | ChocoFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/login2.css' %}">
+    <style>
+        .login-wrapper { height: auto; min-height: 540px; }
+        .login-left    { min-height: 580px; }
+        .login-right   { padding: 36px 52px; justify-content: flex-start; overflow-y: auto; }
+    </style>
+</head>
+<body class="login-page">
 
-{% block title %}
-Registro | ChocoFlow
-{% endblock %}
+<div class="login-wrapper registro">
 
-{% block body_class %}login-page{% endblock %}
+    <!-- ══ PANEL IZQUIERDO ══════════════════════════════════ -->
+    <div class="login-left">
+        <div class="deco-icon">🍫</div>
+        <h1>¡Únete a<br>ChocoFlow!</h1>
+        <p>Aquí podras Registrar<br>Nuevos Empleados</p>
+        <a href="{% url 'dashboard' %}" class="btn-register">Volver al Dashboard</a>
+    </div>
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/login2.css' %}">
-{% endblock %}
+    <!-- ══ PANEL DERECHO ════════════════════════════════════ -->
+    <div class="login-right">
 
-{% block hero %}
-{% endblock %}
+        <h2 class="form-title">Crear Cuenta</h2>
+        <p class="form-subtitle">Completa los datos para registrarte</p>
 
-{% block content %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert-choco">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
-<div class="container py-5">
-<div class="row justify-content-center">
+        <form method="POST" action="{% url 'registro' %}">
+            {% csrf_token %}
 
-<div class="col-md-6">
+            <!-- ID / Documento -->
+            <div class="input-group-custom">
+                <input type="text" name="identificacion" class="form-control-login" placeholder="ID / Documento" required>
+                <span class="input-icon">🪪</span>
+            </div>
 
-<div class="card login-card shadow">
+            <!-- Nombre -->
+            <div class="input-group-custom">
+                <input type="text" name="nombre" class="form-control-login" placeholder="Nombre completo" required>
+                <span class="input-icon">👤</span>
+            </div>
 
-<div class="card-body p-5">
+            <!-- Correo -->
+            <div class="input-group-custom">
+                <input type="email" name="correo" class="form-control-login" placeholder="Correo electrónico" required>
+                <span class="input-icon">✉️</span>
+            </div>
 
-<h2 class="text-center mb-4 form-title">
-Crear Cuenta
-</h2>
+            <!-- Teléfono -->
+            <div class="input-group-custom">
+                <input type="tel" name="telefono" class="form-control-login" placeholder="Teléfono" required>
+                <span class="input-icon">📞</span>
+            </div>
 
-{% if messages %}
-{% for message in messages %}
-<div class="alert alert-danger">
-{{ message }}
-</div>
-{% endfor %}
-{% endif %}
+            <!-- Dirección -->
+            <div class="input-group-custom">
+                <input type="text" name="direccion" class="form-control-login" placeholder="Dirección" required>
+                <span class="input-icon">📍</span>
+            </div>
 
-<form method="POST">
-{% csrf_token %}
+            <!-- Contraseña -->
+            <div class="input-group-custom">
+                <input
+                    type="password"
+                    name="password"
+                    id="password-registro"
+                    class="form-control-login"
+                    placeholder="Contraseña"
+                    required
+                >
+                <span class="input-icon toggle-password" onclick="togglePassword('password-registro', this)" title="Mostrar/ocultar contraseña">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c49a6c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path class="eye-top" d="M2 12 C6 6, 18 6, 22 12"/>
+                        <path class="eye-bot" d="M2 12 C6 18, 18 18, 22 12"/>
+                        <circle class="eye-pupil" cx="12" cy="12" r="2.8" fill="#c49a6c" stroke="none"/>
+                    </svg>
+                </span>
+            </div>
 
-<!-- ID -->
-<div class="mb-3">
-<label class="form-label">
-ID / Documento
-</label>
-<input
-type="text"
-name="identificacion"
-class="form-control"
-required
-placeholder="Ingrese su Documento"
-required
->
-</div>
+            <!-- Rol -->
+            <div class="input-group-custom">
+                <select name="rol" class="form-control-login" required>
+                    <option value="">Seleccione rol</option>
+                    <option value="admin">Administrador</option>
+                    <option value="Supervisor">Supervisor</option>
+                </select>
+            </div>
 
-<!-- Nombre -->
-<div class="mb-3">
-<label class="form-label">
-Nombre completo
-</label>
-<input
-type="text"
-name="nombre"
-class="form-control"
-required
-placeholder="Ingrese su Nombre"
-required
->
-</div>
+            <button type="submit" class="btn-login-main">Registrarse</button>
 
-<!-- Correo -->
-<div class="mb-3">
-<label class="form-label">
-Correo electrónico
-</label>
-<input
-type="email"
-name="correo"
-class="form-control"
-required
-placeholder="Ingrese su Correo"
-required
->
-</div>
-
-<!-- Contraseña -->
-<div class="mb-3">
-<label class="form-label">
-Contraseña
-</label>
-<input
-type="password"
-name="password"
-class="form-control"
-required
-placeholder="Ingrese su Contraseña"
-required
->
-</div>
-
-<!-- Rol -->
-<div class="mb-3">
-<label class="form-label">
-Rol
-</label>
-<select
-name="rol"
-class="form-control"
-required
->
-<option value="">Seleccione rol</option>
-<option value="admin">Administrador</option>
-<option value="supervisor">Supervisor</option>
-</select>
+        </form>
+    </div>
 </div>
 
-<!-- Estado -->
-<div class="mb-4">
-<label class="form-label">
-Estado
-</label>
-<select
-name="estado"
-class="form-control"
-required
->
-<option value="">Seleccione estado</option>
-<option value="activo">Activo</option>
-<option value="inactivo">Inactivo</option>
-</select>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function togglePassword(inputId, iconEl) {
+    const input    = document.getElementById(inputId);
+    const eyeTop   = iconEl.querySelector('.eye-top');
+    const eyeBot   = iconEl.querySelector('.eye-bot');
+    const eyePupil = iconEl.querySelector('.eye-pupil');
 
-<div class="d-grid">
-<button type="submit" class="btn btn-login">
-Registrarse
-</button>
-</div>
+    const OPEN  = { top: "M2 12 C6 6, 18 6, 22 12",   bot: "M2 12 C6 18, 18 18, 22 12"  };
+    const CLOSE = { top: "M2 12 C6 11, 18 11, 22 12",  bot: "M2 12 C6 13, 18 13, 22 12"  };
 
-<div class="text-center mt-4">
-¿Ya tienes cuenta?
-<a href="{% url 'login' %}">
-Inicia sesión
-</a>
-</div>
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
 
-</form>
-
-</div>
-</div>
-
-</div>
-</div>
-</div>
-
-{% endblock %}
+    eyeTop.setAttribute('d',     isPassword ? OPEN.top  : CLOSE.top);
+    eyeBot.setAttribute('d',     isPassword ? OPEN.bot  : CLOSE.bot);
+    eyePupil.style.opacity     = isPassword ? '1' : '0';
+    eyePupil.style.transform   = isPassword ? 'scale(1)' : 'scale(0)';
+}
+</script>
+</body>
+</html>

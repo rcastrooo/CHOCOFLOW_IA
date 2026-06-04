@@ -1,0 +1,353 @@
+{% extends 'layouts/sidebar.html' %}
+{% load static %}
+{% block titulo %}Solicitudes{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/solicitudes.css' %}">
+{% endblock %}
+
+{% block content %}
+
+
+<div class="contenedor-solicitudes">
+
+    <!-- HEADER -->
+    <div class="header-solicitudes">
+
+        <div>
+            <h1>Gestión de Solicitudes</h1>
+            <p>Administración de cambios de turnos de empleados</p>
+        </div>
+
+        <div class="acciones-header">
+
+            <a href="{% url 'generar_reporte_solicitudes' %}" class="btn-reporte">
+                <i class="fas fa-file-pdf"></i>
+                Reporte PDF
+            </a>
+
+            <button class="btn-agregar" onclick="abrirModal()">
+                <i class="fas fa-plus"></i>
+                Nueva Solicitud
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- ALERTAS -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alerta {{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- FILTROS -->
+    <div class="contenedor-filtros">
+
+        <form method="GET" class="filtros-form">
+
+            <div class="grupo-filtro">
+                <input type="text"
+                       name="q"
+                       placeholder="Buscar empleado..."
+                       value="{{ request.GET.q }}">
+            </div>
+
+            <div class="grupo-filtro">
+                <select name="estado">
+
+                    <option value="Todos">Todos los estados</option>
+
+                    <option value="Pendiente"
+                        {% if request.GET.estado == 'Pendiente' %}
+                            selected
+                        {% endif %}
+                    >
+                        Pendiente
+                    </option>
+
+                    <option value="Aprobado"
+                        {% if request.GET.estado == 'Aprobado' %}
+                            selected
+                        {% endif %}
+                    >
+                        Aprobado
+                    </option>
+
+                    <option value="Rechazado"
+                        {% if request.GET.estado == 'Rechazado' %}
+                            selected
+                        {% endif %}
+                    >
+                        Rechazado
+                    </option>
+
+                </select>
+            </div>
+
+            <button type="submit" class="btn-filtrar">
+                <i class="fas fa-search"></i>
+                Filtrar
+            </button>
+
+        </form>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="tabla-contenedor">
+
+        <table class="tabla-solicitudes">
+
+            <thead>
+                <tr>
+                    <th>Empleado</th>
+                    <th>Turno Actual</th>
+                    <th>Turno Solicitado</th>
+                    <th>Motivo</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Revisado Por</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for solicitud in solicitudes %}
+
+                <tr>
+
+                    <td>{{ solicitud.empleado.nombre }}</td>
+
+                    <td>
+                        {{ solicitud.turno_actual.horario }}
+                    </td>
+
+                    <td>
+                        {{ solicitud.turno_solicitado.horario }}
+                    </td>
+
+                    <td>
+                        {{ solicitud.motivo|truncatechars:40 }}
+                    </td>
+
+                    <td>
+                        {{ solicitud.fecha_solicitud }}
+                    </td>
+
+                    <td>
+                        <span class="badge 
+                            {% if solicitud.estado == 'Pendiente' %}
+                                pendiente
+                            {% elif solicitud.estado == 'Aprobado' %}
+                                aprobado
+                            {% else %}
+                                rechazado
+                            {% endif %}
+                        ">
+                            {{ solicitud.estado }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if solicitud.revisado_por %}
+                            {{ solicitud.revisado_por.nombre }}
+                        {% else %}
+                            ---
+                        {% endif %}
+                    </td>
+
+                    <td>
+
+                        {% if solicitud.estado == 'Pendiente' %}
+
+                        <div class="acciones-tabla">
+
+                            <form method="POST"
+                                  action="{% url 'revisar_solicitud' solicitud.id %}">
+                                {% csrf_token %}
+
+                                <input type="hidden"
+                                       name="estado"
+                                       value="Aprobado">
+
+                                <button type="submit"
+                                        class="btn-aprobar">
+                                    Aprobar
+                                </button>
+
+                            </form>
+
+                            <form method="POST"
+                                  action="{% url 'revisar_solicitud' solicitud.id %}">
+                                {% csrf_token %}
+
+                                <input type="hidden"
+                                       name="estado"
+                                       value="Rechazado">
+
+                                <button type="submit"
+                                        class="btn-rechazar">
+                                    Rechazar
+                                </button>
+
+                            </form>
+
+                        </div>
+
+                        {% else %}
+                            ---
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+                    <td colspan="8" class="sin-datos">
+                        No hay solicitudes registradas
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal" id="modalSolicitud">
+
+    <div class="modal-contenido">
+
+        <div class="modal-header">
+            <h2>Nueva Solicitud</h2>
+
+            <button class="cerrar-modal"
+                    onclick="cerrarModal()">
+                &times;
+            </button>
+        </div>
+
+        <form method="POST"
+              action="{% url 'guardar_solicitud' %}">
+
+            {% csrf_token %}
+
+            <div class="grupo-input">
+
+                <label>Empleado</label>
+
+                <select name="empleado_id" required>
+
+                    <option value="">Seleccione</option>
+
+                    {% for empleado in empleados %}
+                        <option value="{{ empleado.id }}">
+                            {{ empleado.nombre }}
+                        </option>
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="grupo-input">
+
+                <label>Turno Actual</label>
+
+                <select name="turno_actual_id" required>
+
+                    <option value="">Seleccione</option>
+
+                    {% for turno in turnos %}
+                        <option value="{{ turno.id }}">
+                            {{ turno.horario }}
+                        </option>
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="grupo-input">
+
+                <label>Turno Solicitado</label>
+
+                <select name="turno_solicitado_id" required>
+
+                    <option value="">Seleccione</option>
+
+                    {% for turno in turnos %}
+                        <option value="{{ turno.id }}">
+                            {{ turno.horario }}
+                        </option>
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="grupo-input">
+
+                <label>Motivo</label>
+
+                <textarea name="motivo"
+                          rows="4"
+                          required></textarea>
+
+            </div>
+
+            <div class="acciones-modal">
+
+                <button type="button"
+                        class="btn-cancelar"
+                        onclick="cerrarModal()">
+                    Cancelar
+                </button>
+
+                <button type="submit"
+                        class="btn-guardar">
+                    Guardar Solicitud
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script>
+
+function abrirModal() {
+    document.getElementById('modalSolicitud').style.display = 'flex';
+}
+
+function cerrarModal() {
+    document.getElementById('modalSolicitud').style.display = 'none';
+}
+
+window.onclick = function(event) {
+
+    const modal = document.getElementById('modalSolicitud');
+
+    if (event.target == modal) {
+        cerrarModal();
+    }
+}
+
+</script>
+
+{% endblock %}

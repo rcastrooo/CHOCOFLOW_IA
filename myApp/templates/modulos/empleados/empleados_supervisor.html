@@ -1,147 +1,136 @@
-{% extends 'layouts/modulos_supervisor.html' %}
+{% extends 'layouts/sidebar.html' %}
 {% load static %}
 
-{% block title %}
-Gestión de Empleados
+{% block titulo %}Empleados - Supervisor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<link rel="stylesheet" href="{% static 'css/empleados.css' %}">
+<div class="main-content">
 
-<section class="container mt-5">
-<div class="container-custom shadow">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="topbar-title">
+      <i class="bi bi-people-fill"></i> Empleados de mi turno
+    </span>
+  </div>
 
-    {% if rol == 'Supervisor' %}
-        <h2 class="text-center section-title mb-2">
-            Empleados 
-        </h2>
-
-        <p class="text-center mb-4 info-turno">
-            📅 {{ fecha_hoy }}
-            &nbsp;·&nbsp;
-            Turno: <strong>{{ horario }}</strong>
-            &nbsp;·&nbsp;
-            Vista de solo lectura
-        </p>
-    {% else %}
-        <h2 class="text-center section-title mb-4">
-            👨‍💼 Gestión de Empleados
-        </h2>
-    {% endif %}
-
-    <!-- CABECERA -->
-    <div class="cabecera-empleados">
-
-        <form method="GET" class="form-filtros">
-
-            <input
-                type="text"
-                name="q"
-                class="form-control"
-                placeholder="Buscar empleado..."
-                value="{{ busqueda }}">
-
-            {% if rol != 'Supervisor' %}
-            <select name="estado" class="form-select">
-                <option value="">Todos</option>
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-                <option value="Suspendido">Suspendido</option>
-                <option value="Incapacitado">Incapacitado</option>
-            </select>
-            {% endif %}
-
-            <button class="btn btn-choco">
-                {% if rol == 'Supervisor' %}
-                    Buscar
-                {% else %}
-                    Filtrar
-                {% endif %}
-            </button>
-
-        </form>
-
-    </div>
-
-    <!-- TABLA -->
-    <div class="table-responsive">
-
-        <table class="table table-hover align-middle">
-
-            <thead>
-                <tr>
-                    <th>Cédula</th>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Teléfono</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for e in empleados %}
-                <tr>
-
-                    <td>{{ e.cedula }}</td>
-                    <td>{{ e.nombre }}</td>
-                    <td>{{ e.email }}</td>
-                    <td>{{ e.telefono }}</td>
-
-                    <td>
-
-                        {% if e.estado == 'Activo' %}
-                            <span class="badge bg-success">
-                                {{ e.estado }}
-                            </span>
-
-                        {% elif e.estado == 'Inactivo' %}
-                            <span class="badge bg-secondary">
-                                {{ e.estado }}
-                            </span>
-
-                        {% else %}
-                            <span class="badge bg-warning text-dark">
-                                {{ e.estado }}
-                            </span>
-                        {% endif %}
-
-                    </td>
-
-                </tr>
-
-                {% empty %}
-
-                <tr>
-
-                    <td colspan="5" class="text-center text-muted py-4">
-
-                        {% if rol == 'Supervisor' %}
-                            No hay empleados activos en tu turno hoy.
-                        {% else %}
-                            No hay empleados registrados.
-                        {% endif %}
-
-                    </td>
-
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-    {% if rol == 'Supervisor' %}
-    <p class="text-center text-muted mt-3" style="font-size:13px">
-        Vista de solo lectura · No puedes modificar empleados
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-person-check"></i> Empleados — Supervisor</h5>
+    <p>
+      Listado de empleados activos asignados a tu turno
+      {% if horario %}<strong>({{ horario }})</strong>{% endif %}
+      el día de hoy — <strong>{{ fecha_hoy }}</strong>.
     </p>
-    {% endif %}
+  </div>
+
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- BÚSQUEDA -->
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <form method="GET" class="d-flex gap-2 flex-grow-1">
+      <input type="text"
+             name="q"
+             value="{{ busqueda }}"
+             placeholder="Buscar por nombre, cédula o correo..."
+             class="form-control"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:#fdf9f6;">
+      <button type="submit" class="btn-choco"
+              style="border-radius:12px; padding:8px 20px; white-space:nowrap;">
+        <i class="bi bi-search"></i> Buscar
+      </button>
+      {% if busqueda %}
+        <a href="{% url 'empleados_supervisor' %}"
+           class="btn-caramel"
+           style="border-radius:12px; padding:8px 14px; text-decoration:none; display:flex; align-items:center;">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Empleados en turno hoy
+  </h6>
+
+  <!-- TABLA — incluye todos los campos del modelo -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Empleado</th>
+          <th>Cédula</th>
+          <th>Correo</th>
+          <th>Teléfono</th>
+          <th>Dirección</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in empleados %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-person-fill" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ e.nombre }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ e.cedula }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ e.email }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ e.telefono }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ e.direccion }}</td>
+          <td>
+            {% if e.estado == 'Activo' %}
+              <span class="badge bg-success">{{ e.estado }}</span>
+            {% elif e.estado == 'Inactivo' %}
+              <span class="badge bg-secondary">{{ e.estado }}</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">{{ e.estado }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            {% if busqueda %}
+              No se encontraron empleados para "{{ busqueda }}"
+            {% else %}
+              No hay empleados asignados a tu turno hoy
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Solo se muestran empleados activos con rotación vigente en tu turno hoy.
+    La gestión de empleados la realiza el administrador.
+  </p>
 
 </div>
-</section>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}

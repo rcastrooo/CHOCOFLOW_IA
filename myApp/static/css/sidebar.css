@@ -1,0 +1,520 @@
+/* =========================
+   SIDEBAR
+========================= */
+
+.sidebar{
+
+    width: 280px;
+    height: 100vh;
+
+    background: linear-gradient(
+        180deg,
+        #4E2A12 0%,
+        #2d1607 100%
+    );
+
+    position: fixed;
+    left: 0;
+    top: 0;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    padding: 20px 18px;
+
+    overflow-y: auto;
+
+    box-shadow: 5px 0px 20px rgba(0,0,0,.15);
+}
+
+/* =========================
+   TOP SIDEBAR
+========================= */
+
+.sidebar-top{
+    width: 100%;
+}
+
+/* =========================
+   LOGO
+========================= */
+
+.logo{
+
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    padding-bottom: 22px;
+    margin-bottom: 25px;
+
+    border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.logo-icon{
+
+    width: 46px;
+    height: 46px;
+
+    border-radius: 14px;
+
+    background: rgba(255,255,255,.12);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: white;
+
+    flex-shrink: 0;
+}
+
+.logo-icon i{
+    font-size: 18px;
+}
+
+.logo-texto{
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-texto h2{
+
+    color: white;
+
+    font-size: 24px;
+    font-weight: 700;
+
+    margin: 0;
+}
+
+.logo-texto span{
+
+    color: rgba(255,255,255,.65);
+
+    font-size: 12px;
+
+    margin-top: 2px;
+}
+
+/* =========================
+   MENÚ
+========================= */
+
+.menu{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.menu li{
+    margin-bottom: 8px;
+}
+
+.menu li a{
+
+    display: flex;
+    align-items: center;
+    gap: 15px;
+
+    padding: 14px 16px;
+
+    border-radius: 14px;
+
+    text-decoration: none;
+
+    color: rgba(255,255,255,.85);
+
+    font-size: 15px;
+    font-weight: 500;
+
+    transition: .3s ease;
+}
+
+/* ICONOS */
+
+.menu li a i{
+
+    width: 20px;
+
+    text-align: center;
+
+    font-size: 16px;
+}
+
+/* HOVER */
+
+.menu li a:hover{
+
+    background: rgba(255,255,255,.12);
+
+    color: white;
+
+    transform: translateX(4px);
+}
+
+/* ACTIVO */
+
+.menu li a.active{
+
+    background: rgba(255,255,255,.14);
+
+    color: white;
+}
+
+/* =========================
+   DROPDOWN BITÁCORA
+========================= */
+
+.dropdown-menu-custom {
+    margin-bottom: 8px;
+}
+
+/* Botón igual al resto de ítems del menú */
+.dropdown-btn {
+
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+
+    padding: 14px 16px;
+
+    border-radius: 14px;
+    border: none;
+    background: transparent;
+
+    color: rgba(255,255,255,.85);
+
+    font-size: 15px;
+    font-weight: 500;
+
+    cursor: pointer;
+
+    transition: .3s ease;
+}
+
+.dropdown-btn .menu-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.dropdown-btn .menu-left i {
+    width: 20px;
+    text-align: center;
+    font-size: 16px;
+}
+
+.dropdown-btn:hover {
+    background: rgba(255,255,255,.12);
+    color: white;
+    transform: translateX(4px);
+}
+
+/* Botón activo (cuando algún hijo está activo) */
+.dropdown-menu-custom.open .dropdown-btn {
+    background: rgba(255,255,255,.10);
+    color: white;
+}
+
+/* Chevron animado */
+.chevron-icon {
+    font-size: 12px;
+    transition: transform .3s ease;
+}
+
+.dropdown-menu-custom.open .chevron-icon {
+    transform: rotate(180deg);
+}
+
+/* Submenú */
+.submenu {
+    display: none;
+    list-style: none;
+    padding: 6px 0 4px 0;
+    margin: 0;
+}
+
+.dropdown-menu-custom.open .submenu {
+    display: block;
+}
+
+.submenu li {
+    margin-bottom: 2px;
+}
+
+/* Links del submenú — ligeramente indentados */
+.submenu li a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 11px 16px 11px 44px;
+
+    border-radius: 12px;
+
+    text-decoration: none;
+
+    color: rgba(255,255,255,.70);
+
+    font-size: 14px;
+    font-weight: 400;
+
+    transition: .3s ease;
+}
+
+.submenu li a i {
+    width: 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.submenu li a:hover {
+    background: rgba(255,255,255,.10);
+    color: white;
+    transform: translateX(4px);
+}
+
+.submenu li a.active {
+    background: rgba(255,255,255,.14);
+    color: white;
+    font-weight: 500;
+}
+
+/* =========================
+   FOOTER SIDEBAR
+========================= */
+
+.sidebar-bottom{
+
+    width: 100%;
+
+    padding-top: 22px;
+
+    border-top: 1px solid rgba(255,255,255,.12);
+
+    margin-top: 25px;
+}
+
+/* =========================
+   PERFIL
+========================= */
+
+.perfil-sidebar{
+
+    display: flex !important;
+
+    align-items: center !important;
+
+    gap: 14px !important;
+
+    margin-bottom: 18px;
+}
+
+/* AVATAR */
+
+.perfil-avatar{
+
+    width: 48px !important;
+    height: 48px !important;
+
+    min-width: 48px;
+    min-height: 48px;
+
+    border-radius: 50%;
+
+    background: rgba(255,255,255,.14);
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    flex-shrink: 0;
+}
+
+.perfil-avatar i{
+
+    color: white;
+
+    font-size: 18px;
+}
+
+/* TEXTO PERFIL */
+
+.perfil-info{
+
+    display: flex !important;
+
+    flex-direction: column !important;
+
+    justify-content: center !important;
+}
+
+.perfil-info h4{
+
+    margin: 0 !important;
+
+    color: white !important;
+
+    font-size: 15px !important;
+
+    font-weight: 600 !important;
+
+    line-height: 1.2 !important;
+
+    white-space: nowrap;
+}
+
+.perfil-info span{
+
+    margin-top: 2px !important;
+
+    color: rgba(255,255,255,.65) !important;
+
+    font-size: 12px !important;
+
+    line-height: 1.2 !important;
+}
+
+/* =========================
+   BOTÓN LOGOUT
+========================= */
+
+.logout-btn{
+
+    width: 100%;
+
+    display: flex !important;
+
+    align-items: center !important;
+
+    justify-content: center !important;
+
+    gap: 10px;
+
+    padding: 12px 15px;
+
+    border-radius: 14px;
+
+    border: 1px solid rgba(255,255,255,.18);
+
+    text-decoration: none !important;
+
+    color: rgba(255,255,255,.88) !important;
+
+    font-size: 14px !important;
+
+    font-weight: 500 !important;
+
+    transition: .3s ease;
+}
+
+/* HOVER */
+
+.logout-btn:hover{
+
+    background: rgba(255,255,255,.12);
+
+    border-color: rgba(255,255,255,.35);
+
+    color: white !important;
+}
+
+/* =========================
+   CONTENT
+========================= */
+
+.content {
+    margin-left: 280px;
+    width: calc(100% - 280px);
+    min-height: 100vh;
+}
+
+/* =========================
+   TOPBAR
+========================= */
+
+.topbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 12px 24px;
+    background: #fff;
+    border-bottom: 1px solid #f0e8e0;
+    margin-bottom: 30px;
+}
+
+.topbar-btn {
+    color: #5c3317;
+    font-size: 1.4rem;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.topbar-btn:hover {
+    opacity: 0.7;
+    color: #5c3317;
+}
+
+.topbar-btn + .topbar-btn {
+    margin-left: 16px;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media(max-width: 992px){
+
+    .sidebar{
+
+        width: 90px;
+
+        padding: 20px 10px;
+    }
+
+    .logo-texto,
+    .menu li a span,
+    .dropdown-btn span,
+    .dropdown-btn .menu-left span,
+    .submenu,
+    .chevron-icon,
+    .perfil-info,
+    .logout-btn span{
+
+        display: none;
+    }
+
+    .content{
+
+        margin-left: 90px;
+
+        width: calc(100% - 90px);
+    }
+
+    .menu li a,
+    .dropdown-btn,
+    .logout-btn{
+
+        justify-content: center !important;
+    }
+
+    .dropdown-btn .menu-left {
+        justify-content: center;
+    }
+
+    .logo{
+
+        justify-content: center;
+    }
+
+    .perfil-sidebar{
+
+        justify-content: center;
+    }
+}

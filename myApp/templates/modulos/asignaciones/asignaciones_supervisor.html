@@ -1,127 +1,234 @@
-{% extends 'layouts/modulos_supervisor.html' %}
+{% extends 'layouts/sidebar.html' %}
 {% load static %}
 
-{% block title %}
-Gestión de Asignaciones
+{% block titulo %}Asignaciones - Supervisor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<link rel="stylesheet" href="{% static 'css/asignaciones.css' %}">
+<div class="main-content">
 
-<section class="container mt-5">
-<div class="container-custom shadow">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="topbar-title">
+      <i class="bi bi-clipboard-check-fill"></i> Mis Asignaciones
+    </span>
+  </div>
 
-    {% if rol == 'Supervisor' %}
-        <h2 class="text-center section-title mb-2">
-           📋 Gestión de Asignaciones
-        </h2>
-
-        <p class="text-center mb-4 info-turno">
-            📅 {{ fecha_hoy }}
-            &nbsp;·&nbsp;
-            Turno: <strong>{{ horario }}</strong>
-            &nbsp;·&nbsp;
-            Vista de solo lectura
-        </p>
-    {% else %}
-        <h2 class="text-center section-title mb-4">
-             Gestión de Asignacciones
-        </h2>
-    {% endif %}
-
-    <!-- CABECERA -->
-    <div class="cabecera-asignaciones">
-
-        <form method="GET" class="form-filtros">
-
-            <input
-                type="text"
-                name="q"
-                class="form-control"
-                placeholder="Buscar asignacion..."
-                value="{{ busqueda }}">
-
-            {% if rol != 'Supervisor' %}
-            <select name="estado" class="form-select">
-                <option value="">Todos</option>
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-            </select>
-            {% endif %}
-
-            <button class="btn btn-choco">
-                {% if rol == 'Supervisor' %}
-                    Buscar
-                {% else %}
-                    Filtrar
-                {% endif %}
-            </button>
-
-        </form>
-
-    </div>
-
-    <!-- TABLA -->
-    <div class="table-responsive">
-
-        <table class="table table-hover align-middle">
-
-            <thead>
-                <tr>
-                    <th>Tarea</th>
-                    <th>Empleado</th>
-                    <th>Turno</th>
-                    <th>Fecha Asignación</th>
-                    <th>Asignado por</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for e in asignaciones %}
-                <tr>
-
-                   <td>{{ a.tarea }}</td>
-                    <td>{{ a.empleado.nombre }}</td>
-                    <td>{{ a.turno.horario }}</td>
-                    <td>{{ a.fecha_asignacion }}</td>
-                    <td>{{ a.asignado_por.nombre }}</td>
-
-                </tr>
-
-                {% empty %}
-
-                <tr>
-
-                    <td colspan="5" class="text-center text-muted py-4">
-
-                        {% if rol == 'Supervisor' %}
-                            No hay asignaciones.
-                        {% else %}
-                            No hay asignaciones registradas.
-                        {% endif %}
-
-                    </td>
-
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-    {% if rol == 'Supervisor' %}
-    <p class="text-center text-muted mt-3" style="font-size:13px">
-        Vista de solo lectura · No puedes modificar turnos
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-clipboard2-pulse"></i> Asignaciones — Supervisor</h5>
+    <p>
+      Listado de asignaciones de tu turno
+      {% if horario %}<strong>({{ horario }})</strong>{% endif %}
+      el día de hoy — <strong>{{ fecha_hoy }}</strong>.
     </p>
-    {% endif %}
+  </div>
+
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- CABECERA -->
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <button class="btn-choco"
+            style="border-radius:12px; padding:8px 18px; white-space:nowrap;"
+            data-bs-toggle="modal"
+            data-bs-target="#modalAsignacion">
+      <i class="bi bi-plus-lg"></i> Nueva Asignación
+    </button>
+    <form method="GET" class="d-flex gap-2 flex-grow-1">
+      <input type="text" name="q" value="{{ busqueda }}"
+             placeholder="Buscar por tarea o empleado..."
+             class="form-control"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:#fdf9f6;">
+      <button type="submit" class="btn-choco"
+              style="border-radius:12px; padding:8px 20px; white-space:nowrap;">
+        <i class="bi bi-search"></i> Buscar
+      </button>
+      {% if busqueda %}
+        <a href="{% url 'asignaciones_supervisor' %}"
+           class="btn-caramel"
+           style="border-radius:12px; padding:8px 14px; text-decoration:none; display:flex; align-items:center;">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Asignaciones de tu turno hoy
+  </h6>
+
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Tarea</th>
+          <th>Empleado</th>
+          <th>Turno</th>
+          <th>Fecha Asignación</th>
+          <th>Asignado por</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in asignaciones %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-clipboard-fill" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ a.tarea }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ a.empleado.nombre }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ a.turno.horario }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ a.fecha_asignacion }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ a.asignado_por.nombre }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            {% if busqueda %}
+              No se encontraron asignaciones para "{{ busqueda }}"
+            {% else %}
+              No hay asignaciones registradas para tu turno hoy
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Solo puedes consultar y crear asignaciones. La edición e inactivación la realiza el administrador.
+  </p>
 
 </div>
-</section>
+
+
+<!-- ============================================================ -->
+<!--  MODAL: Crear nueva asignación                               -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalAsignacion" tabindex="-1" aria-labelledby="modalAsignacionLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+      <form method="POST" action="{% url 'guardar_asignacion_supervisor' %}">
+        {% csrf_token %}
+
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title" id="modalAsignacionLabel">
+            <i class="bi bi-clipboard-plus"></i> Nueva Asignación
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body" style="background:#fdf9f6;">
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              <i class="bi bi-card-text"></i> Tarea
+            </label>
+            <select name="tarea" class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:white;"
+                    required>
+              <option value="">-- Seleccionar Tarea --</option>
+              <option value="Temperar">Temperar</option>
+              <option value="Mezclado">Mezclado</option>
+              <option value="Moldear">Moldear</option>
+              <option value="Desmoldear">Desmoldear</option>
+              <option value="Picar">Picar</option>
+              <option value="Triturado">Triturado</option>
+              <option value="Molienda">Molienda</option>
+              <option value="Paletear">Paletear</option>
+              <option value="Empacar">Empacar</option>
+              <option value="Sellado">Sellado</option>
+              <option value="Etiquetado">Etiquetado</option>
+              <option value="Limpieza General">Limpieza General</option>
+              <option value="Limpieza de Maquinaria">Limpieza de Maquinaria</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              <i class="bi bi-calendar-event"></i> Fecha de asignación
+            </label>
+            <input type="date" name="fecha_asignacion" id="fecha_asignacion_sup"
+                   class="form-control"
+                   style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:white;"
+                   required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              <i class="bi bi-person"></i> Empleado
+            </label>
+            <select name="empleado_id" class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:white;"
+                    required>
+              <option value="">-- Seleccionar Empleado --</option>
+              {% for emp in empleados %}
+                <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-1">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              <i class="bi bi-clock"></i> Turno
+            </label>
+            <select name="turno_id" class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:white;"
+                    required>
+              <option value="">-- Seleccionar Turno --</option>
+              {% for t in turnos %}
+                <option value="{{ t.id }}">{{ t.horario }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
+            <i class="bi bi-check-lg"></i> Guardar
+          </button>
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px; padding:8px 16px;"
+                  data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Fecha mínima = hoy para bloquear fechas pasadas desde el frontend
+  document.getElementById('fecha_asignacion_sup').setAttribute(
+      'min', new Date().toISOString().split('T')[0]
+  );
+</script>
 
 {% endblock %}
