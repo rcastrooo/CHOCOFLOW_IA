@@ -37,7 +37,7 @@ from .models import (
 )
 
 # ========================
-# FUNCIÓN AUXILIAR
+# FUNCIÓN AUXILIAR — parsear body JSON
 # ========================
 
 def parse_body(request):
@@ -48,7 +48,36 @@ def parse_body(request):
 
 
 # ========================
-# INDEX — si no hay sesión, va al login
+# FUNCIONES AUXILIARES — turno supervisor
+# ========================
+
+def get_turno_supervisor(usuario_id):
+    """
+    Retorna el string del horario del turno asignado al supervisor
+    (campo Usuario.turno), o None si no tiene turno asignado.
+    Ejemplo de retorno: 'Mañana 6:00am - 12:00pm'
+    """
+    supervisor = Usuario.objects.filter(id=usuario_id, rol='Supervisor').first()
+    if not supervisor or not supervisor.turno:
+        return None
+    return supervisor.turno
+
+
+def get_empleados_de_turno_supervisor(turno_horario):
+    """
+    Retorna un QuerySet de IDs de empleados que tienen RotacionTurno
+    en la semana ISO actual con el turno que coincide con turno_horario.
+    Al rotar la semana, automáticamente refleja los nuevos empleados del turno.
+    """
+    semana_actual = date.today().isocalendar()[1]
+    return RotacionTurno.objects.filter(
+        semana=semana_actual,
+        turno__horario=turno_horario,
+    ).values_list('empleado_id', flat=True)
+
+
+# ========================
+# INDEX
 # ========================
 
 def index(request):
@@ -102,11 +131,7 @@ def login_usuario(request):
                 request.session['usuario_id'] = usuario_db.id
                 request.session['rol']        = usuario_db.rol.strip()
 
-                # Guardar horario_fijo en sesión si es Supervisor
-                # NOTA: horario_fijo se almacena en sesión (no en modelo Usuario)
-                # El admin lo puede setear via gestionar_supervisores
                 horario_fijo = request.session.get('horario_fijo', '')
-                # Si ya existía en sesión lo mantenemos; si no, queda vacío hasta que admin lo asigne
 
                 rol = usuario_db.rol.strip()
 
@@ -148,11 +173,14 @@ def registro(request):
         identificacion = request.POST.get('identificacion', '').strip()
         nombre         = request.POST.get('nombre', '').strip()
         correo         = request.POST.get('correo', '').strip()
+        telefono       = request.POST.get('telefono', '').strip()
+        direccion      = request.POST.get('direccion', '').strip()
         password       = request.POST.get('password', '').strip()
-        rol            = request.POST.get('rol', '')
-        estado         = request.POST.get('estado', '')
+        rol            = request.POST.get('rol', '').strip()
+        estado         = request.POST.get('estado', 'Activo').strip()
+        turno          = request.POST.get('turno', '').strip()
 
-        # --- Validaciones ---
+        # ── Validaciones ──────────────────────────────────────────
         if not identificacion.isdigit():
             messages.error(request, "La identificación solo debe contener números.")
             return redirect('registro')
@@ -202,7 +230,17 @@ def registro(request):
             messages.error(request, "Selecciona un estado.")
             return redirect('registro')
 
-        # --- Crear usuario Django ---
+        # ── Validación turno (obligatorio si es Supervisor) ───────
+        turnos_validos = ['Mañana 6:00am - 2:00pm', 'Tarde 2:00pm - 10:00pm']
+        if rol == 'Supervisor':
+            if not turno:
+                messages.error(request, "Debes seleccionar un turno para el supervisor.")
+                return redirect('registro')
+            if turno not in turnos_validos:
+                messages.error(request, "Turno no válido.")
+                return redirect('registro')
+
+        # ── Crear usuario Django ──────────────────────────────────
         User.objects.create_user(
             username   = identificacion,
             first_name = nombre,
@@ -210,16 +248,16 @@ def registro(request):
             password   = password
         )
 
-        # --- Crear perfil Usuario (modelo propio) ---
-        # NOTA: el modelo tiene 'ttelefono' (typo real en el modelo),
-        # pero como no lo tocamos lo dejamos con el campo correcto según el modelo.
+        # ── Crear perfil Usuario ──────────────────────────────────
         Usuario.objects.create(
             nombre     = nombre,
             email      = correo,
-            direccion  = 'Sin dirección',
+            telefono   = telefono or None,
+            direccion  = direccion if direccion else 'Sin dirección',
             contrasena = password,
             rol        = rol,
             estado     = estado,
+            turno      = turno if rol == 'Supervisor' else None,
         )
 
         messages.success(request, "Usuario registrado correctamente.")
@@ -283,53 +321,260 @@ def dashboard(request):
     return render(request, 'dashboard.html', context)
 
 
-# =======================
-# GESTIONAR SUPERVISORES
-# =======================
-# CORRECCIÓN: horario_fijo no existe en el modelo Usuario.
-# Lo guardamos en la sesión usando un diccionario persistente en BD simulado
-# a través de la sesión de Django. Si quieres persistencia real, agrega el
-# campo al modelo. Por ahora usamos la sesión del request actual para demo,
-# y guardamos en un dict global (cache simple) para que funcione entre sesiones.
-
-_horarios_supervisores = {}  # {usuario_id: horario} — cache en memoria del proceso
+# ======================================================
+# GESTIÓN DE SUPERVISORES
+# ======================================================
 
 @login_required(login_url='login')
 def gestionar_supervisores(request):
+    qs = Usuario.objects.filter(rol='Supervisor')
 
-    if request.method == 'POST':
-        supervisor_id = request.POST.get('supervisor_id')
-        horario       = request.POST.get('horario_fijo', '').strip()
+    q      = request.GET.get('q', '').strip()
+    turno  = request.GET.get('turno', '').strip()
+    estado = request.GET.get('estado', '').strip()
 
-        supervisor = get_object_or_404(Usuario, id=supervisor_id, rol='Supervisor')
+    if q:
+        qs = qs.filter(Q(nombre__icontains=q) | Q(email__icontains=q))
 
-        if not horario:
-            messages.error(request, "Debes seleccionar un horario.")
-            return redirect('gestionar_supervisores')
+    if turno == 'Sin asignar':
+        qs = qs.filter(Q(turno__isnull=True) | Q(turno=''))
+    elif turno:
+        qs = qs.filter(turno=turno)
 
-        # Persistimos en caché en memoria (reemplazar por campo en modelo para producción)
-        _horarios_supervisores[supervisor.id] = horario
-
-        messages.success(request, f"Horario de {supervisor.nombre} actualizado a '{horario}'.")
-        return redirect('gestionar_supervisores')
-
-    supervisores = Usuario.objects.filter(rol='Supervisor')
-
-    # Inyectamos el horario asignado para cada supervisor desde caché
-    supervisores_con_horario = []
-    for sup in supervisores:
-        supervisores_con_horario.append({
-            'id':          sup.id,
-            'nombre':      sup.nombre,
-            'email':       sup.email,
-            'estado':      sup.estado,
-            'horario_fijo': _horarios_supervisores.get(sup.id, ''),
-        })
+    if estado:
+        qs = qs.filter(estado=estado)
 
     return render(request, 'modulos/supervisores/gestionar_supervisores.html', {
-        'supervisores': supervisores_con_horario,
-        'turnos':       Turno.objects.filter(activo=True),
+        'supervisores': qs,
     })
+
+
+@login_required(login_url='login')
+def asignar_turno_supervisor(request, supervisor_id):
+    if request.method != 'POST':
+        return redirect('gestionar_supervisores')
+
+    supervisor = get_object_or_404(Usuario, id=supervisor_id, rol='Supervisor')
+    turno      = request.POST.get('turno', '').strip()
+
+    TURNOS_VALIDOS = ('Mañana 6:00am - 2:00pm', 'Tarde 2:00pm - 10:00pm')
+    if turno not in TURNOS_VALIDOS:
+        messages.error(request, 'Turno no válido.')
+        return redirect('gestionar_supervisores')
+
+    supervisor.turno = turno if turno else None
+    supervisor.save()
+
+    etiqueta = turno if turno else 'Sin asignar'
+    messages.success(
+        request,
+        f'Turno actualizado a "{etiqueta}" para {supervisor.nombre}.'
+    )
+    return redirect('gestionar_supervisores')
+
+
+@login_required(login_url='login')
+def editar_supervisor(request):
+    if request.method != 'POST':
+        return redirect('gestionar_supervisores')
+
+    sup_id     = request.POST.get('id', '').strip()
+    supervisor = get_object_or_404(Usuario, id=sup_id, rol='Supervisor')
+
+    nombre    = request.POST.get('nombre', '').strip()
+    email     = request.POST.get('email', '').strip()
+    telefono  = request.POST.get('telefono', '').strip()
+    direccion = request.POST.get('direccion', '').strip()
+    estado    = request.POST.get('estado', '').strip()
+    turno     = request.POST.get('turno', '').strip()
+
+    if not nombre or not email or not estado:
+        messages.error(request, 'Nombre, email y estado son obligatorios.')
+        return redirect('gestionar_supervisores')
+
+    patron_correo = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
+    if not re.match(patron_correo, email):
+        messages.error(request, 'El correo no tiene un formato válido.')
+        return redirect('gestionar_supervisores')
+
+    if telefono and not re.fullmatch(r'\d{10}', telefono):
+        messages.error(request, 'El teléfono debe contener solo números (10 dígitos).')
+        return redirect('gestionar_supervisores')
+
+    if Usuario.objects.filter(email=email).exclude(id=sup_id).exists():
+        messages.error(request, 'Ya existe otro usuario con ese correo electrónico.')
+        return redirect('gestionar_supervisores')
+
+    estados_validos = ['Activo', 'Inactivo', 'Suspendido', 'Incapacitado']
+    if estado not in estados_validos:
+        messages.error(request, 'Estado no válido.')
+        return redirect('gestionar_supervisores')
+
+    turnos_validos = ('Mañana 6:00am - 2:00pm', 'Tarde 2:00pm - 10:00pm')
+    if turno and turno not in turnos_validos:
+        messages.error(request, 'Turno no válido.')
+        return redirect('gestionar_supervisores')
+
+    supervisor.nombre    = nombre
+    supervisor.email     = email
+    supervisor.telefono  = telefono or None
+    supervisor.direccion = direccion or 'Sin dirección'
+    supervisor.estado    = estado
+    supervisor.turno     = turno or None
+    supervisor.save()
+
+    messages.success(request, f'Supervisor "{nombre}" actualizado correctamente.')
+    return redirect('gestionar_supervisores')
+
+
+@login_required(login_url='login')
+def inactivar_supervisor(request, supervisor_id):
+    supervisor        = get_object_or_404(Usuario, id=supervisor_id, rol='Supervisor')
+    supervisor.estado = 'Inactivo'
+    supervisor.save()
+    messages.warning(
+        request,
+        f'Supervisor "{supervisor.nombre}" marcado como Inactivo.'
+    )
+    return redirect('gestionar_supervisores')
+
+
+@login_required(login_url='login')
+def carga_masiva_supervisores(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    csv_file = request.FILES.get('csv_file')
+    if not csv_file:
+        return JsonResponse({'error': 'No se recibió ningún archivo.'}, status=400)
+
+    if not csv_file.name.endswith('.csv'):
+        return JsonResponse({'error': 'El archivo debe ser .csv'}, status=400)
+
+    try:
+        contenido = csv_file.read().decode('utf-8-sig')
+    except UnicodeDecodeError:
+        try:
+            csv_file.seek(0)
+            contenido = csv_file.read().decode('latin-1')
+        except Exception:
+            return JsonResponse(
+                {'error': 'No se pudo leer el archivo. Usa codificación UTF-8.'},
+                status=400
+            )
+
+    import csv as csv_module
+    reader  = csv_module.DictReader(BytesIO(contenido.encode()).read().decode().__class__(contenido).splitlines())
+    headers = [h.strip().lower() for h in (reader.fieldnames or [])]
+
+    REQUERIDOS = ['nombre', 'email', 'contrasena', 'estado']
+    faltantes  = [r for r in REQUERIDOS if r not in headers]
+    if faltantes:
+        return JsonResponse(
+            {'error': f'Faltan columnas requeridas: {", ".join(faltantes)}'},
+            status=400
+        )
+
+    ESTADOS_VALIDOS = {'Activo', 'Inactivo', 'Suspendido', 'Incapacitado'}
+    TURNOS_VALIDOS = {'Mañana 6:00am - 2:00pm', 'Tarde 2:00pm - 10:00pm'}
+    patron_correo   = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
+
+    creados  = 0
+    omitidos = 0
+    errores  = []
+
+    for num_fila, row in enumerate(reader, start=2):
+
+        fila_info = f'Fila {num_fila}'
+        row       = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+
+        nombre     = row.get('nombre', '')
+        email      = row.get('email', '')
+        telefono   = row.get('telefono', '')
+        direccion  = row.get('direccion', 'Sin dirección')
+        contrasena = row.get('contrasena', '')
+        estado     = row.get('estado', 'Activo')
+        turno      = row.get('turno', '')
+
+        if not nombre:
+            errores.append({'fila': fila_info, 'motivo': 'Nombre vacío'}); continue
+        if not email:
+            errores.append({'fila': fila_info, 'motivo': 'Email vacío'}); continue
+        if not re.match(patron_correo, email):
+            errores.append({'fila': fila_info, 'motivo': f'Email inválido: "{email}"'}); continue
+        if not contrasena:
+            errores.append({'fila': fila_info, 'motivo': 'Contraseña vacía'}); continue
+        if estado not in ESTADOS_VALIDOS:
+            errores.append({'fila': fila_info, 'motivo': f'Estado inválido: "{estado}"'}); continue
+        if turno and turno not in TURNOS_VALIDOS:
+            errores.append({'fila': fila_info, 'motivo': f'Turno inválido: "{turno}"'}); continue
+
+        if Usuario.objects.filter(email=email).exists():
+            omitidos += 1
+            continue
+
+        Usuario.objects.create(
+            nombre     = nombre,
+            email      = email,
+            telefono   = telefono or None,
+            direccion  = direccion,
+            contrasena = contrasena,
+            rol        = 'Supervisor',
+            estado     = estado,
+            turno      = turno or None,
+        )
+        creados += 1
+
+    return JsonResponse({
+        'creados':  creados,
+        'omitidos': omitidos,
+        'errores':  errores,
+    })
+
+
+@login_required(login_url='login')
+def reporte_supervisores(request):
+    supervisores = Usuario.objects.filter(rol='Supervisor').order_by('nombre')
+
+    buffer    = BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    elementos = []
+    estilos   = getSampleStyleSheet()
+
+    elementos.append(Paragraph("Reporte de Supervisores - ChocoFlow", estilos['Title']))
+    elementos.append(Spacer(1, 20))
+
+    datos = [['Nombre', 'Email', 'Teléfono', 'Dirección', 'Turno', 'Estado']]
+    for s in supervisores:
+        datos.append([
+            s.nombre,
+            s.email,
+            s.telefono or '—',
+            s.direccion or '—',
+            s.turno or 'Sin asignar',
+            s.estado,
+        ])
+
+    tabla = Table(datos)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_supervisores.pdf"'
+    response.write(pdf)
+    return response
 
 
 # =======================
@@ -339,10 +584,8 @@ def gestionar_supervisores(request):
 @login_required(login_url='login')
 def dashboard_supervisor(request):
 
-    # Sincronizar horario del supervisor desde caché al iniciar sesión
-    usuario_id = request.session.get('usuario_id')
-    if usuario_id and usuario_id in _horarios_supervisores:
-        request.session['horario_fijo'] = _horarios_supervisores[usuario_id]
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
 
     empleados_activos        = Empleado.objects.filter(estado='Activo').count()
     turnos                   = Turno.objects.count()
@@ -366,6 +609,7 @@ def dashboard_supervisor(request):
         'total_bitacora':           total_bitacora,
         'asignaciones':             asignaciones,
         'lotes':                    lotes,
+        'mi_turno':                 turno_horario or '',
     }
 
     return render(request, 'dashboard_supervisor.html', context)
@@ -378,54 +622,67 @@ def dashboard_supervisor(request):
 @login_required(login_url='login')
 def api_stats_supervisor(request):
 
-    hoy = timezone.now().date()
+    hoy           = timezone.now().date()
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
 
-    empleados_con_turno = RotacionTurno.objects.values_list('empleado_id', flat=True)
+    # IDs de empleados del turno del supervisor esta semana
+    if turno_horario:
+        ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+    else:
+        ids_empleados = []
+
+    empleados_de_mi_turno = Empleado.objects.filter(id__in=ids_empleados)
 
     sin_turno = Empleado.objects.filter(
         estado='Activo'
     ).exclude(
-        id__in=empleados_con_turno
+        id__in=RotacionTurno.objects.values_list('empleado_id', flat=True)
     ).count()
 
-    turno = Turno.objects.filter(activo=True).first()
+    turno = Turno.objects.filter(horario=turno_horario).first() if turno_horario else None
 
     data = {
-        'total_empleados':          Empleado.objects.count(),
-        'empleados_activos':        Empleado.objects.filter(estado='Activo').count(),
-        'asignaciones_hoy':         Asignacion.objects.filter(fecha_asignacion=hoy).count(),
+        'total_empleados':          empleados_de_mi_turno.count(),
+        'empleados_activos':        empleados_de_mi_turno.filter(estado='Activo').count(),
+        'asignaciones_hoy':         Asignacion.objects.filter(
+                                        fecha_asignacion=hoy,
+                                        empleado_id__in=ids_empleados
+                                    ).count(),
         'sin_turno':                sin_turno,
-        'lotes_totales':            Lote.objects.count(),
-        'exportaciones_pendientes': Exportacion.objects.filter(estado='Pendiente').count(),
-        'exportaciones_enviadas':   Exportacion.objects.filter(estado='Enviado').count(),
-        'bitacora_hoy':             Bitacora.objects.filter(fecha_registro=hoy).count(),
-        'bitacora_pendientes':      Bitacora.objects.filter(fecha_registro=hoy, estado='Borrador').count(),
-        'bitacora_enviados':        Bitacora.objects.filter(fecha_registro=hoy, estado='Enviado').count(),
-        'turno_nombre':             turno.horario if turno else 'Sin turno hoy',
+        'lotes_totales':            Lote.objects.filter(
+                                        produccion__empleado_responsable_id__in=ids_empleados
+                                    ).count(),
+        'exportaciones_pendientes': Exportacion.objects.filter(
+                                        estado='Pendiente',
+                                        produccion__empleado_responsable_id__in=ids_empleados
+                                    ).count(),
+        'exportaciones_enviadas':   Exportacion.objects.filter(
+                                        estado='Enviado',
+                                        produccion__empleado_responsable_id__in=ids_empleados
+                                    ).count(),
+        'bitacora_hoy':             Bitacora.objects.filter(
+                                        fecha_registro=hoy,
+                                        supervisor_id=usuario_id
+                                    ).count(),
+        'bitacora_pendientes':      Bitacora.objects.filter(
+                                        fecha_registro=hoy,
+                                        estado='Borrador',
+                                        supervisor_id=usuario_id
+                                    ).count(),
+        'bitacora_enviados':        Bitacora.objects.filter(
+                                        fecha_registro=hoy,
+                                        estado='Enviado',
+                                        supervisor_id=usuario_id
+                                    ).count(),
+        'turno_nombre':             turno.horario if turno else 'Sin turno asignado',
     }
 
     return JsonResponse(data)
 
-
 # ===================
 # EMPLEADOS
 # ===================
-
-import re
-from datetime import date
-from io import BytesIO
-
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.db.models import Q
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
-
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
 
 @login_required(login_url='login')
 def empleados(request):
@@ -460,8 +717,16 @@ def empleados(request):
 @login_required(login_url='login')
 def empleados_supervisor(request):
 
-    query = request.GET.get('q', '')
-    lista = Empleado.objects.filter(estado='Activo')
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
+    query         = request.GET.get('q', '')
+
+    if turno_horario:
+        ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+        lista = Empleado.objects.filter(estado='Activo', id__in=ids_empleados)
+    else:
+        lista = Empleado.objects.none()
+        messages.warning(request, "No tienes un turno asignado esta semana.")
 
     if query:
         lista = lista.filter(
@@ -472,9 +737,10 @@ def empleados_supervisor(request):
 
     return render(request, 'modulos/empleados/empleados_supervisor.html', {
         'empleados': lista,
-        'horario':   '',
+        'horario':   turno_horario or '',
         'fecha_hoy': date.today(),
         'busqueda':  query,
+        'mi_turno':  turno_horario or '',
     })
 
 
@@ -482,7 +748,6 @@ def empleados_supervisor(request):
 def guardar_empleado(request):
     if request.method == 'POST':
 
-        # ── Verificar sesión ──────────────────────────────────────────
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
@@ -493,11 +758,9 @@ def guardar_empleado(request):
             messages.error(request, "No se encontró tu perfil.")
             return redirect('login')
 
-        # ── Obtener o crear instancia ─────────────────────────────────
         empleado_id = request.POST.get('id')
         empleado    = get_object_or_404(Empleado, id=empleado_id) if empleado_id else Empleado()
 
-        # ── Leer campos ───────────────────────────────────────────────
         cedula    = request.POST.get('cedula',    '').strip()
         nombre    = request.POST.get('nombre',    '').strip()
         email     = request.POST.get('email',     '').strip()
@@ -505,40 +768,31 @@ def guardar_empleado(request):
         direccion = request.POST.get('direccion', '').strip()
         estado    = request.POST.get('estado',    '').strip()
 
-        # ── Validaciones ──────────────────────────────────────────────
-
-        # 1. Campos obligatorios
         if not cedula or not nombre or not email or not estado:
             messages.error(request, "Cédula, nombre, email y estado son obligatorios.")
             return redirect('empleados')
 
-        # 2. Cédula: solo dígitos, entre 6 y 12 caracteres
         if not re.fullmatch(r'\d{6,12}', cedula):
             messages.error(request, "La cédula debe contener solo números (6–12 dígitos).")
             return redirect('empleados')
 
-        # 3. Nombre: solo letras (incluyendo tildes), espacios y guiones
         if not re.fullmatch(r"[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s\-']{2,80}", nombre):
             messages.error(request, "El nombre solo puede contener letras, espacios y guiones.")
             return redirect('empleados')
 
-        # 4. Email: formato válido
         if not re.fullmatch(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', email):
             messages.error(request, "El correo electrónico no tiene un formato válido.")
             return redirect('empleados')
 
-        # 5. Teléfono: solo dígitos, solo 10 caracteres (si se ingresa)
         if telefono and not re.fullmatch(r'\d{10}', telefono):
             messages.error(request, "El teléfono debe contener solo números (10 dígitos).")
             return redirect('empleados')
 
-        # 6. Estado: debe ser uno de los valores permitidos
         estados_validos = ['Activo', 'Inactivo', 'Suspendido', 'Incapacitado']
         if estado not in estados_validos:
             messages.error(request, "El estado seleccionado no es válido.")
             return redirect('empleados')
 
-        # 7. Email duplicado
         qs_email = Empleado.objects.filter(email=email)
         if empleado_id:
             qs_email = qs_email.exclude(id=empleado_id)
@@ -546,7 +800,6 @@ def guardar_empleado(request):
             messages.error(request, "Ya existe un empleado con ese correo.")
             return redirect('empleados')
 
-        # 8. Cédula duplicada
         qs_cedula = Empleado.objects.filter(cedula=cedula)
         if empleado_id:
             qs_cedula = qs_cedula.exclude(id=empleado_id)
@@ -554,7 +807,6 @@ def guardar_empleado(request):
             messages.error(request, "Ya existe un empleado con esa cédula.")
             return redirect('empleados')
 
-        # ── Guardar ───────────────────────────────────────────────────
         empleado.cedula     = cedula
         empleado.nombre     = nombre
         empleado.email      = email
@@ -628,7 +880,7 @@ def generar_reporte_empleados(request):
     response.write(pdf)
     return response
 
-# Imports necesarios: from datetime import date, timedelta
+
 # ===================
 # TURNOS
 # ===================
@@ -648,20 +900,16 @@ def turnos(request):
     if semana_filtro:
         lista = lista.filter(semana=semana_filtro)
 
-    # ── Generar las semanas del año desde la semana actual hasta la 53 ──
-    # Cada semana se representa como el lunes de esa semana ISO.
-    # Se pasan al template para el select del filtro y del modal.
     semanas = []
-    # Lunes de la semana actual
     lunes_actual = hoy - timedelta(days=hoy.weekday())
     for i in range(0, 53 - semana_actual + 1):
-        lunes = lunes_actual + timedelta(weeks=i)
+        lunes   = lunes_actual + timedelta(weeks=i)
         domingo = lunes + timedelta(days=6)
         semanas.append({
-            'numero':      lunes.isocalendar()[1],
-            'lunes':       lunes.isoformat(),
-            'domingo':     domingo.isoformat(),
-            'label':       f"Semana del {lunes.day} {lunes.strftime('%b')} · {lunes.day}-{domingo.day} {domingo.strftime('%b')}",
+            'numero':  lunes.isocalendar()[1],
+            'lunes':   lunes.isoformat(),
+            'domingo': domingo.isoformat(),
+            'label':   f"Semana del {lunes.day} {lunes.strftime('%b')} · {lunes.day}-{domingo.day} {domingo.strftime('%b')}",
         })
 
     return render(request, 'modulos/turnos/turnos.html', {
@@ -677,9 +925,21 @@ def turnos(request):
 @login_required(login_url='login')
 def turnos_supervisor(request):
 
-    busqueda = request.GET.get('q', '')
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
+    busqueda      = request.GET.get('q', '')
 
-    lista = RotacionTurno.objects.select_related('empleado', 'turno').all().order_by('-fecha_inicio')
+    if turno_horario:
+        ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+        lista = RotacionTurno.objects.select_related(
+            'empleado', 'turno'
+        ).filter(
+            empleado_id__in=ids_empleados,
+            turno__horario=turno_horario,
+        ).order_by('-fecha_inicio')
+    else:
+        lista = RotacionTurno.objects.none()
+        messages.warning(request, "No tienes un turno asignado esta semana.")
 
     if busqueda:
         lista = lista.filter(empleado__nombre__icontains=busqueda)
@@ -689,6 +949,7 @@ def turnos_supervisor(request):
         'rol':       'Supervisor',
         'fecha_hoy': timezone.now().date(),
         'busqueda':  busqueda,
+        'mi_turno':  turno_horario or '',
     })
 
 
@@ -696,33 +957,29 @@ def turnos_supervisor(request):
 def guardar_rotacion(request):
     if request.method == 'POST':
 
-        # ── Verificar sesión ──────────────────────────────────────────
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
             return redirect('login')
 
-        rotacion_id  = request.POST.get('id', '').strip()
-        empleado_id  = request.POST.get('empleado_id', '').strip()
-        turno_id     = request.POST.get('turno_id', '').strip()
-        fecha_inicio = request.POST.get('fecha_inicio', '').strip()
-        fecha_fin    = request.POST.get('fecha_fin', '').strip()
-        semana       = request.POST.get('semana', '').strip()
-        sabado       = request.POST.get('sabado_asignado') == 'on'
+        rotacion_id    = request.POST.get('id', '').strip()
+        empleado_id    = request.POST.get('empleado_id', '').strip()
+        turno_id       = request.POST.get('turno_id', '').strip()
+        fecha_inicio   = request.POST.get('fecha_inicio', '').strip()
+        fecha_fin      = request.POST.get('fecha_fin', '').strip()
+        semana         = request.POST.get('semana', '').strip()
+        sabado         = request.POST.get('sabado_asignado') == 'on'
         horario_sabado = request.POST.get('horario_sabado', '').strip() or None
-        estado       = request.POST.get('estado', 'Pendiente')
+        estado         = request.POST.get('estado', 'Pendiente')
 
-        # ── 1. Campos obligatorios ────────────────────────────────────
         if not all([empleado_id, turno_id, fecha_inicio, fecha_fin, semana]):
             messages.error(request, "Todos los campos son obligatorios.")
             return redirect('turnos')
 
-        # ── 2. Si sábado está marcado, horario_sabado es obligatorio ──
         if sabado and not horario_sabado:
             messages.error(request, "Debes seleccionar el horario del sábado.")
             return redirect('turnos')
 
-        # ── 3. Validar semana (1–53) ──────────────────────────────────
         try:
             semana_int = int(semana)
             if not (1 <= semana_int <= 53):
@@ -731,16 +988,13 @@ def guardar_rotacion(request):
             messages.error(request, "El número de semana debe estar entre 1 y 53.")
             return redirect('turnos')
 
-        # ── 4. No permitir semanas pasadas ────────────────────────────
-        hoy            = date.today()
-        semana_actual  = hoy.isocalendar()[1]
-        anio_actual    = hoy.isocalendar()[0]
+        hoy           = date.today()
+        semana_actual = hoy.isocalendar()[1]
 
         if semana_int < semana_actual:
             messages.error(request, f"No puedes asignar turnos en semanas anteriores. Semana actual: {semana_actual}.")
             return redirect('turnos')
 
-        # ── 5. Validar formato y lógica de fechas ─────────────────────
         try:
             fi = date.fromisoformat(fecha_inicio)
             ff = date.fromisoformat(fecha_fin)
@@ -748,7 +1002,6 @@ def guardar_rotacion(request):
             messages.error(request, "El formato de fecha no es válido.")
             return redirect('turnos')
 
-        # No permitir fechas de inicio en el pasado (solo para creación)
         if not rotacion_id and fi < hoy:
             messages.error(request, "La fecha de inicio no puede ser anterior a hoy.")
             return redirect('turnos')
@@ -757,25 +1010,21 @@ def guardar_rotacion(request):
             messages.error(request, "La fecha de fin no puede ser anterior a la de inicio.")
             return redirect('turnos')
 
-        # La fecha_inicio debe pertenecer a la semana indicada
         semana_de_fi = fi.isocalendar()[1]
         if semana_de_fi != semana_int:
             messages.error(request, f"La fecha de inicio pertenece a la semana {semana_de_fi}, no a la semana {semana_int}.")
             return redirect('turnos')
 
-        # ── 6. Validar estado permitido ───────────────────────────────
         estados_validos = ['Asignado', 'Completado', 'Pendiente']
         if estado not in estados_validos:
             messages.error(request, "Estado no válido.")
             return redirect('turnos')
 
-        # ── 7. Validar horario_sabado si aplica ───────────────────────
         horarios_sabado_validos = ['Mañana 6:00am - 12:00pm', 'Tarde 12:00pm - 6:00pm']
         if horario_sabado and horario_sabado not in horarios_sabado_validos:
             messages.error(request, "Horario de sábado no válido.")
             return redirect('turnos')
 
-        # ── Guardar ───────────────────────────────────────────────────
         try:
             empleado = get_object_or_404(Empleado, id=empleado_id)
             turno    = get_object_or_404(Turno, id=turno_id)
@@ -793,7 +1042,6 @@ def guardar_rotacion(request):
                 rot.save()
                 messages.success(request, "Rotación actualizada correctamente.")
             else:
-                # Verificar constraint único (empleado + fecha_inicio + fecha_fin)
                 if RotacionTurno.objects.filter(
                     empleado=empleado,
                     fecha_inicio=fi,
@@ -844,7 +1092,7 @@ def rotacion_turnos(request):
 @login_required(login_url='login')
 def generar_reporte_turnos(request):
 
-    lista = Turno.objects.filter(activo=True)  # ← sin select_related
+    lista = Turno.objects.filter(activo=True)
 
     buffer    = BytesIO()
     doc       = SimpleDocTemplate(buffer, pagesize=letter)
@@ -854,7 +1102,7 @@ def generar_reporte_turnos(request):
     elementos.append(Paragraph("Reporte de Turnos - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Horario', 'Estado']]  # ← sin columna "Creado por"
+    datos = [['Horario', 'Estado']]
     for t in lista:
         datos.append([
             t.horario,
@@ -930,6 +1178,7 @@ def generar_reporte_rotacion(request):
     response.write(pdf)
     return response
 
+
 # ===================
 # SOLICITUDES
 # ===================
@@ -948,7 +1197,7 @@ def solicitudes(request):
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
 
-    turnos_activos = Turno.objects.filter(activo=True)
+    turnos_activos    = Turno.objects.filter(activo=True)
     empleados_activos = Empleado.objects.filter(estado='Activo')
 
     return render(request, 'modulos/solicitudes/solicitudes.html', {
@@ -1003,7 +1252,7 @@ def revisar_solicitud(request, id):
         usuario   = get_object_or_404(Usuario, id=usuario_id)
         solicitud = get_object_or_404(Solicitud, id=id)
 
-        nuevo_estado = request.POST.get('estado', '').strip()
+        nuevo_estado    = request.POST.get('estado', '').strip()
         estados_validos = ['Aprobado', 'Rechazado', 'Pendiente']
 
         if nuevo_estado not in estados_validos:
@@ -1066,7 +1315,6 @@ def generar_reporte_solicitudes(request):
     response.write(pdf)
     return response
 
-from datetime import date
 
 # ===================
 # ASIGNACIONES
@@ -1080,7 +1328,7 @@ def asignaciones(request):
 
     lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
-    ).exclude(estado='Finalizado')  # Las "borradas" no aparecen en el listado
+    ).exclude(estado='Finalizado')
 
     if query:
         lista = lista.filter(
@@ -1100,12 +1348,12 @@ def asignaciones(request):
     })
 
 
-# ─────────────────────────────────────────────────────────────────
-#  Función auxiliar: valida que el turno seleccionado coincida
-#  con la rotación activa del empleado para la fecha dada.
-#  Retorna (True, None) si es válido, o (False, mensaje) si no.
-# ─────────────────────────────────────────────────────────────────
 def _validar_turno_empleado(empleado, turno, fecha):
+    """
+    Valida que el turno seleccionado coincida con la rotación activa
+    del empleado para la fecha dada.
+    Retorna (True, None) si es válido, o (False, mensaje) si no.
+    """
     rotacion = RotacionTurno.objects.filter(
         empleado=empleado,
         fecha_inicio__lte=fecha,
@@ -1125,13 +1373,6 @@ def _validar_turno_empleado(empleado, turno, fecha):
     return True, None
 
 
-# ─────────────────────────────────────────────
-#  ADMIN — Crear / Editar asignación
-#  Validaciones:
-#   1. Fecha no anterior a hoy
-#   2. Turno debe coincidir con la rotación del empleado
-#   3. Si ya tiene 2+ tareas ese día → modal de confirmación
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def guardar_asignacion(request):
     if request.method != 'POST':
@@ -1160,7 +1401,6 @@ def guardar_asignacion(request):
         messages.error(request, "Todos los campos son obligatorios.")
         return redirect('asignaciones')
 
-    # ── 1. Fecha no anterior a hoy ────────────────────────────────
     fecha_ingresada = date.fromisoformat(fecha)
     if fecha_ingresada < date.today():
         messages.error(request, "No se pueden asignar tareas en fechas anteriores a la actual.")
@@ -1169,13 +1409,11 @@ def guardar_asignacion(request):
     empleado = get_object_or_404(Empleado, id=emp_id)
     turno    = get_object_or_404(Turno, id=turno_id)
 
-    # ── 2. Turno debe coincidir con la rotación del empleado ──────
     valido, error_turno = _validar_turno_empleado(empleado, turno, fecha_ingresada)
     if not valido:
         messages.error(request, error_turno)
         return redirect('asignaciones')
 
-    # ── 3. Límite de tareas diarias (solo en creaciones nuevas) ───
     es_nueva = not asignacion_id
     if es_nueva and forzar != '1':
         tareas_del_dia = Asignacion.objects.filter(
@@ -1184,9 +1422,7 @@ def guardar_asignacion(request):
         ).count()
 
         if tareas_del_dia >= 2:
-            lista = Asignacion.objects.select_related(
-                'empleado', 'turno', 'asignado_por'
-            ).exclude(estado='Finalizado')  # Las "borradas" no aparecen en el listado
+            lista             = Asignacion.objects.select_related('empleado', 'turno', 'asignado_por').exclude(estado='Finalizado')
             empleados_activos = Empleado.objects.filter(estado='Activo')
             turnos_activos    = Turno.objects.filter(activo=True)
 
@@ -1194,7 +1430,6 @@ def guardar_asignacion(request):
                 'asignaciones':     lista,
                 'empleados':        empleados_activos,
                 'turnos':           turnos_activos,
-                # Señal para que el JS abra el modal de confirmación
                 'confirmar_extra':  True,
                 'extra_tarea':      tarea,
                 'extra_fecha':      fecha,
@@ -1204,7 +1439,6 @@ def guardar_asignacion(request):
                 'extra_emp_nombre': empleado.nombre,
             })
 
-    # ── Guardar ───────────────────────────────────────────────────
     if asignacion_id:
         asignacion = get_object_or_404(Asignacion, id=asignacion_id)
     else:
@@ -1226,9 +1460,6 @@ def guardar_asignacion(request):
     return redirect('asignaciones')
 
 
-# ─────────────────────────────────────────────
-#  ADMIN — Inactivar / Finalizar asignación
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def inactivar_asignacion(request, id):
     asignacion        = get_object_or_404(Asignacion, id=id)
@@ -1238,21 +1469,25 @@ def inactivar_asignacion(request, id):
     return redirect('asignaciones')
 
 
-# ─────────────────────────────────────────────
-#  SUPERVISOR — Listado de asignaciones
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def asignaciones_supervisor(request):
 
-    usuario_id = request.session.get('usuario_id')
-    if not usuario_id:
-        return redirect('login')
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
+    busqueda      = request.GET.get('q', '')
 
-    busqueda = request.GET.get('q', '')
-
-    lista = Asignacion.objects.select_related(
-        'empleado', 'turno', 'asignado_por'
-    ).order_by('-fecha_asignacion')
+    if turno_horario:
+        ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+        lista = Asignacion.objects.select_related(
+            'empleado', 'turno', 'asignado_por'
+        ).filter(
+            empleado_id__in=ids_empleados
+        ).order_by('-fecha_asignacion')
+        empleados_activos = Empleado.objects.filter(estado='Activo', id__in=ids_empleados)
+    else:
+        lista             = Asignacion.objects.none()
+        empleados_activos = Empleado.objects.none()
+        messages.warning(request, "No tienes un turno asignado esta semana.")
 
     if busqueda:
         lista = lista.filter(
@@ -1260,8 +1495,7 @@ def asignaciones_supervisor(request):
             Q(empleado__nombre__icontains=busqueda)
         )
 
-    empleados_activos = Empleado.objects.filter(estado='Activo')
-    turnos_activos    = Turno.objects.filter(activo=True)
+    turnos_activos = Turno.objects.filter(activo=True)
 
     return render(request, 'modulos/asignaciones/asignaciones_supervisor.html', {
         'asignaciones': lista,
@@ -1269,16 +1503,10 @@ def asignaciones_supervisor(request):
         'empleados':    empleados_activos,
         'turnos':       turnos_activos,
         'fecha_hoy':    timezone.now().date(),
+        'mi_turno':     turno_horario or '',
     })
 
 
-# ─────────────────────────────────────────────
-#  SUPERVISOR — Solo crear asignación
-#  Validaciones:
-#   1. Fecha no anterior a hoy
-#   2. Turno debe coincidir con la rotación del empleado
-#   3. Límite duro de 2 tareas diarias
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def guardar_asignacion_supervisor(request):
     if request.method != 'POST':
@@ -1295,6 +1523,11 @@ def guardar_asignacion_supervisor(request):
         messages.error(request, "No se encontró tu perfil.")
         return redirect('login')
 
+    turno_horario = get_turno_supervisor(usuario_id)
+    if not turno_horario:
+        messages.error(request, "No tienes un turno asignado. No puedes crear asignaciones.")
+        return redirect('asignaciones_supervisor')
+
     tarea    = request.POST.get('tarea', '').strip()
     fecha    = request.POST.get('fecha_asignacion', '').strip()
     emp_id   = request.POST.get('empleado_id', '').strip()
@@ -1304,7 +1537,6 @@ def guardar_asignacion_supervisor(request):
         messages.error(request, "Todos los campos son obligatorios.")
         return redirect('asignaciones_supervisor')
 
-    # ── 1. Fecha no anterior a hoy ────────────────────────────────
     fecha_ingresada = date.fromisoformat(fecha)
     if fecha_ingresada < date.today():
         messages.error(request, "No se pueden asignar tareas en fechas anteriores a la actual.")
@@ -1313,13 +1545,17 @@ def guardar_asignacion_supervisor(request):
     empleado = get_object_or_404(Empleado, id=emp_id)
     turno    = get_object_or_404(Turno, id=turno_id)
 
-    # ── 2. Turno debe coincidir con la rotación del empleado ──────
+    # Verificar que el empleado pertenece al turno del supervisor esta semana
+    ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+    if empleado.id not in list(ids_empleados):
+        messages.error(request, f"El empleado {empleado.nombre} no pertenece a tu turno.")
+        return redirect('asignaciones_supervisor')
+
     valido, error_turno = _validar_turno_empleado(empleado, turno, fecha_ingresada)
     if not valido:
         messages.error(request, error_turno)
         return redirect('asignaciones_supervisor')
 
-    # ── 3. Límite duro de 2 tareas diarias para el supervisor ─────
     tareas_del_dia = Asignacion.objects.filter(
         empleado=empleado,
         fecha_asignacion=fecha
@@ -1349,9 +1585,6 @@ def guardar_asignacion_supervisor(request):
     return redirect('asignaciones_supervisor')
 
 
-# ─────────────────────────────────────────────
-#  ADMIN — Generar reporte PDF de asignaciones
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def generar_reporte_asignaciones(request):
 
@@ -1359,7 +1592,7 @@ def generar_reporte_asignaciones(request):
 
     lista = Asignacion.objects.select_related(
         'empleado', 'turno', 'asignado_por'
-    ).exclude(estado='Finalizado')  # Las "borradas" no aparecen en el listado
+    ).exclude(estado='Finalizado')
 
     if query:
         lista = lista.filter(
@@ -1406,7 +1639,8 @@ def generar_reporte_asignaciones(request):
     response['Content-Disposition'] = 'attachment; filename="reporte_asignaciones.pdf"'
     response.write(pdf)
     return response
- 
+
+
 # ===================
 # PRODUCCION
 # ===================
@@ -1448,9 +1682,7 @@ def guardar_produccion(request):
             messages.error(request, "No se encontró tu perfil.")
             return redirect('login')
 
-        produccion_id = request.POST.get('id', '').strip()
-
-        # Campos reales del modelo Produccion
+        produccion_id      = request.POST.get('id', '').strip()
         producto           = request.POST.get('producto', '').strip()
         ingredientes       = request.POST.get('ingredientes', '').strip()
         cantidad_requerida = request.POST.get('cantidad_requerida', '').strip()
@@ -1467,7 +1699,6 @@ def guardar_produccion(request):
             messages.error(request, "Los ingredientes son obligatorios.")
             return redirect('producciones')
 
-        # Validar que fecha_limite no sea anterior a fecha_entrega
         if fecha_limite < fecha_entrega:
             messages.error(request, "La fecha límite no puede ser anterior a la fecha de entrega.")
             return redirect('producciones')
@@ -1479,12 +1710,12 @@ def guardar_produccion(request):
         else:
             produccion = Produccion()
 
-        produccion.producto           = producto
-        produccion.ingredientes       = ingredientes
-        produccion.cantidad_requerida = cantidad_requerida
-        produccion.fecha_entrega      = fecha_entrega
-        produccion.fecha_limite       = fecha_limite
-        produccion.estado             = estado
+        produccion.producto             = producto
+        produccion.ingredientes         = ingredientes
+        produccion.cantidad_requerida   = cantidad_requerida
+        produccion.fecha_entrega        = fecha_entrega
+        produccion.fecha_limite         = fecha_limite
+        produccion.estado               = estado
         produccion.empleado_responsable = empleado
         produccion.creado_por           = usuario_perfil
 
@@ -1526,7 +1757,6 @@ def generar_reporte_producciones(request):
     elementos.append(Paragraph("Reporte de Producciones - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    # Columnas ajustadas a campos reales del modelo
     datos = [['Producto', 'Responsable', 'Cant. Requerida', 'Fecha Entrega', 'Fecha Límite', 'Estado']]
     for p in lista:
         datos.append([
@@ -1559,32 +1789,42 @@ def generar_reporte_producciones(request):
     response.write(pdf)
     return response
 
-# La misma monda pero del supervisor
+
 @login_required(login_url='login')
 def producciones_supervisor(request):
-    query  = request.GET.get('q', '')
-    estado = request.GET.get('estado', '')
-    lista  = Produccion.objects.select_related('empleado_responsable').all()
+
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
+    query         = request.GET.get('q', '')
+    estado        = request.GET.get('estado', '')
+
+    if turno_horario:
+        ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+        lista = Produccion.objects.select_related(
+            'empleado_responsable'
+        ).filter(empleado_responsable_id__in=ids_empleados)
+        empleados = Empleado.objects.filter(estado='Activo', id__in=ids_empleados)
+    else:
+        lista     = Produccion.objects.none()
+        empleados = Empleado.objects.none()
+        messages.warning(request, "No tienes un turno asignado esta semana.")
 
     if query:
         lista = lista.filter(producto__icontains=query)
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
 
-    empleados = Empleado.objects.filter(estado='Activo')
-
     return render(request, 'modulos/produccion/produccion_supervisor.html', {
         'producciones': lista,
         'empleados':    empleados,
         'fecha_hoy':    timezone.now().date(),
+        'mi_turno':     turno_horario or '',
     })
 
 
 # ===================
 # EXPORTACIONES
 # ===================
-# CORRECCIÓN: Exportacion no tiene campo 'creado_por' en el modelo.
-# Se eliminó esa asignación.
 
 @login_required(login_url='login')
 def gestionar_exportaciones(request):
@@ -1599,7 +1839,6 @@ def gestionar_exportaciones(request):
     if estado:
         exportaciones = exportaciones.filter(estado=estado)
 
-    # Solo producciones En Proceso o Pendiente para asociar a exportaciones
     producciones = Produccion.objects.filter(estado__in=['En Proceso', 'Pendiente'])
 
     return render(request, 'modulos/exportaciones/exportaciones.html', {
@@ -1612,10 +1851,23 @@ def gestionar_exportaciones(request):
 
 @login_required(login_url='login')
 def exportaciones_supervisor(request):
+
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
     busqueda      = request.GET.get('q', '')
     estado_filtro = request.GET.get('estado', '')
 
-    lista = Exportacion.objects.all().order_by('-fecha_envio')
+    if turno_horario:
+        ids_empleados    = get_empleados_de_turno_supervisor(turno_horario)
+        ids_producciones = Produccion.objects.filter(
+            empleado_responsable_id__in=ids_empleados
+        ).values_list('id', flat=True)
+        lista = Exportacion.objects.filter(
+            produccion_id__in=ids_producciones
+        ).order_by('-fecha_envio')
+    else:
+        lista = Exportacion.objects.none()
+        messages.warning(request, "No tienes un turno asignado esta semana.")
 
     if busqueda:
         lista = lista.filter(
@@ -1630,6 +1882,7 @@ def exportaciones_supervisor(request):
         'busqueda':      busqueda,
         'estado_filtro': estado_filtro,
         'fecha_hoy':     timezone.now().date(),
+        'mi_turno':      turno_horario or '',
     })
 
 
@@ -1641,7 +1894,6 @@ def guardar_exportacion(request):
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
             return redirect('login')
-        # Verificamos que el usuario existe aunque Exportacion no tenga creado_por
         try:
             Usuario.objects.get(id=usuario_id)
         except Usuario.DoesNotExist:
@@ -1687,7 +1939,6 @@ def guardar_exportacion(request):
                 fecha_entrega = fecha_entrega,
                 estado        = estado,
                 produccion    = produccion,
-                # Sin creado_por: el modelo Exportacion no tiene ese campo
             )
             messages.success(request, 'Exportación creada correctamente.')
 
@@ -1782,11 +2033,22 @@ def gestionar_lotes(request):
 
 @login_required(login_url='login')
 def lotes_supervisor(request):
-    busqueda = request.GET.get('q', '')
 
-    lista = Lote.objects.select_related(
-        'produccion', 'exportacion'
-    ).order_by('-fecha_produccion')
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
+    busqueda      = request.GET.get('q', '')
+
+    if turno_horario:
+        ids_empleados    = get_empleados_de_turno_supervisor(turno_horario)
+        ids_producciones = Produccion.objects.filter(
+            empleado_responsable_id__in=ids_empleados
+        ).values_list('id', flat=True)
+        lista = Lote.objects.select_related(
+            'produccion', 'exportacion'
+        ).filter(produccion_id__in=ids_producciones).order_by('-fecha_produccion')
+    else:
+        lista = Lote.objects.none()
+        messages.warning(request, "No tienes un turno asignado esta semana.")
 
     if busqueda:
         lista = lista.filter(codigo_lote__icontains=busqueda)
@@ -1795,8 +2057,10 @@ def lotes_supervisor(request):
         'lotes':     lista,
         'busqueda':  busqueda,
         'fecha_hoy': timezone.now().date(),
+        'mi_turno':  turno_horario or '',
     })
-    
+
+
 @login_required(login_url='login')
 def guardar_lote(request):
     if request.method == 'POST':
@@ -1915,17 +2179,6 @@ def generar_reporte_lotes(request):
 # BITÁCORA DE PRODUCCIÓN
 # ========================
 
-from datetime import date
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
-
-from .models import Bitacora, Produccion, Usuario
-
-
-# ─────────────────────────────────────────────
-#  SUPERVISOR — Crear nueva bitácora
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def bitacora_supervisor(request):
 
@@ -1951,7 +2204,6 @@ def bitacora_supervisor(request):
         observaciones       = request.POST.get('observaciones', '').strip()
         estado              = request.POST.get('estado', 'Borrador')
 
-        # Contexto para re-renderizar sin perder lo escrito
         ctx = {
             'producciones':       producciones,
             'today':              date.today(),
@@ -2024,9 +2276,6 @@ def bitacora_supervisor(request):
     })
 
 
-# ─────────────────────────────────────────────
-#  SUPERVISOR — Enviar borrador existente
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def enviar_bitacora(request, id):
 
@@ -2038,7 +2287,6 @@ def enviar_bitacora(request, id):
     if not supervisor:
         return redirect('login')
 
-    # Solo puede enviar sus propias bitácoras
     bitacora = get_object_or_404(Bitacora, id=id, supervisor=supervisor)
 
     if bitacora.estado != 'Borrador':
@@ -2052,9 +2300,6 @@ def enviar_bitacora(request, id):
     return redirect('listar_bitacoras_supervisor')
 
 
-# ─────────────────────────────────────────────
-#  SUPERVISOR — Listar sus propias bitácoras
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def listar_bitacoras_supervisor(request):
 
@@ -2077,9 +2322,6 @@ def listar_bitacoras_supervisor(request):
     })
 
 
-# ─────────────────────────────────────────────
-#  ADMIN — Listar todas las bitácoras
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def listar_bitacoras(request):
 
@@ -2096,9 +2338,6 @@ def listar_bitacoras(request):
     })
 
 
-# ─────────────────────────────────────────────
-#  ADMIN — Revisar bitácora (aprobar / rechazar)
-# ─────────────────────────────────────────────
 @login_required(login_url='login')
 def revisar_bitacora(request, id):
 
@@ -2130,6 +2369,7 @@ def revisar_bitacora(request, id):
         messages.success(request, f"Bitácora '{bitacora.titulo}' {accion} correctamente.")
 
     return redirect('listar_bitacoras')
+
 
 # ========================
 # ASISTENTE IA CON GEMINI

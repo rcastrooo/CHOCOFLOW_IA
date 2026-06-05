@@ -1,0 +1,478 @@
+{% extends 'layouts/sidebar.html' %}
+{% load static %}
+
+{% block title %}Gestión de Supervisores{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="main-content">
+
+  <!-- TOPBAR -->
+  <div class="topbar" style="margin-bottom:0;">
+    <span class="topbar-title">
+      <i class="bi bi-person-badge"></i> GESTIÓN DE SUPERVISORES
+    </span>
+  </div>
+
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-shield-person"></i> Supervisores</h5>
+    <p>Administra los supervisores registrados, sus turnos y estados.</p>
+  </div>
+
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- ACCIONES -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+
+    <form method="GET" class="d-flex gap-2 flex-wrap">
+      <input type="text"
+             name="q"
+             class="form-control"
+             placeholder="Buscar supervisor..."
+             value="{{ request.GET.q }}"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:180px;">
+
+      <!-- CORREGIDO: values con el string completo -->
+      <select name="turno"
+              class="form-select"
+              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:200px;">
+        <option value="">Todos los turnos</option>
+        <option value="Mañana 6:00am - 12:00pm" {% if request.GET.turno == 'Mañana 6:00am - 12:00pm' %}selected{% endif %}>Mañana 6:00am - 12:00pm</option>
+        <option value="Tarde 12:00pm - 6:00pm"  {% if request.GET.turno == 'Tarde 12:00pm - 6:00pm'  %}selected{% endif %}>Tarde 12:00pm - 6:00pm</option>
+        <option value="Sin asignar"             {% if request.GET.turno == 'Sin asignar'             %}selected{% endif %}>Sin asignar</option>
+      </select>
+
+      <select name="estado"
+              class="form-select"
+              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:140px;">
+        <option value="">Todos los estados</option>
+        <option value="Activo"       {% if request.GET.estado == 'Activo'       %}selected{% endif %}>Activo</option>
+        <option value="Inactivo"     {% if request.GET.estado == 'Inactivo'     %}selected{% endif %}>Inactivo</option>
+        <option value="Suspendido"   {% if request.GET.estado == 'Suspendido'   %}selected{% endif %}>Suspendido</option>
+        <option value="Incapacitado" {% if request.GET.estado == 'Incapacitado' %}selected{% endif %}>Incapacitado</option>
+      </select>
+
+      <button class="btn-caramel"
+              style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </form>
+
+  </div>
+
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Listado de supervisores
+  </h6>
+
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Teléfono</th>
+          <th>Dirección</th>
+          <th>Turno</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in supervisores %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-person-badge" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ s.nombre }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ s.email }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ s.telefono|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ s.direccion }}</td>
+
+          <!-- TURNO INLINE — CORREGIDO: values con string completo -->
+          <td>
+            <form method="POST" action="{% url 'asignar_turno_supervisor' s.id %}" class="d-flex align-items-center gap-1">
+              {% csrf_token %}
+              <select name="turno"
+                      class="form-select form-select-sm turno-select"
+                      style="border-radius:8px; border:1.5px solid #e8ddd5; font-size:0.82rem; min-width:180px;"
+                      onchange="this.form.submit()">
+                <option value=""                        {% if not s.turno %}selected{% endif %}>Sin asignar</option>
+                <option value="Mañana 6:00am - 12:00pm" {% if s.turno == 'Mañana 6:00am - 12:00pm' %}selected{% endif %}>Mañana 6:00am - 12:00pm</option>
+                <option value="Tarde 12:00pm - 6:00pm"  {% if s.turno == 'Tarde 12:00pm - 6:00pm'  %}selected{% endif %}>Tarde 12:00pm - 6:00pm</option>
+              </select>
+            </form>
+          </td>
+
+          <!-- ESTADO -->
+          <td>
+            {% if s.estado == 'Activo' %}
+              <span class="badge bg-success">{{ s.estado }}</span>
+            {% elif s.estado == 'Inactivo' %}
+              <span class="badge bg-secondary">{{ s.estado }}</span>
+            {% elif s.estado == 'Suspendido' %}
+              <span class="badge bg-danger">{{ s.estado }}</span>
+            {% elif s.estado == 'Incapacitado' %}
+              <span class="badge bg-warning text-dark">{{ s.estado }}</span>
+            {% endif %}
+          </td>
+
+          <!-- ACCIONES -->
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1"
+                    style="border-radius:8px;"
+                    title="Editar"
+                    onclick="editarSupervisor(
+                      '{{ s.id }}',
+                      '{{ s.nombre|escapejs }}',
+                      '{{ s.email }}',
+                      '{{ s.telefono|default:'' }}',
+                      '{{ s.direccion|escapejs }}',
+                      '{{ s.estado }}',
+                      '{{ s.turno|default:'' }}'
+                    )">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <a href="{% url 'inactivar_supervisor' s.id %}"
+               class="btn btn-sm btn-outline-danger"
+               style="border-radius:8px;"
+               title="Inactivar"
+               onclick="return confirm('¿Inactivar este supervisor?')">
+              <i class="bi bi-trash"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No hay supervisores registrados
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BOTONES INFERIORES -->
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+
+    <!-- Carga masiva CSV -->
+    <div>
+      <button type="button"
+              class="btn-caramel"
+              style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px; display:inline-flex; align-items:center; gap:6px;"
+              onclick="document.getElementById('csvInputSup').click()">
+        <i class="bi bi-folder2-open"></i> Carga Masiva
+      </button>
+      <input type="file" id="csvInputSup" accept=".csv" style="display:none"
+             onchange="subirCSV(this)">
+    </div>
+
+    <!-- Reporte PDF -->
+    <a href="{% url 'reporte_supervisores' %}"
+       class="btn-choco"
+       style="border-radius:12px; padding:0 20px; text-decoration:none; font-size:0.88rem; height:44px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-file-earmark-pdf"></i> Generar Reporte
+    </a>
+
+  </div>
+
+  <!-- Barra de progreso carga masiva -->
+  <div id="csvProgressWrap" class="mt-3" style="display:none;">
+    <div style="font-size:0.83rem; color:#603C1C; font-weight:600; margin-bottom:4px;">
+      <i class="bi bi-arrow-repeat spin"></i> Procesando archivo CSV...
+    </div>
+    <div class="progress" style="height:8px; border-radius:10px;">
+      <div class="progress-bar bg-warning" id="csvBar" role="progressbar" style="width:0%; border-radius:10px;"></div>
+    </div>
+    <div id="csvMsg" style="font-size:0.8rem; color:#888; margin-top:4px;"></div>
+  </div>
+
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Filtra por nombre, turno o estado. El CSV debe tener columnas:
+    <strong>nombre, email, telefono, direccion, contrasena, estado, turno</strong>
+  </p>
+
+</div>
+
+
+<!-- ============================================================ -->
+<!--  MODAL: Editar supervisor                                    -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalSupervisor" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+
+      <form method="POST" action="{% url 'editar_supervisor' %}" id="formSupervisor" novalidate>
+        {% csrf_token %}
+
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar Supervisor</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body" style="background:#fdf9f6;">
+
+          <input type="hidden" name="id" id="sup-id">
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem;font-weight:600;color:#603C1C;">
+              Nombre completo <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="nombre" id="sup-nombre"
+                   class="form-control"
+                   maxlength="100"
+                   style="border-radius:10px;border:1.5px solid #e8ddd5;font-size:0.88rem;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem;font-weight:600;color:#603C1C;">
+              Correo electrónico <span class="text-danger">*</span>
+            </label>
+            <input type="email" name="email" id="sup-email"
+                   class="form-control"
+                   maxlength="255"
+                   style="border-radius:10px;border:1.5px solid #e8ddd5;font-size:0.88rem;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem;font-weight:600;color:#603C1C;">
+              Teléfono
+            </label>
+            <input type="text" name="telefono" id="sup-telefono"
+                   class="form-control"
+                   maxlength="10"
+                   inputmode="numeric"
+                   style="border-radius:10px;border:1.5px solid #e8ddd5;font-size:0.88rem;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem;font-weight:600;color:#603C1C;">
+              Dirección
+            </label>
+            <input type="text" name="direccion" id="sup-direccion"
+                   class="form-control"
+                   maxlength="255"
+                   style="border-radius:10px;border:1.5px solid #e8ddd5;font-size:0.88rem;">
+          </div>
+
+          <div class="row">
+            <div class="col-6 mb-1">
+              <label class="form-label" style="font-size:0.85rem;font-weight:600;color:#603C1C;">
+                Turno <span class="text-danger">*</span>
+              </label>
+              <!-- CORREGIDO: values con string completo -->
+              <select name="turno" id="sup-turno"
+                      class="form-select"
+                      style="border-radius:10px;border:1.5px solid #e8ddd5;font-size:0.88rem;">
+                <option value="">Sin asignar</option>
+                <option value="Mañana 6:00am - 2:00pm">Mañana 6:00am - 2:00pm</option>
+                <option value="Tarde 2:00pm - 10:00pm">Tarde 2:00pm - 10:00pm</option>
+              </select>
+            </div>
+            <div class="col-6 mb-1">
+              <label class="form-label" style="font-size:0.85rem;font-weight:600;color:#603C1C;">
+                Estado <span class="text-danger">*</span>
+              </label>
+              <select name="estado" id="sup-estado"
+                      class="form-select"
+                      style="border-radius:10px;border:1.5px solid #e8ddd5;font-size:0.88rem;">
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+                <option value="Suspendido">Suspendido</option>
+                <option value="Incapacitado">Incapacitado</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="background:#fdf9f6;border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px;padding:8px 22px;">
+            <i class="bi bi-save"></i> Guardar cambios
+          </button>
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px;padding:8px 16px;"
+                  data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!--  MODAL: Resultado carga masiva                               -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalCSV" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51);color:white;border:none;">
+        <h5 class="modal-title"><i class="bi bi-table"></i> Resultado Carga Masiva</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="background:#fdf9f6;" id="csvResultBody">
+      </div>
+      <div class="modal-footer" style="background:#fdf9f6;border-top:1px solid #e8ddd5;">
+        <button type="button" class="btn-choco"
+                style="border-radius:10px;padding:8px 22px;"
+                onclick="location.reload()">
+          <i class="bi bi-arrow-clockwise"></i> Actualizar listado
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display:inline-block; animation: spin 1s linear infinite; }
+
+.turno-select:focus {
+  border-color: #D88C51 !important;
+  box-shadow: 0 0 0 3px rgba(216,140,81,0.15) !important;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// ── Abrir modal edición ───────────────────────────────────────────
+function editarSupervisor(id, nombre, email, telefono, direccion, estado, turno) {
+  document.getElementById('sup-id').value        = id;
+  document.getElementById('sup-nombre').value    = nombre;
+  document.getElementById('sup-email').value     = email;
+  document.getElementById('sup-telefono').value  = telefono;
+  document.getElementById('sup-direccion').value = direccion;
+  document.getElementById('sup-estado').value    = estado;
+  document.getElementById('sup-turno').value     = turno;
+  new bootstrap.Modal(document.getElementById('modalSupervisor')).show();
+}
+
+// ── Solo números en teléfono ──────────────────────────────────────
+document.getElementById('sup-telefono').addEventListener('input', function() {
+  this.value = this.value.replace(/\D/g, '');
+});
+
+// ── Carga masiva CSV ──────────────────────────────────────────────
+function subirCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const wrap = document.getElementById('csvProgressWrap');
+  const bar  = document.getElementById('csvBar');
+  const msg  = document.getElementById('csvMsg');
+  wrap.style.display = 'block';
+  bar.style.width    = '0%';
+  msg.textContent    = 'Leyendo archivo...';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    bar.style.width  = '30%';
+    msg.textContent  = 'Procesando filas...';
+
+    const lines = e.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+      msg.textContent = '⚠️ El archivo está vacío o no tiene datos.';
+      bar.style.width = '100%';
+      bar.classList.add('bg-danger');
+      return;
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const required = ['nombre','email','contrasena','estado'];
+    const missing  = required.filter(r => !headers.includes(r));
+
+    if (missing.length) {
+      msg.textContent = `⚠️ Faltan columnas requeridas: ${missing.join(', ')}`;
+      bar.style.width = '100%';
+      bar.classList.add('bg-danger');
+      return;
+    }
+
+    bar.style.width = '60%';
+    msg.textContent = 'Enviando al servidor...';
+
+    const formData = new FormData();
+    formData.append('csv_file', file);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    fetch("{% url 'carga_masiva_supervisores' %}", {
+      method: 'POST',
+      body:   formData,
+    })
+    .then(r => r.json())
+    .then(data => {
+      bar.style.width = '100%';
+      bar.classList.add('bg-success');
+      msg.textContent = `✅ Proceso completado.`;
+
+      let html = `
+        <div class="d-flex gap-3 flex-wrap mb-3">
+          <div style="background:#d1fae5;border-radius:10px;padding:10px 18px;font-size:0.88rem;font-weight:600;color:#065f46;">
+            <i class="bi bi-check-circle"></i> Creados: ${data.creados}
+          </div>
+          <div style="background:#fef3c7;border-radius:10px;padding:10px 18px;font-size:0.88rem;font-weight:600;color:#78350f;">
+            <i class="bi bi-skip-forward"></i> Omitidos (ya existen): ${data.omitidos}
+          </div>
+          ${data.errores.length ? `
+          <div style="background:#fee2e2;border-radius:10px;padding:10px 18px;font-size:0.88rem;font-weight:600;color:#991b1b;">
+            <i class="bi bi-exclamation-triangle"></i> Errores: ${data.errores.length}
+          </div>` : ''}
+        </div>`;
+
+      if (data.errores.length) {
+        html += `<h6 style="font-size:0.82rem;color:#603C1C;font-weight:700;text-transform:uppercase;">Filas con error</h6>
+        <div class="table-responsive">
+          <table class="table table-sm" style="font-size:0.82rem;">
+            <thead><tr><th>Fila</th><th>Motivo</th></tr></thead>
+            <tbody>
+              ${data.errores.map(e => `<tr><td>${e.fila}</td><td>${e.motivo}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      }
+
+      document.getElementById('csvResultBody').innerHTML = html;
+      new bootstrap.Modal(document.getElementById('modalCSV')).show();
+
+      setTimeout(() => { wrap.style.display = 'none'; input.value = ''; }, 2000);
+    })
+    .catch(() => {
+      bar.style.width = '100%';
+      bar.classList.add('bg-danger');
+      msg.textContent = '❌ Error al comunicarse con el servidor.';
+    });
+  };
+
+  reader.readAsText(file, 'UTF-8');
+}
+</script>
+
+{% endblock %}

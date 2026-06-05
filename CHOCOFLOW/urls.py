@@ -18,6 +18,11 @@ urlpatterns = [
 
     # SUPERVISORES
     path('supervisores/', views.gestionar_supervisores, name='gestionar_supervisores'),
+    path('supervisores/turno/<int:supervisor_id>/', views.asignar_turno_supervisor, name='asignar_turno_supervisor'),
+    path('supervisores/editar/', views.editar_supervisor, name='editar_supervisor'),
+    path('supervisores/inactivar/<int:supervisor_id>/', views.inactivar_supervisor, name='inactivar_supervisor'),
+    path('supervisores/carga-masiva/', views.carga_masiva_supervisores, name='carga_masiva_supervisores'),
+    path('supervisores/reporte/', views.reporte_supervisores, name='reporte_supervisores'),
 
     # EMPLEADOS
     path('empleados/', views.empleados, name='empleados'),

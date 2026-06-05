@@ -10,6 +10,12 @@ class Usuario(models.Model):
         ('Administrador', 'Administrador'),
         ('Supervisor', 'Supervisor'),
     ]
+    
+    TURNO_CHOICES = [
+        ('Mañana 6:00am - 2:00pm', 'Mañana 6:00am - 2:00pm'),
+        ('Tarde 2:00pm - 10:00pm', 'Tarde 2:00pm - 10:00pm'),
+    ]
+    
     ESTADO_CHOICES = [
         ('Activo', 'Activo'),
         ('Inactivo', 'Inactivo'),
@@ -23,6 +29,7 @@ class Usuario(models.Model):
     direccion = models.CharField(max_length=255)
     contrasena = models.CharField(max_length=255)
     rol       = models.CharField(max_length=20, choices=ROL_CHOICES)
+    turno = models.CharField(max_length=50, choices=TURNO_CHOICES, blank=True, null=True)
     estado    = models.CharField(max_length=20, choices=ESTADO_CHOICES)
 
     def __str__(self):
