@@ -117,3 +117,12 @@
 .form-select {
     border-radius: 12px;
 }
+#lote_produccion {
+    margin-top: 6px;
+}
+.modal-body label {
+    margin-top: 10px;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #444;
+}

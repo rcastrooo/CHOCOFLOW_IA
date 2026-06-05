@@ -86,7 +86,6 @@
                         '{{ lote.fecha_produccion }}',
                         '{{ lote.fecha_vencimiento }}',
                         '{{ lote.produccion.id }}',
-                        '{{ lote.exportacion.id }}'
                     )">✏️
                 </button>
 
@@ -166,25 +165,20 @@
         <input type="date" name="fecha_vencimiento" id="lote_fecha_vencimiento"
             class="form-control mb-2" required>
 
-        {# Select: producción a la que pertenece este lote (FK obligatoria) #}
-        <label class="form-label mb-0">Producción</label>
-        <select name="produccion_id" id="lote_produccion" class="form-select mb-2">
+            <label class="form-label mt-2 mb-1">Producción</label>
+
+        <select name="produccion_id"
+                id="lote_produccion"
+                class="form-select mb-2"
+                required>
             <option value="">-- Seleccionar Producción --</option>
+
             {% for p in producciones %}
-                <option value="{{ p.id }}">{{ p }}</option>
+                <option value="{{ p.id }}">
+                    {{ p.producto }}
+                </option>
             {% endfor %}
-        </select>
-
-        {# Select: exportación a la que pertenece este lote (FK obligatoria) #}
-        <label class="form-label mb-0">Exportación</label>
-        <select name="exportacion_id" id="lote_exportacion" class="form-select">
-            <option value="">-- Seleccionar Exportación --</option>
-            {% for e in exportaciones %}
-                <option value="{{ e.id }}">{{ e }}</option>
-            {% endfor %}
-        </select>
-
-    </div>
+        </select>   
 
     <div class="modal-footer">
         <button class="btn btn-caramel">Guardar</button>
@@ -211,7 +205,7 @@ function editarLote(id, codigo, cantidad, fecha_produccion, fecha_vencimiento, p
     document.getElementById('lote_fecha_produccion').value  = fecha_produccion;
     document.getElementById('lote_fecha_vencimiento').value = fecha_vencimiento;
     document.getElementById('lote_produccion').value        = produccion_id;
-    document.getElementById('lote_exportacion').value       = exportacion_id;
+    
 
     // Abrir el modal con Bootstrap
     new bootstrap.Modal(document.getElementById('modalLote')).show();

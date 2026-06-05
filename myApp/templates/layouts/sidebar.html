@@ -66,14 +66,41 @@
                         <span>Dashboard</span>
                     </a>
                 </li>
+                <!-- EMPLEADOS — desplegable inline -->
+                <li class="dropdown-menu-custom {% if request.resolver_match.url_name == 'empleados' or request.resolver_match.url_name == 'empleados_supervisor' %}open{% endif %}">
 
-                <li>
-                    <a href="{% url 'empleados' %}"
-                       class="{% if request.resolver_match.url_name == 'empleados' %}active{% endif %}">
-                        <i class="fa-solid fa-users"></i>
-                        <span>Empleados</span>
-                    </a>
+                    <!-- BOTÓN -->
+                    <button class="dropdown-btn" onclick="this.parentElement.classList.toggle('open')">
+                        <div class="menu-left">
+                            <i class="fa-solid fa-users"></i>
+                            <span>Empleados</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down chevron-icon"></i>
+                    </button>
+
+                    <!-- SUBMENÚ -->
+                    <ul class="submenu">
+
+                        <li>
+                            <a href="{% url 'empleados' %}"
+                            class="{% if request.resolver_match.url_name == 'empleados' %}active{% endif %}">
+                                <i class="fa-solid fa-user-group"></i>
+                                <span>Empleados</span>
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{% url 'supervisores' %}"
+                            class="{% if request.resolver_match.url_name == 'empleados_supervisor' %}active{% endif %}">
+                                <i class="fa-solid fa-user-tie"></i>
+                                <span>Supervisor</span>
+                            </a>
+                        </li>
+
+                    </ul>
+
                 </li>
+
 
                 <li>
                     <a href="{% url 'turnos' %}"

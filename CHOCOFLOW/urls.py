@@ -25,6 +25,8 @@ urlpatterns = [
     path('empleados/inactivar/<int:id>/', views.inactivar_empleado, name='inactivar_empleado'),
     path('empleados/reporte/', views.generar_reporte_empleados, name='reporte_empleados'),
     path('empleados/supervisor/', views.empleados_supervisor, name='empleados_supervisor'),
+    path('supervisores/',views.gestionar_supervisores,name='supervisores'),
+    path('supervisores/reporte/',views.reporte_supervisores,name='reporte_supervisores'),
 
     # TURNOS
     path('turnos/', views.turnos, name='turnos'),

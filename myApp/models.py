@@ -5,11 +5,16 @@ from django.core.exceptions import ValidationError
 # -------------------------
 # Usuario
 # -------------------------
+# -------------------------
+# Usuario
+# -------------------------
 class Usuario(models.Model):
+
     ROL_CHOICES = [
         ('Administrador', 'Administrador'),
         ('Supervisor', 'Supervisor'),
     ]
+
     ESTADO_CHOICES = [
         ('Activo', 'Activo'),
         ('Inactivo', 'Inactivo'),
@@ -17,13 +22,46 @@ class Usuario(models.Model):
         ('Suspendido', 'Suspendido'),
     ]
 
-    nombre    = models.CharField(max_length=100)
-    email     = models.EmailField(unique=True, max_length=255)
-    telefono  = models.CharField(max_length=10, blank=True, null=True)
-    direccion = models.CharField(max_length=255)
-    contrasena = models.CharField(max_length=255)
-    rol       = models.CharField(max_length=20, choices=ROL_CHOICES)
-    estado    = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    nombre = models.CharField(max_length=100)
+
+    email = models.EmailField(
+        unique=True,
+        max_length=255
+    )
+
+    telefono = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True
+    )
+
+    direccion = models.CharField(
+        max_length=255
+    )
+
+    contrasena = models.CharField(
+        max_length=255
+    )
+
+    rol = models.CharField(
+        max_length=20,
+        choices=ROL_CHOICES
+    )
+
+    # TURNO ASIGNADO AL SUPERVISOR
+    turno = models.ForeignKey(
+        'Turno',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supervisores'
+    )
+
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='Activo'
+    )
 
     def __str__(self):
         return self.nombre

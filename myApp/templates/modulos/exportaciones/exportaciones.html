@@ -105,10 +105,11 @@
                         '{{ exp.destino }}',
                         '{{ exp.pais }}',
                         '{{ exp.nombre_producto }}',
+                        '{{ exp.lote }}',
                         '{{ exp.fecha_envio }}',
                         '{{ exp.fecha_entrega }}',
                         '{{ exp.estado }}',
-                        '{{ exp.produccion.id|default:'' }}'
+                        '{{ exp.produccion.id|default:''}}'
                     )">✏️
                 </button>
 
@@ -159,25 +160,27 @@
     <div class="modal-body">
 
         <input type="hidden" name="id" id="exp_id">
-
+        <label class="form-label">Destino</label>
         <input type="text" name="destino" id="exp_destino"
             class="form-control mb-2"
             placeholder="Destino" required>
-
+        <label class="form-label">País</label>
         <input type="text" name="pais" id="exp_pais"
             class="form-control mb-2"
             placeholder="País">
-
-        <input type="text" name="producto" id="exp_producto"
-            class="form-control mb-2"
-            placeholder="Producto">
-
+        <label class="form-label">Producto</label>
+            <input type="text"
+                name="nombre_producto"
+                id="exp_producto"
+                class="form-control mb-2"
+                placeholder="Producto">
+        <label class="form-label">Fecha de Envio</label>
         <input type="date" name="fecha_envio" id="exp_fecha_envio"
             class="form-control mb-2" required>
-
+        <label class="form-label">Fecha de Entrega</label>
         <input type="date" name="fecha_entrega" id="exp_fecha_entrega"
             class="form-control mb-2" required>
-
+        <label class="form-label">Estado</label>
         <select name="estado" id="exp_estado" class="form-select mb-2">
             <option value="Pendiente">Pendiente</option>
             <option value="Enviado">Enviado</option>
@@ -197,10 +200,15 @@
         </select>
 
         <!-- ================= LOTE (NUEVO) ================= -->
-        <label class="form-label mb-0">Lote</label>
-        <select name="lote_id" id="exp_lote"
-            class="form-select">
-            <option value="">-- Seleccione lote --</option>
+        <label class="form-label">Lote</label>
+        <select name="lote_id" id="exp_lote" class="form-select">
+            <option value="">-- Seleccionar lote --</option>
+
+            {% for lote in lotes %}
+                <option value="{{ lote.id }}">
+                    {{ lote.codigo_lote }}
+                </option>
+            {% endfor %}
         </select>
 
     </div>
@@ -231,17 +239,30 @@ function abrirModalNuevaExportacion() {
     new bootstrap.Modal(document.getElementById('modalExportacion')).show();
 }
 
-function editarExportacion(id, destino, pais, producto, fecha_envio, fecha_entrega, estado, produccionId) {
+function editarExportacion(
+    id,
+    destino,
+    pais,
+    producto,
+    lote,
+    fecha_envio,
+    fecha_entrega,
+    estado,
+    produccionId
+) {
     document.getElementById('exp_id').value = id;
     document.getElementById('exp_destino').value = destino;
     document.getElementById('exp_pais').value = pais;
     document.getElementById('exp_producto').value = producto;
+    document.getElementById('exp_lote').value = lote;
     document.getElementById('exp_fecha_envio').value = fecha_envio;
     document.getElementById('exp_fecha_entrega').value = fecha_entrega;
     document.getElementById('exp_estado').value = estado;
     document.getElementById('exp_produccion').value = produccionId;
 
-    new bootstrap.Modal(document.getElementById('modalExportacion')).show();
+    new bootstrap.Modal(
+        document.getElementById('modalExportacion')
+    ).show();
 }
 
 </script>

@@ -79,8 +79,6 @@ class Command(BaseCommand):
         turnos = [
             {'horario': 'Mañana 6:00am - 2:00pm'},
             {'horario': 'Tarde 2:00pm - 10:00pm'},
-            {'horario': 'Sábado Mañana 6:00am - 12:00pm'},
-            {'horario': 'Sábado Tarde 12:00pm - 6:00pm'},
         ]
 
         for t in turnos:
