@@ -10,10 +10,12 @@
 <section class="container mt-5">
 <div class="container-custom shadow">
 
+    {# ----------- Título principal del módulo ----------- #}
     <h2 class="text-center section-title mb-4">
         📦 Gestión de Exportaciones
     </h2>
 
+    {# ----------- Mensajes de alerta (éxito, error, etc.) ----------- #}
     {% for msg in messages %}
         <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
             {{ msg }}
@@ -21,26 +23,31 @@
         </div>
     {% endfor %}
 
-    <!-- ================= BOTÓN NUEVA EXPORTACIÓN (FUNCIONAL) ================= -->
+    {# ============================================================ #}
+    {#  CABECERA: botón nueva exportación + formulario de búsqueda  #}
+    {# ============================================================ #}
     <div class="cabecera-exportaciones">
 
-        <button type="button"
-            class="btn btn-caramel"
-            onclick="abrirModalNuevaExportacion()">
+        {# Botón que abre el modal para crear una nueva exportación #}
+        <button class="btn btn-caramel"
+            data-bs-toggle="modal"
+            data-bs-target="#modalExportacion">
             + Nueva Exportación
         </button>
 
+        {# Formulario de búsqueda por destino y filtro por estado #}
         <form method="GET" class="form-filtros">
             <input type="text" name="q" class="form-control"
                 placeholder="Buscar destino..."
                 value="{{ q }}">
 
+            {# Select para filtrar por estado de la exportación #}
             <select name="estado" class="form-select">
                 <option value="">Todos</option>
-                <option value="Pendiente" {% if estado_filtro == 'Pendiente' %}selected{% endif %}>Pendiente</option>
-                <option value="Enviado" {% if estado_filtro == 'Enviado' %}selected{% endif %}>Enviado</option>
-                <option value="Entregado" {% if estado_filtro == 'Entregado' %}selected{% endif %}>Entregado</option>
-                <option value="Cancelado" {% if estado_filtro == 'Cancelado' %}selected{% endif %}>Cancelado</option>
+                <option value="Pendiente"  {% if estado_filtro == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
+                <option value="Enviado"    {% if estado_filtro == 'Enviado'    %}selected{% endif %}>Enviado</option>
+                <option value="Entregado"  {% if estado_filtro == 'Entregado'  %}selected{% endif %}>Entregado</option>
+                <option value="Cancelado"  {% if estado_filtro == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
             </select>
 
             <button class="btn btn-choco">Filtrar</button>
@@ -48,7 +55,9 @@
 
     </div>
 
-    <!-- ================= TABLA ================= -->
+    {# ============================================================ #}
+    {#  TABLA de exportaciones registradas                          #}
+    {# ============================================================ #}
     <div class="table-responsive">
     <table class="table table-hover align-middle">
         <thead>
@@ -56,36 +65,29 @@
                 <th>Destino</th>
                 <th>País</th>
                 <th>Producto</th>
-                <th>Lote</th>
                 <th>Fecha Envío</th>
                 <th>Fecha Entrega</th>
                 <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
-
         <tbody>
 
+        {# Iterar sobre cada exportación recibida desde la vista #}
         {% for exp in exportaciones %}
         <tr>
             <td>{{ exp.destino }}</td>
+
+            {# Campo pais del modelo Exportacion #}
             <td>{{ exp.pais }}</td>
 
-            <!-- PRODUCTO -->
-            <td>{{ exp.nombre_producto }}</td>
-
-            <!-- LOTE (CORRECCIÓN IMPORTANTE) -->
-            <td>
-                {% if exp.produccion and exp.produccion.lote_set.all %}
-                    {{ exp.produccion.lote_set.first.codigo_lote }}
-                {% else %}
-                    <span class="text-muted">Sin lote</span>
-                {% endif %}
-            </td>
+            {# Campo producto del modelo Exportacion #}
+            <td>{{ exp.producto }}</td>
 
             <td>{{ exp.fecha_envio }}</td>
             <td>{{ exp.fecha_entrega }}</td>
 
+            {# Badge de color según el estado de la exportación #}
             <td>
                 {% if exp.estado == 'Pendiente' %}
                     <span class="badge bg-warning text-dark">{{ exp.estado }}</span>
@@ -94,25 +96,27 @@
                 {% elif exp.estado == 'Entregado' %}
                     <span class="badge bg-success">{{ exp.estado }}</span>
                 {% else %}
+                    {# Cubre: Cancelado #}
                     <span class="badge bg-danger">{{ exp.estado }}</span>
                 {% endif %}
             </td>
 
             <td>
+                {# Botón editar: pre-carga el modal con los datos de la exportación #}
                 <button class="btn btn-sm btn-primary"
                     onclick="editarExportacion(
                         '{{ exp.id }}',
                         '{{ exp.destino }}',
                         '{{ exp.pais }}',
-                        '{{ exp.nombre_producto }}',
-                        '{{ exp.lote }}',
+                        '{{ exp.producto }}',
                         '{{ exp.fecha_envio }}',
                         '{{ exp.fecha_entrega }}',
                         '{{ exp.estado }}',
-                        '{{ exp.produccion.id|default:''}}'
+                        '{{ exp.produccion.id|default:'' }}'
                     )">✏️
                 </button>
 
+                {# Botón cancelar: cambia estado a 'Cancelado', no borra el registro #}
                 <a href="{% url 'inactivar_exportacion' exp.id %}"
                    class="btn btn-sm btn-danger"
                    onclick="return confirm('¿Cancelar esta exportación?')">
@@ -121,9 +125,10 @@
             </td>
         </tr>
 
+        {# Mensaje cuando no existen exportaciones registradas #}
         {% empty %}
         <tr>
-            <td colspan="8" class="text-center">
+            <td colspan="7" class="text-center">
                 No hay exportaciones registradas.
             </td>
         </tr>
@@ -133,6 +138,7 @@
     </table>
     </div>
 
+    {# Botón para generar el reporte PDF, pasa los filtros activos como parámetros #}
     <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
         <a href="{% url 'reporte_exportaciones' %}?busqueda={{ q }}&estado={{ estado_filtro }}"
            class="btn btn-reporte custom-bottom-btn">
@@ -143,11 +149,15 @@
 </div>
 </section>
 
-<!-- ================= MODAL ================= -->
+
+{# ============================================================ #}
+{#  MODAL: Crear / Editar exportación                           #}
+{# ============================================================ #}
 <div class="modal fade" id="modalExportacion">
 <div class="modal-dialog">
 <div class="modal-content">
 
+    {# Formulario que envía datos a la vista guardar_exportacion vía POST #}
     <form method="POST" action="{% url 'guardar_exportacion' %}">
     {% csrf_token %}
 
@@ -159,28 +169,35 @@
 
     <div class="modal-body">
 
+        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
         <input type="hidden" name="id" id="exp_id">
-        <label class="form-label">Destino</label>
+
+        {# Campo: ciudad o lugar de destino de la exportación #}
         <input type="text" name="destino" id="exp_destino"
             class="form-control mb-2"
             placeholder="Destino" required>
-        <label class="form-label">País</label>
+
+        {# Campo: país de destino (campo pais del modelo) #}
         <input type="text" name="pais" id="exp_pais"
             class="form-control mb-2"
             placeholder="País">
-        <label class="form-label">Producto</label>
-            <input type="text"
-                name="nombre_producto"
-                id="exp_producto"
-                class="form-control mb-2"
-                placeholder="Producto">
-        <label class="form-label">Fecha de Envio</label>
+
+        {# Campo: nombre del producto exportado #}
+        <input type="text" name="producto" id="exp_producto"
+            class="form-control mb-2"
+            placeholder="Producto">
+
+        {# Campo: fecha en que se realiza el envío #}
+        <label class="form-label mb-0">Fecha de Envío</label>
         <input type="date" name="fecha_envio" id="exp_fecha_envio"
             class="form-control mb-2" required>
-        <label class="form-label">Fecha de Entrega</label>
+
+        {# Campo: fecha estimada de llegada al destino #}
+        <label class="form-label mb-0">Fecha de Entrega</label>
         <input type="date" name="fecha_entrega" id="exp_fecha_entrega"
             class="form-control mb-2" required>
-        <label class="form-label">Estado</label>
+
+        {# Select: estado actual de la exportación según ESTADO_CHOICES del modelo #}
         <select name="estado" id="exp_estado" class="form-select mb-2">
             <option value="Pendiente">Pendiente</option>
             <option value="Enviado">Enviado</option>
@@ -188,26 +205,12 @@
             <option value="Cancelado">Cancelado</option>
         </select>
 
-        <!-- ================= PRODUCCIÓN ================= -->
-        <label class="form-label mb-0">Producción</label>
-        <select name="produccion_id" id="exp_produccion"
-            class="form-select mb-2"
-            onchange="filtrarLotes(this.value)">
-            <option value="">-- Seleccione producción --</option>
+        {# Select: producción asociada a esta exportación (campo nullable en el modelo) #}
+        <label class="form-label mb-0">Producción asociada</label>
+        <select name="produccion_id" id="exp_produccion" class="form-select">
+            <option value="">-- Sin producción --</option>
             {% for p in producciones %}
                 <option value="{{ p.id }}">{{ p }}</option>
-            {% endfor %}
-        </select>
-
-        <!-- ================= LOTE (NUEVO) ================= -->
-        <label class="form-label">Lote</label>
-        <select name="lote_id" id="exp_lote" class="form-select">
-            <option value="">-- Seleccionar lote --</option>
-
-            {% for lote in lotes %}
-                <option value="{{ lote.id }}">
-                    {{ lote.codigo_lote }}
-                </option>
             {% endfor %}
         </select>
 
@@ -223,48 +226,27 @@
 </div>
 </div>
 </div>
-<!-- ================= JS ================= -->
+
+
+{# ============================================================ #}
+{#  SCRIPT: pre-carga los datos de una exportación en el modal  #}
+{#  para poder editarla                                         #}
+{# ============================================================ #}
 <script>
+function editarExportacion(id, destino, pais, producto, fecha_envio, fecha_entrega, estado, produccionId) {
+    // Asignar los valores recibidos a cada campo del modal
+    document.getElementById('exp_id').value            = id;
+    document.getElementById('exp_destino').value       = destino;
+    document.getElementById('exp_pais').value          = pais;
+    document.getElementById('exp_producto').value      = producto;
+    document.getElementById('exp_fecha_envio').value   = fecha_envio;
+    document.getElementById('exp_fecha_entrega').value = fecha_entrega;
+    document.getElementById('exp_estado').value        = estado;
+    document.getElementById('exp_produccion').value    = produccionId;
 
-function abrirModalNuevaExportacion() {
-    document.getElementById('exp_id').value = '';
-    document.getElementById('exp_destino').value = '';
-    document.getElementById('exp_pais').value = '';
-    document.getElementById('exp_producto').value = '';
-    document.getElementById('exp_fecha_envio').value = '';
-    document.getElementById('exp_fecha_entrega').value = '';
-    document.getElementById('exp_estado').value = 'Pendiente';
-    document.getElementById('exp_produccion').value = '';
-
+    // Abrir el modal con Bootstrap
     new bootstrap.Modal(document.getElementById('modalExportacion')).show();
 }
-
-function editarExportacion(
-    id,
-    destino,
-    pais,
-    producto,
-    lote,
-    fecha_envio,
-    fecha_entrega,
-    estado,
-    produccionId
-) {
-    document.getElementById('exp_id').value = id;
-    document.getElementById('exp_destino').value = destino;
-    document.getElementById('exp_pais').value = pais;
-    document.getElementById('exp_producto').value = producto;
-    document.getElementById('exp_lote').value = lote;
-    document.getElementById('exp_fecha_envio').value = fecha_envio;
-    document.getElementById('exp_fecha_entrega').value = fecha_entrega;
-    document.getElementById('exp_estado').value = estado;
-    document.getElementById('exp_produccion').value = produccionId;
-
-    new bootstrap.Modal(
-        document.getElementById('modalExportacion')
-    ).show();
-}
-
 </script>
 
 {% endblock %}

@@ -91,7 +91,6 @@
           <th>Producto</th>
           <th>Fecha Envío</th>
           <th>Fecha Entrega</th>
-          <th>Lote</th>
           <th>Estado</th>
         </tr>
       </thead>
@@ -110,7 +109,6 @@
           <td style="font-size:0.85rem; color:#666;">{{ exp.producto }}</td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.fecha_envio }}</td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.fecha_entrega }}</td>
-          <td style="font-size:0.85rem; color:#666;">{{ exp.lote }}</td>
           <td>
             {% if exp.estado == 'Pendiente' %}
               <span class="badge bg-warning text-dark">{{ exp.estado }}</span>

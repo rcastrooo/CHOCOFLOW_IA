@@ -2,61 +2,32 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>{% block title %}ChocoFlow{% endblock %}</title>
-
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-    <!-- CSS GLOBAL -->
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
-
-    <!-- CSS EXTRA -->
     {% block extra_css %}{% endblock %}
-
 </head>
-
 <body>
-
 <div class="layout">
 
-    <!-- =========================
-         SIDEBAR
-    ========================== -->
     <aside class="sidebar">
-
-        <!-- TOP -->
         <div class="sidebar-top">
-
-            <!-- LOGO -->
             <div class="logo">
-                <div class="logo-icon">
-                    <i class="fa-solid fa-cube"></i>
-                </div>
+                <div class="logo-icon"><i class="fa-solid fa-cube"></i></div>
                 <div class="logo-texto">
                     <h2>ChocoFlow</h2>
                     <span>Sistema Inteligente</span>
                 </div>
             </div>
-
         </div>
-        <!-- /sidebar-top -->
 
-        <!-- MENÚ -->
         <ul class="menu">
 
-            <!-- =========================
-                 ADMINISTRADOR
-            ========================== -->
+            <!-- ========================= ADMINISTRADOR ========================== -->
             {% if request.session.rol == 'Administrador' %}
 
                 <li>
@@ -66,10 +37,9 @@
                         <span>Dashboard</span>
                     </a>
                 </li>
-                <!-- EMPLEADOS — desplegable inline -->
-                <li class="dropdown-menu-custom {% if request.resolver_match.url_name == 'empleados' or request.resolver_match.url_name == 'empleados_supervisor' %}open{% endif %}">
 
-                    <!-- BOTÓN -->
+                <!-- EMPLEADOS — desplegable -->
+                <li class="dropdown-menu-custom {% if request.resolver_match.url_name in 'empleados,gestionar_supervisores' %}open{% endif %}">
                     <button class="dropdown-btn" onclick="this.parentElement.classList.toggle('open')">
                         <div class="menu-left">
                             <i class="fa-solid fa-users"></i>
@@ -77,30 +47,23 @@
                         </div>
                         <i class="fa-solid fa-chevron-down chevron-icon"></i>
                     </button>
-
-                    <!-- SUBMENÚ -->
                     <ul class="submenu">
-
+                        <li>
+                            <a href="{% url 'gestionar_supervisores' %}"
+                               class="{% if request.resolver_match.url_name == 'gestionar_supervisores' %}active{% endif %}">
+                                <i class="bi bi-file-person-fill"></i>
+                                <span>Supervisores</span>
+                            </a>
+                        </li>
                         <li>
                             <a href="{% url 'empleados' %}"
-                            class="{% if request.resolver_match.url_name == 'empleados' %}active{% endif %}">
-                                <i class="fa-solid fa-user-group"></i>
-                                <span>Empleados</span>
+                               class="{% if request.resolver_match.url_name == 'empleados' %}active{% endif %}">
+                                <i class="bi bi-cookie"></i>
+                                <span>Personal de Planta</span>
                             </a>
                         </li>
-
-                        <li>
-                            <a href="{% url 'supervisores' %}"
-                            class="{% if request.resolver_match.url_name == 'empleados_supervisor' %}active{% endif %}">
-                                <i class="fa-solid fa-user-tie"></i>
-                                <span>Supervisor</span>
-                            </a>
-                        </li>
-
                     </ul>
-
                 </li>
-
 
                 <li>
                     <a href="{% url 'turnos' %}"
@@ -152,9 +115,7 @@
 
             {% endif %}
 
-            <!-- =========================
-                 SUPERVISOR
-            ========================== -->
+            <!-- ========================= SUPERVISOR ========================== -->
             {% if request.session.rol == 'Supervisor' %}
 
                 <li>
@@ -213,10 +174,8 @@
                     </a>
                 </li>
 
-                <!-- BITÁCORA — desplegable inline (sin menú flotante) -->
+                <!-- BITÁCORA SUPERVISOR — desplegable -->
                 <li class="dropdown-menu-custom {% if request.resolver_match.url_name == 'bitacora_supervisor' or request.resolver_match.url_name == 'listar_bitacoras_supervisor' %}open{% endif %}">
-
-                    <!-- BOTÓN que abre/cierra el submenú -->
                     <button class="dropdown-btn" onclick="this.parentElement.classList.toggle('open')">
                         <div class="menu-left">
                             <i class="fa-solid fa-book"></i>
@@ -224,10 +183,7 @@
                         </div>
                         <i class="fa-solid fa-chevron-down chevron-icon"></i>
                     </button>
-
-                    <!-- SUBMENÚ INLINE -->
                     <ul class="submenu">
-
                         <li>
                             <a href="{% url 'bitacora_supervisor' %}"
                                class="{% if request.resolver_match.url_name == 'bitacora_supervisor' %}active{% endif %}">
@@ -235,7 +191,6 @@
                                 <span>Nueva Bitácora</span>
                             </a>
                         </li>
-
                         <li>
                             <a href="{% url 'listar_bitacoras_supervisor' %}"
                                class="{% if request.resolver_match.url_name == 'listar_bitacoras_supervisor' %}active{% endif %}">
@@ -243,71 +198,91 @@
                                 <span>Historial</span>
                             </a>
                         </li>
-
                     </ul>
-
                 </li>
-                <!-- /BITÁCORA -->
 
             {% endif %}
 
         </ul>
-        <!-- /menu -->
 
-        <!-- =========================
-             FOOTER SIDEBAR
-        ========================== -->
+        <!-- FOOTER SIDEBAR -->
         <div class="sidebar-bottom">
-
-            <!-- PERFIL -->
             <div class="perfil-sidebar">
-                <div class="perfil-avatar">
-                    <i class="fa-solid fa-user"></i>
-                </div>
+                <div class="perfil-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="perfil-info">
                     <h4>{{ usuario_nombre }}</h4>
                     <span>{{ request.session.rol }}</span>
                 </div>
             </div>
-
-            <!-- LOGOUT -->
             <a href="{% url 'logout' %}" class="logout-btn">
                 <i class="fa-solid fa-right-from-bracket"></i>
                 <span>Cerrar sesión</span>
             </a>
-
         </div>
-        <!-- /sidebar-bottom -->
-
     </aside>
-    <!-- /sidebar -->
 
-    <!-- =========================
-         CONTENIDO PRINCIPAL
-    ========================== -->
     <main class="content">
-
-        <!-- TOPBAR -->
         <div class="topbar">
             {% if request.session.rol == 'Administrador' %}
             <a href="{% url 'registro' %}" class="topbar-btn" title="Agregar persona">
                 <i class="bi bi-person-fill-add"></i>
             </a>
-            <a href="{% url 'empleados' %}" class="topbar-btn" title="Notificaciones">
-                <i class="bi bi-bell-fill"></i>
+            <a href="{% url 'registro' %}" class="topbar-btn" title="Enviar correos">
+                <i class="bi bi-envelope-at-fill"></i>
             </a>
+            <div class="notif-wrapper" id="notifWrapper">
+                <button class="topbar-btn notif-btn" id="notifBtn" title="Notificaciones">
+                    <i class="bi bi-bell-fill"></i>
+                    {% if bitacoras_pendientes > 0 %}
+                    <span class="notif-badge">{{ bitacoras_pendientes }}</span>
+                    {% endif %}
+                </button>
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        <span>Notificaciones</span>
+                        {% if bitacoras_pendientes > 0 %}
+                        <span class="notif-count-label">{{ bitacoras_pendientes }} pendiente{{ bitacoras_pendientes|pluralize }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="notif-body">
+                        {% if bitacoras_pendientes > 0 %}
+                        <a href="{% url 'listar_bitacoras' %}" class="notif-item">
+                            <div class="notif-icon-wrap"><i class="fa-solid fa-book"></i></div>
+                            <div class="notif-texto">
+                                <strong>Bitácoras pendientes</strong>
+                                <span>Tienes {{ bitacoras_pendientes }} bitácora{{ bitacoras_pendientes|pluralize }} por revisar</span>
+                            </div>
+                        </a>
+                        {% else %}
+                        <div class="notif-empty">
+                            <i class="bi bi-check-circle"></i>
+                            <span>Sin notificaciones</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
             {% endif %}
         </div>
-        <!-- /TOPBAR -->
 
         {% block content %}{% endblock %}
     </main>
 
 </div>
-<!-- /layout -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    if (notifBtn) {
+        notifBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('show');
+        });
+        document.addEventListener('click', () => notifDropdown.classList.remove('show'));
+        notifDropdown.addEventListener('click', (e) => e.stopPropagation());
+    }
+</script>
 {% block scripts %}{% endblock %}
-
 </body>
 </html>

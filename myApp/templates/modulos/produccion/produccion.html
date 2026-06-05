@@ -104,39 +104,25 @@
 
             <td>
               
-                {% if p.estado == 'Finalizado' %}
+                <button class="btn btn-sm btn-primary"
+                    onclick="editarProduccion(
+                        '{{ p.id }}',
+                        '{{ p.producto }}',
+                        '{{ p.ingredientes }}',
+                        '{{ p.cantidad_requerida }}',
+                        '{{ p.fecha_entrega|date:"Y-m-d" }}',
+                        '{{ p.fecha_limite|date:"Y-m-d" }}',
+                        '{{ p.estado }}',
+                        '{{ p.empleado_responsable.id }}'
+                    )">✏️
+                </button>
 
-                    <button class="btn btn-secondary btn-sm" disabled>
-                        ✏️
-                    </button>
-
-                    <button class="btn btn-secondary btn-sm" disabled>
-                        🗑️
-                    </button>
-
-                    {% else %}
-
-                    <button class="btn btn-primary btn-sm"
-                            onclick="editarProduccion(
-                                '{{ p.id }}',
-                                '{{ p.producto|escapejs }}',
-                                '{{ p.ingredientes|escapejs }}',
-                                '{{ p.cantidad_requerida }}',
-                                '{{ p.fecha_entrega|date:'Y-m-d' }}',
-                                '{{ p.fecha_limite|date:'Y-m-d' }}',
-                                '{{ p.estado }}',
-                                '{{ p.empleado_responsable.id }}'
-                            )">
-                        ✏️
-                    </button>
-
-                    <a href="{% url 'inactivar_produccion' p.id %}"
-                    class="btn btn-danger btn-sm"
-                    onclick="return confirm('¿Cancelar esta producción?')">
-                    🗑️
-                    </a>
-
-                    {% endif %}
+                
+                <a href="{% url 'inactivar_produccion' p.id %}"
+                   class="btn btn-sm btn-danger"
+                   onclick="return confirm('¿Cancelar esta producción?')">
+                   🗑️
+                </a>
             </td>
         </tr>
 
