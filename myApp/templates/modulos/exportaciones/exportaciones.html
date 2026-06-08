@@ -5,247 +5,668 @@
 
 {% block content %}
 
-<link rel="stylesheet" href="{% static 'css/exportaciones.css' %}">
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<section class="container mt-5">
-<div class="container-custom shadow">
+<div class="main-content">
 
-    {# ----------- Título principal del módulo ----------- #}
-    <h2 class="text-center section-title mb-4">
-        📦 Gestión de Exportaciones
-    </h2>
+  <div class="topbar" style="margin-bottom:0;">
+    <span class="topbar-title">
+      <i class="bi bi-box-seam"></i> GESTIÓN DE EXPORTACIONES
+    </span>
+  </div>
 
-    {# ----------- Mensajes de alerta (éxito, error, etc.) ----------- #}
+  <div class="bienvenida">
+    <h5><i class="bi bi-airplane"></i> Exportaciones</h5>
+    <p>Registra y controla las exportaciones, destinos, contenedores y estados de envío.</p>
+  </div>
+
+  {% if messages %}
     {% for msg in messages %}
-        <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
-            {{ msg }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
     {% endfor %}
+  {% endif %}
 
-    {# ============================================================ #}
-    {#  CABECERA: botón nueva exportación + formulario de búsqueda  #}
-    {# ============================================================ #}
-    <div class="cabecera-exportaciones">
-
-        {# Botón que abre el modal para crear una nueva exportación #}
-        <button class="btn btn-caramel"
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <button class="btn-choco"
+            style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;"
             data-bs-toggle="modal"
-            data-bs-target="#modalExportacion">
-            + Nueva Exportación
-        </button>
+            data-bs-target="#modalExportacion"
+            onclick="limpiarModal()">
+      <i class="bi bi-plus-lg"></i> Nueva Exportación
+    </button>
 
-        {# Formulario de búsqueda por destino y filtro por estado #}
-        <form method="GET" class="form-filtros">
-            <input type="text" name="q" class="form-control"
-                placeholder="Buscar destino..."
-                value="{{ q }}">
+    <form method="GET" class="d-flex gap-2 flex-wrap">
+      <input type="text" name="q" class="form-control"
+             placeholder="Buscar destino..."
+             value="{{ q }}"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:180px;">
+      <select name="estado" class="form-select"
+              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:140px;">
+        <option value="">Todos</option>
+        <option value="Pendiente"  {% if estado_filtro == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
+        <option value="Enviado"    {% if estado_filtro == 'Enviado'    %}selected{% endif %}>Enviado</option>
+        <option value="Entregado"  {% if estado_filtro == 'Entregado'  %}selected{% endif %}>Entregado</option>
+        <option value="Cancelado"  {% if estado_filtro == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
+      </select>
+      <button class="btn-caramel"
+              style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </form>
+  </div>
 
-            {# Select para filtrar por estado de la exportación #}
-            <select name="estado" class="form-select">
-                <option value="">Todos</option>
-                <option value="Pendiente"  {% if estado_filtro == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
-                <option value="Enviado"    {% if estado_filtro == 'Enviado'    %}selected{% endif %}>Enviado</option>
-                <option value="Entregado"  {% if estado_filtro == 'Entregado'  %}selected{% endif %}>Entregado</option>
-                <option value="Cancelado"  {% if estado_filtro == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
-            </select>
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Listado de exportaciones
+  </h6>
 
-            <button class="btn btn-choco">Filtrar</button>
-        </form>
-
-    </div>
-
-    {# ============================================================ #}
-    {#  TABLA de exportaciones registradas                          #}
-    {# ============================================================ #}
-    <div class="table-responsive">
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Destino</th>
-                <th>País</th>
-                <th>Producto</th>
-                <th>Fecha Envío</th>
-                <th>Fecha Entrega</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-
-        {# Iterar sobre cada exportación recibida desde la vista #}
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Destino</th>
+          <th>País</th>
+          <th>Producto</th>
+          <th>Lote</th>
+          <th>Empresa</th>
+          <th>Nº Contenedor</th>
+          <th>Cajas</th>
+          <th>Peso Total</th>
+          <th>Fecha Envío</th>
+          <th>Fecha Entrega</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
         {% for exp in exportaciones %}
         <tr>
-            <td>{{ exp.destino }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-globe" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ exp.destino }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.pais }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.nombre_producto|default:"—" }}</td>
 
-            {# Campo pais del modelo Exportacion #}
-            <td>{{ exp.pais }}</td>
+          <!-- ═══════════════════════════════════════════════════════════
+               COLUMNA LOTE — muestra ID + código del lote asociado.
+               
+               USA SOLO UNA de las dos opciones según tu modelo:
+               
+               OPCIÓN A: Exportacion tiene FK directa a Lote (exp.lote)
+               OPCIÓN B: Lote tiene FK a Exportacion (relación inversa lote_set)
+               
+               Borra la opción que NO uses.
+          ══════════════════════════════════════════════════════════════ -->
 
-            {# Campo producto del modelo Exportacion #}
-            <td>{{ exp.producto }}</td>
+          {# ── OPCIÓN A: exp.lote  (FK directa en Exportacion → Lote) ── #}
+          <td style="font-size:0.85rem; color:#666;">
+            {% if exp.lote %}
+              <span class="badge" style="background:#f0e6dc; color:#603C1C; font-size:0.78rem;">
+                #{{ exp.lote.id }} — {{ exp.lote.codigo_lote }}
+              </span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
 
-            <td>{{ exp.fecha_envio }}</td>
-            <td>{{ exp.fecha_entrega }}</td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% with lote=exp.lote_set.first %}
+              {% if lote %}
+                <span class="badge" style="background:#f0e6dc; color:#603C1C; font-size:0.78rem;">
+                  #{{ lote.id }} — {{ lote.codigo_lote }}
+                </span>
+              {% else %}
+                —
+              {% endif %}
+            {% endwith %}
+          </td>
+          #}
 
-            {# Badge de color según el estado de la exportación #}
-            <td>
-                {% if exp.estado == 'Pendiente' %}
-                    <span class="badge bg-warning text-dark">{{ exp.estado }}</span>
-                {% elif exp.estado == 'Enviado' %}
-                    <span class="badge bg-primary">{{ exp.estado }}</span>
-                {% elif exp.estado == 'Entregado' %}
-                    <span class="badge bg-success">{{ exp.estado }}</span>
-                {% else %}
-                    {# Cubre: Cancelado #}
-                    <span class="badge bg-danger">{{ exp.estado }}</span>
-                {% endif %}
-            </td>
-
-            <td>
-                {# Botón editar: pre-carga el modal con los datos de la exportación #}
-                <button class="btn btn-sm btn-primary"
+          <td style="font-size:0.85rem; color:#666;">{{ exp.empresa_exportadora|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.numero_contenedor|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if exp.cantidad_cajas %}
+              {{ exp.cantidad_cajas }}{% if exp.unidades_por_caja %} ({{ exp.unidades_por_caja }} u/c){% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if exp.peso_total %}{{ exp.peso_total }} kg{% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.fecha_envio }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.fecha_entrega }}</td>
+          <td>
+            {% if exp.estado == 'Pendiente' %}
+              <span class="badge bg-warning text-dark">{{ exp.estado }}</span>
+            {% elif exp.estado == 'Enviado' %}
+              <span class="badge bg-primary">{{ exp.estado }}</span>
+            {% elif exp.estado == 'Entregado' %}
+              <span class="badge bg-success">{{ exp.estado }}</span>
+            {% else %}
+              <span class="badge bg-danger">{{ exp.estado }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1"
+                    style="border-radius:8px;" title="Editar"
                     onclick="editarExportacion(
-                        '{{ exp.id }}',
-                        '{{ exp.destino }}',
-                        '{{ exp.pais }}',
-                        '{{ exp.producto }}',
-                        '{{ exp.fecha_envio }}',
-                        '{{ exp.fecha_entrega }}',
-                        '{{ exp.estado }}',
-                        '{{ exp.produccion.id|default:'' }}'
-                    )">✏️
-                </button>
-
-                {# Botón cancelar: cambia estado a 'Cancelado', no borra el registro #}
-                <a href="{% url 'inactivar_exportacion' exp.id %}"
-                   class="btn btn-sm btn-danger"
-                   onclick="return confirm('¿Cancelar esta exportación?')">
-                   🗑️
-                </a>
-            </td>
+                      '{{ exp.id }}',
+                      '{{ exp.destino|escapejs }}',
+                      '{{ exp.pais|escapejs }}',
+                      '{{ exp.nombre_producto|default:""|escapejs }}',
+                      '{{ exp.fecha_envio|date:"Y-m-d" }}',
+                      '{{ exp.fecha_entrega|date:"Y-m-d" }}',
+                      '{{ exp.estado }}',
+                      '{{ exp.produccion.id|default:"" }}',
+                      '{% with lote=exp.lote_set.first %}{{ lote.id|default:"" }}{% endwith %}',
+                      '{{ exp.cantidad_cajas|default:"" }}',
+                      '{{ exp.unidades_por_caja|default:"" }}',
+                      '{{ exp.peso_caja|default:"" }}',
+                      '{{ exp.peso_total|default:"" }}',
+                      '{{ exp.empresa_exportadora|default:""|escapejs }}',
+                      '{{ exp.numero_contenedor|default:""|escapejs }}',
+                      '{{ exp.observaciones|default:""|escapejs }}'
+                    )">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <a href="{% url 'inactivar_exportacion' exp.id %}"
+               class="btn btn-sm btn-outline-danger"
+               style="border-radius:8px;" title="Cancelar"
+               onclick="return confirm('¿Cancelar esta exportación?')">
+              <i class="bi bi-trash"></i>
+            </a>
+          </td>
         </tr>
-
-        {# Mensaje cuando no existen exportaciones registradas #}
         {% empty %}
         <tr>
-            <td colspan="7" class="text-center">
-                No hay exportaciones registradas.
-            </td>
+          <td colspan="12" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No hay exportaciones registradas
+          </td>
         </tr>
         {% endfor %}
-
-        </tbody>
+      </tbody>
     </table>
-    </div>
+  </div>
 
-    {# Botón para generar el reporte PDF, pasa los filtros activos como parámetros #}
-    <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
-        <a href="{% url 'reporte_exportaciones' %}?busqueda={{ q }}&estado={{ estado_filtro }}"
-           class="btn btn-reporte custom-bottom-btn">
-            📄 Generar Reporte
-        </a>
-    </div>
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'reporte_exportaciones' %}?busqueda={{ q }}&estado={{ estado_filtro }}"
+       class="btn-choco"
+       style="border-radius:12px; padding:0 20px; text-decoration:none; font-size:0.88rem; height:44px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-file-earmark-text"></i> Generar Reporte
+    </a>
+  </div>
+
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    La fecha de entrega no puede ser anterior a la fecha de envío. Destino y país solo admiten letras.
+  </p>
 
 </div>
-</section>
 
+<!-- MODAL -->
+<div class="modal fade" id="modalExportacion" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+      <form method="POST" action="{% url 'guardar_exportacion' %}" id="formExportacion" novalidate>
+        {% csrf_token %}
 
-{# ============================================================ #}
-{#  MODAL: Crear / Editar exportación                           #}
-{# ============================================================ #}
-<div class="modal fade" id="modalExportacion">
-<div class="modal-dialog">
-<div class="modal-content">
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title" id="modalTitulo">
+            <i class="bi bi-plus-circle"></i> Nueva Exportación
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
 
-    {# Formulario que envía datos a la vista guardar_exportacion vía POST #}
-    <form method="POST" action="{% url 'guardar_exportacion' %}">
-    {% csrf_token %}
+        <div class="modal-body" style="background:#fdf9f6;">
+          <input type="hidden" name="id" id="exp_id">
 
-    <div class="modal-header">
-        <h5 class="modal-title">Exportación</h5>
-        <button type="button" class="btn-close btn-close-white"
-                data-bs-dismiss="modal"></button>
+          <!-- Fila 1: destino + país -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Destino <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="destino" id="exp_destino"
+                     class="form-control" placeholder="Ej: Nueva York" maxlength="255"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-destino"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                País <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="pais" id="exp_pais"
+                     class="form-control" placeholder="Ej: Estados Unidos" maxlength="255"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-pais"></div>
+            </div>
+          </div>
+
+          <!-- Fila 2: producto + empresa -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Nombre del Producto
+              </label>
+              <input type="text" name="nombre_producto" id="exp_nombre_producto"
+                     class="form-control" placeholder="Ej: Chocolate negro 70%" maxlength="100"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-nombre_producto"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Empresa Exportadora
+              </label>
+              <input type="text" name="empresa_exportadora" id="exp_empresa"
+                     class="form-control" placeholder="Ej: ChocoFlow S.A.S" maxlength="100"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+            </div>
+          </div>
+
+          <!-- Fila 3: contenedor + estado -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Número de Contenedor
+              </label>
+              <input type="text" name="numero_contenedor" id="exp_contenedor"
+                     class="form-control" placeholder="Ej: CONT-00123" maxlength="100"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Estado <span class="text-danger">*</span>
+              </label>
+              <select name="estado" id="exp_estado" class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="Pendiente">Pendiente</option>
+                <option value="Enviado">Enviado</option>
+                <option value="Entregado">Entregado</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Fila 4: cajas + unidades -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Cantidad de Cajas
+              </label>
+              <input type="text" name="cantidad_cajas" id="exp_cantidad_cajas"
+                     class="form-control" placeholder="Ej: 100" maxlength="10" inputmode="numeric"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-cantidad_cajas"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Unidades por Caja
+              </label>
+              <input type="text" name="unidades_por_caja" id="exp_unidades_caja"
+                     class="form-control" placeholder="Ej: 12" maxlength="10" inputmode="numeric"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-unidades_por_caja"></div>
+            </div>
+          </div>
+
+          <!-- Fila 5: pesos -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Peso por Caja (kg)
+              </label>
+              <input type="text" name="peso_caja" id="exp_peso_caja"
+                     class="form-control" placeholder="Ej: 5.50" maxlength="10"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-peso_caja"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Peso Total (kg)
+              </label>
+              <input type="text" name="peso_total" id="exp_peso_total"
+                     class="form-control" placeholder="Ej: 550.00" maxlength="10"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-peso_total"></div>
+            </div>
+          </div>
+
+          <!-- Fila 6: fechas -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Fecha de Envío <span class="text-danger">*</span>
+              </label>
+              <input type="date" name="fecha_envio" id="exp_fecha_envio"
+                     class="form-control"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-fecha_envio"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Fecha de Entrega <span class="text-danger">*</span>
+              </label>
+              <input type="date" name="fecha_entrega" id="exp_fecha_entrega"
+                     class="form-control"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-fecha_entrega"></div>
+            </div>
+          </div>
+
+          <!-- Fila 7: producción + lote -->
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Producción Asociada
+              </label>
+              <select name="produccion_id" id="exp_produccion" class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="">-- Sin producción --</option>
+                {% for p in producciones %}
+                  <option value="{{ p.id }}" data-fecha="{{ p.fecha_entrega|date:'Y-m-d' }}">{{ p }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Lote Asociado
+              </label>
+              <select name="lote_id" id="exp_lote" class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="">-- Sin lote --</option>
+                {% for lote in lotes %}
+                  <option value="{{ lote.id }}"
+                          data-produccion="{{ lote.produccion.id }}">
+                    #{{ lote.id }} — {{ lote.codigo_lote }}{% if lote.nombre_producto %} — {{ lote.nombre_producto }}{% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback" id="err-lote"></div>
+            </div>
+          </div>
+
+          <!-- Fila 8: observaciones -->
+          <div class="row">
+            <div class="col-md-12 mb-1">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Observaciones
+              </label>
+              <textarea name="observaciones" id="exp_observaciones"
+                        class="form-control" rows="3"
+                        placeholder="Notas adicionales sobre la exportación..."
+                        style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; resize:vertical;"></textarea>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
+            <i class="bi bi-save"></i> Guardar
+          </button>
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px; padding:8px 16px;" data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
+      </form>
     </div>
-
-    <div class="modal-body">
-
-        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
-        <input type="hidden" name="id" id="exp_id">
-
-        {# Campo: ciudad o lugar de destino de la exportación #}
-        <input type="text" name="destino" id="exp_destino"
-            class="form-control mb-2"
-            placeholder="Destino" required>
-
-        {# Campo: país de destino (campo pais del modelo) #}
-        <input type="text" name="pais" id="exp_pais"
-            class="form-control mb-2"
-            placeholder="País">
-
-        {# Campo: nombre del producto exportado #}
-        <input type="text" name="producto" id="exp_producto"
-            class="form-control mb-2"
-            placeholder="Producto">
-
-        {# Campo: fecha en que se realiza el envío #}
-        <label class="form-label mb-0">Fecha de Envío</label>
-        <input type="date" name="fecha_envio" id="exp_fecha_envio"
-            class="form-control mb-2" required>
-
-        {# Campo: fecha estimada de llegada al destino #}
-        <label class="form-label mb-0">Fecha de Entrega</label>
-        <input type="date" name="fecha_entrega" id="exp_fecha_entrega"
-            class="form-control mb-2" required>
-
-        {# Select: estado actual de la exportación según ESTADO_CHOICES del modelo #}
-        <select name="estado" id="exp_estado" class="form-select mb-2">
-            <option value="Pendiente">Pendiente</option>
-            <option value="Enviado">Enviado</option>
-            <option value="Entregado">Entregado</option>
-            <option value="Cancelado">Cancelado</option>
-        </select>
-
-        {# Select: producción asociada a esta exportación (campo nullable en el modelo) #}
-        <label class="form-label mb-0">Producción asociada</label>
-        <select name="produccion_id" id="exp_produccion" class="form-select">
-            <option value="">-- Sin producción --</option>
-            {% for p in producciones %}
-                <option value="{{ p.id }}">{{ p }}</option>
-            {% endfor %}
-        </select>
-
-    </div>
-
-    <div class="modal-footer">
-        <button class="btn btn-caramel">Guardar</button>
-        <button type="button" class="btn btn-secondary"
-            data-bs-dismiss="modal">Cancelar</button>
-    </div>
-
-    </form>
-</div>
-</div>
+  </div>
 </div>
 
-
-{# ============================================================ #}
-{#  SCRIPT: pre-carga los datos de una exportación en el modal  #}
-{#  para poder editarla                                         #}
-{# ============================================================ #}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function editarExportacion(id, destino, pais, producto, fecha_envio, fecha_entrega, estado, produccionId) {
-    // Asignar los valores recibidos a cada campo del modal
-    document.getElementById('exp_id').value            = id;
-    document.getElementById('exp_destino').value       = destino;
-    document.getElementById('exp_pais').value          = pais;
-    document.getElementById('exp_producto').value      = producto;
-    document.getElementById('exp_fecha_envio').value   = fecha_envio;
-    document.getElementById('exp_fecha_entrega').value = fecha_entrega;
-    document.getElementById('exp_estado').value        = estado;
-    document.getElementById('exp_produccion').value    = produccionId;
+const RX_TEXTO = /^[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s]+$/;
 
-    // Abrir el modal con Bootstrap
+// ── Solo letras en destino y país ────────────────────────────────
+['exp_destino', 'exp_pais'].forEach(id => {
+    document.getElementById(id).addEventListener('keypress', function(e) {
+        if (!/[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s]/.test(e.key)) e.preventDefault();
+    });
+});
+
+// ── Solo números en enteros ──────────────────────────────────────
+['exp_cantidad_cajas', 'exp_unidades_caja'].forEach(id => {
+    document.getElementById(id).addEventListener('keypress', function(e) {
+        if (!/\d/.test(e.key) && e.key !== 'Backspace') e.preventDefault();
+    });
+    document.getElementById(id).addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '');
+    });
+});
+
+// ── Solo decimales en pesos ──────────────────────────────────────
+['exp_peso_caja', 'exp_peso_total'].forEach(id => {
+    document.getElementById(id).addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+    });
+});
+
+// ── Al elegir producción, filtra los lotes disponibles ──────────
+document.getElementById('exp_produccion').addEventListener('change', function() {
+    const prodId   = this.value;
+    const lotesSel = document.getElementById('exp_lote');
+
+    Array.from(lotesSel.options).forEach(opt => {
+        if (!opt.value) return;
+        opt.hidden = prodId ? opt.dataset.produccion !== prodId : false;
+    });
+    lotesSel.value = '';
+});
+
+// ── Validación al enviar ─────────────────────────────────────────
+document.getElementById('formExportacion').addEventListener('submit', function(e) {
+    let valido = true;
+
+    // Destino
+    const destino    = document.getElementById('exp_destino');
+    const errDestino = document.getElementById('err-destino');
+    if (!destino.value.trim()) {
+        destino.classList.add('is-invalid');
+        errDestino.textContent = 'El destino es obligatorio.';
+        valido = false;
+    } else if (!RX_TEXTO.test(destino.value.trim())) {
+        destino.classList.add('is-invalid');
+        errDestino.textContent = 'El destino solo puede contener letras.';
+        valido = false;
+    } else {
+        destino.classList.remove('is-invalid');
+        destino.classList.add('is-valid');
+        errDestino.textContent = '';
+    }
+
+    // País
+    const pais    = document.getElementById('exp_pais');
+    const errPais = document.getElementById('err-pais');
+    if (!pais.value.trim()) {
+        pais.classList.add('is-invalid');
+        errPais.textContent = 'El país es obligatorio.';
+        valido = false;
+    } else if (!RX_TEXTO.test(pais.value.trim())) {
+        pais.classList.add('is-invalid');
+        errPais.textContent = 'El país solo puede contener letras.';
+        valido = false;
+    } else {
+        pais.classList.remove('is-invalid');
+        pais.classList.add('is-valid');
+        errPais.textContent = '';
+    }
+
+    // Nombre producto (opcional, solo letras si se llena)
+    const producto    = document.getElementById('exp_nombre_producto');
+    const errProducto = document.getElementById('err-nombre_producto');
+    if (producto.value.trim() && !RX_TEXTO.test(producto.value.trim())) {
+        producto.classList.add('is-invalid');
+        errProducto.textContent = 'El nombre del producto solo puede contener letras.';
+        valido = false;
+    } else {
+        producto.classList.remove('is-invalid');
+        errProducto.textContent = '';
+    }
+
+    // Cantidad cajas (opcional, entero positivo)
+    const cajas    = document.getElementById('exp_cantidad_cajas');
+    const errCajas = document.getElementById('err-cantidad_cajas');
+    if (cajas.value.trim() && (!/^\d+$/.test(cajas.value.trim()) || parseInt(cajas.value) <= 0)) {
+        cajas.classList.add('is-invalid');
+        errCajas.textContent = 'Debe ser un número entero positivo.';
+        valido = false;
+    } else {
+        cajas.classList.remove('is-invalid');
+        errCajas.textContent = '';
+    }
+
+    // Unidades por caja (opcional, entero positivo)
+    const unidades    = document.getElementById('exp_unidades_caja');
+    const errUnidades = document.getElementById('err-unidades_por_caja');
+    if (unidades.value.trim() && (!/^\d+$/.test(unidades.value.trim()) || parseInt(unidades.value) <= 0)) {
+        unidades.classList.add('is-invalid');
+        errUnidades.textContent = 'Debe ser un número entero positivo.';
+        valido = false;
+    } else {
+        unidades.classList.remove('is-invalid');
+        errUnidades.textContent = '';
+    }
+
+    // Peso caja (opcional, decimal positivo)
+    const pesoCaja    = document.getElementById('exp_peso_caja');
+    const errPesoCaja = document.getElementById('err-peso_caja');
+    if (pesoCaja.value.trim() && (isNaN(parseFloat(pesoCaja.value)) || parseFloat(pesoCaja.value) <= 0)) {
+        pesoCaja.classList.add('is-invalid');
+        errPesoCaja.textContent = 'Debe ser un número decimal positivo. Ej: 5.50';
+        valido = false;
+    } else {
+        pesoCaja.classList.remove('is-invalid');
+        errPesoCaja.textContent = '';
+    }
+
+    // Peso total (opcional, decimal positivo)
+    const pesoTotal    = document.getElementById('exp_peso_total');
+    const errPesoTotal = document.getElementById('err-peso_total');
+    if (pesoTotal.value.trim() && (isNaN(parseFloat(pesoTotal.value)) || parseFloat(pesoTotal.value) <= 0)) {
+        pesoTotal.classList.add('is-invalid');
+        errPesoTotal.textContent = 'Debe ser un número decimal positivo. Ej: 550.00';
+        valido = false;
+    } else {
+        pesoTotal.classList.remove('is-invalid');
+        errPesoTotal.textContent = '';
+    }
+
+    // Fecha envío
+    const fechaEnvio    = document.getElementById('exp_fecha_envio');
+    const errFechaEnvio = document.getElementById('err-fecha_envio');
+    if (!fechaEnvio.value) {
+        fechaEnvio.classList.add('is-invalid');
+        errFechaEnvio.textContent = 'La fecha de envío es obligatoria.';
+        valido = false;
+    } else {
+        fechaEnvio.classList.remove('is-invalid');
+        errFechaEnvio.textContent = '';
+    }
+
+    // Fecha entrega
+    const fechaEntrega    = document.getElementById('exp_fecha_entrega');
+    const errFechaEntrega = document.getElementById('err-fecha_entrega');
+    if (!fechaEntrega.value) {
+        fechaEntrega.classList.add('is-invalid');
+        errFechaEntrega.textContent = 'La fecha de entrega es obligatoria.';
+        valido = false;
+    } else if (fechaEnvio.value && fechaEntrega.value < fechaEnvio.value) {
+        fechaEntrega.classList.add('is-invalid');
+        errFechaEntrega.textContent = 'La fecha de entrega no puede ser anterior a la de envío.';
+        valido = false;
+    } else {
+        fechaEntrega.classList.remove('is-invalid');
+        errFechaEntrega.textContent = '';
+    }
+
+    // Validar que el lote pertenece a la producción seleccionada
+    const lote       = document.getElementById('exp_lote');
+    const errLote    = document.getElementById('err-lote');
+    const produccion = document.getElementById('exp_produccion');
+    if (lote.value && produccion.value) {
+        const selectedLote = lote.options[lote.selectedIndex];
+        if (selectedLote.dataset.produccion !== produccion.value) {
+            lote.classList.add('is-invalid');
+            errLote.textContent = 'El lote seleccionado no pertenece a la producción elegida.';
+            valido = false;
+        } else {
+            lote.classList.remove('is-invalid');
+            errLote.textContent = '';
+        }
+    } else {
+        lote.classList.remove('is-invalid');
+        if (errLote) errLote.textContent = '';
+    }
+
+    if (!valido) e.preventDefault();
+});
+
+// ── Limpiar clases en vivo ───────────────────────────────────────
+['exp_destino','exp_pais','exp_nombre_producto','exp_cantidad_cajas',
+ 'exp_unidades_caja','exp_peso_caja','exp_peso_total',
+ 'exp_fecha_envio','exp_fecha_entrega','exp_lote'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('input',  function() { this.classList.remove('is-invalid'); });
+        el.addEventListener('change', function() { this.classList.remove('is-invalid'); });
+    }
+});
+
+// ── Editar ───────────────────────────────────────────────────────
+function editarExportacion(id, destino, pais, nombreProducto, fechaEnvio,
+                            fechaEntrega, estado, produccionId, loteId,
+                            cantidadCajas, unidadesCaja, pesoCaja, pesoTotal,
+                            empresa, contenedor, observaciones) {
+    limpiarModal();
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-pencil-square"></i> Editar Exportación';
+    document.getElementById('exp_id').value              = id;
+    document.getElementById('exp_destino').value         = destino;
+    document.getElementById('exp_pais').value            = pais;
+    document.getElementById('exp_nombre_producto').value = nombreProducto;
+    document.getElementById('exp_fecha_envio').value     = fechaEnvio;
+    document.getElementById('exp_fecha_entrega').value   = fechaEntrega;
+    document.getElementById('exp_estado').value          = estado;
+    document.getElementById('exp_produccion').value      = produccionId;
+    document.getElementById('exp_lote').value            = loteId;
+    document.getElementById('exp_cantidad_cajas').value  = cantidadCajas;
+    document.getElementById('exp_unidades_caja').value   = unidadesCaja;
+    document.getElementById('exp_peso_caja').value       = pesoCaja;
+    document.getElementById('exp_peso_total').value      = pesoTotal;
+    document.getElementById('exp_empresa').value         = empresa;
+    document.getElementById('exp_contenedor').value      = contenedor;
+    document.getElementById('exp_observaciones').value   = observaciones;
     new bootstrap.Modal(document.getElementById('modalExportacion')).show();
+}
+
+// ── Limpiar ──────────────────────────────────────────────────────
+function limpiarModal() {
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-plus-circle"></i> Nueva Exportación';
+    ['exp_id','exp_destino','exp_pais','exp_nombre_producto','exp_fecha_envio',
+     'exp_fecha_entrega','exp_cantidad_cajas','exp_unidades_caja','exp_peso_caja',
+     'exp_peso_total','exp_empresa','exp_contenedor','exp_observaciones'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.value = ''; el.classList.remove('is-invalid','is-valid'); }
+    });
+    document.getElementById('exp_estado').value     = 'Pendiente';
+    document.getElementById('exp_produccion').value = '';
+    document.getElementById('exp_lote').value       = '';
+    ['err-destino','err-pais','err-nombre_producto','err-cantidad_cajas',
+     'err-unidades_por_caja','err-peso_caja','err-peso_total',
+     'err-fecha_envio','err-fecha_entrega','err-lote'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
 }
 </script>
 

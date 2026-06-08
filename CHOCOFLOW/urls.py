@@ -85,4 +85,8 @@ urlpatterns = [
     path('bitacora/enviar/<int:id>/', views.enviar_bitacora, name='enviar_bitacora'),
     path('bitacora/admin/', views.listar_bitacoras, name='listar_bitacoras'),
     path('bitacora/revisar/<int:id>/', views.revisar_bitacora, name='revisar_bitacora'),
+    
+    #CORREOS
+    path('correos/', views.correos_vista, name='correos_vista'),
+    path('correos/enviar/', views.enviar_correos_masivos, name='enviar_correos_masivos'),
 ]

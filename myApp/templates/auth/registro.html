@@ -17,15 +17,15 @@
 
 <div class="login-wrapper registro">
 
-    <!-- ══ PANEL IZQUIERDO ══════════════════════════════════ -->
+    <!-- PANEL IZQUIERDO -->
     <div class="login-left">
         <div class="deco-icon">🍫</div>
         <h1>¡Únete a<br>ChocoFlow!</h1>
-        <p>Aquí podras Registrar<br>Nuevos Empleados</p>
+        <p>Aquí podrás registrar<br>nuevos usuarios</p>
         <a href="{% url 'dashboard' %}" class="btn-register">Volver al Dashboard</a>
     </div>
 
-    <!-- ══ PANEL DERECHO ════════════════════════════════════ -->
+    <!-- PANEL DERECHO -->
     <div class="login-right">
 
         <h2 class="form-title">Crear Cuenta</h2>
@@ -40,82 +40,84 @@
         <form method="POST" action="{% url 'registro' %}">
             {% csrf_token %}
 
-            <!-- ID / Documento -->
+            <!-- Identificación -->
             <div class="input-group-custom">
-                <input type="text" name="identificacion" class="form-control-login" placeholder="ID / Documento" required>
+                <input type="text" name="identificacion" class="form-control-login"
+                       placeholder="ID / Documento" required>
                 <span class="input-icon">🪪</span>
             </div>
 
             <!-- Nombre -->
             <div class="input-group-custom">
-                <input type="text" name="nombre" class="form-control-login" placeholder="Nombre completo" required>
+                <input type="text" name="nombre" class="form-control-login"
+                       placeholder="Nombre completo" required>
                 <span class="input-icon">👤</span>
             </div>
 
             <!-- Correo -->
             <div class="input-group-custom">
-                <input type="email" name="correo" class="form-control-login" placeholder="Correo electrónico" required>
+                <input type="email" name="correo" class="form-control-login"
+                       placeholder="Correo electrónico" required>
                 <span class="input-icon">✉️</span>
             </div>
 
             <!-- Teléfono -->
             <div class="input-group-custom">
-                <input type="tel" name="telefono" class="form-control-login" placeholder="Teléfono" required>
+                <input type="tel" name="telefono" class="form-control-login"
+                       placeholder="Teléfono">
                 <span class="input-icon">📞</span>
             </div>
 
             <!-- Dirección -->
             <div class="input-group-custom">
-                <input type="text" name="direccion" class="form-control-login" placeholder="Dirección" required>
+                <input type="text" name="direccion" class="form-control-login"
+                       placeholder="Dirección" required>
                 <span class="input-icon">📍</span>
             </div>
 
             <!-- Contraseña -->
             <div class="input-group-custom">
-                <input
-                    type="password"
-                    name="password"
-                    id="password-registro"
-                    class="form-control-login"
-                    placeholder="Contraseña"
-                    required
-                >
-                <span class="input-icon toggle-password" onclick="togglePassword('password-registro', this)" title="Mostrar/ocultar contraseña">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c49a6c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <input type="password" name="password" id="password-registro"
+                       class="form-control-login" placeholder="Contraseña" required>
+                <span class="input-icon toggle-password"
+                      onclick="togglePassword('password-registro', this)"
+                      title="Mostrar/ocultar contraseña">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="#c49a6c" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
                         <path class="eye-top" d="M2 12 C6 6, 18 6, 22 12"/>
                         <path class="eye-bot" d="M2 12 C6 18, 18 18, 22 12"/>
-                        <circle class="eye-pupil" cx="12" cy="12" r="2.8" fill="#c49a6c" stroke="none"/>
+                        <circle class="eye-pupil" cx="12" cy="12" r="2.8"
+                                fill="#c49a6c" stroke="none"/>
                     </svg>
                 </span>
             </div>
 
             <!-- Rol -->
-<div class="input-group-custom">
-    <select name="rol" id="rol-select" class="form-control-login" required onchange="toggleTurno()">
-        <option value="">Seleccione rol</option>
-        <option value="Administrador">Administrador</option>
-        <option value="Supervisor">Supervisor</option>
-    </select>
-</div>
+            <div class="input-group-custom">
+                <select name="rol" id="rol-select" class="form-control-login"
+                        required onchange="toggleTurno()">
+                    <option value="">Seleccione rol</option>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Supervisor">Supervisor</option>
+                </select>
+            </div>
 
-<!-- Turno (solo si es Supervisor) -->
-<div class="input-group-custom" id="turno-field" style="display:none;">
-    <select name="turno" id="turno-select" class="form-control-login">
-        <option value="">Seleccione turno</option>
-        <option value="Mañana 6:00am - 2:00pm">Mañana 6:00am - 2:00pm</option>
-        <option value="Tarde 2:00pm - 10:00pm">Tarde 2:00pm - 10:00pm</option>
-    </select>
-</div>
+            <!-- Turno (solo si es Supervisor) -->
+            <div class="input-group-custom" id="turno-field" style="display:none;">
+                <select name="turno" id="turno-select" class="form-control-login">
+                    <option value="">Seleccione turno</option>
+                    <option value="Mañana 6:00am - 2:00pm">Mañana 6:00am - 2:00pm</option>
+                    <option value="Tarde 2:00pm - 10:00pm">Tarde 2:00pm - 10:00pm</option>
+                </select>
+            </div>
 
-<!-- Estado -->
-<div class="input-group-custom">
-    <select name="estado" class="form-control-login" required>
-        <option value="Activo" selected>Activo</option>
-        <option value="Inactivo">Inactivo</option>
-        <option value="Suspendido">Suspendido</option>
-        <option value="Incapacitado">Incapacitado</option>
-    </select>
-</div>
+            <!-- Botón submit -->
+            <!-- Botón submit -->
+<button type="submit"
+        style="width:100%; margin-top:12px; padding:14px; background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none; border-radius:12px; font-size:1rem; font-weight:600; cursor:pointer; letter-spacing:0.03em;">
+    Registrar usuario
+</button>
 
         </form>
     </div>

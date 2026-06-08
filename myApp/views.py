@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
@@ -34,6 +34,7 @@ from .models import (
     Lote,
     Exportacion,
     Bitacora,
+    HistorialCorreo,
 )
 
 # ========================
@@ -322,6 +323,38 @@ def dashboard(request):
 
 
 # ======================================================
+# HELPERS DE TURNO SUPERVISOR
+# ======================================================
+
+def get_turno_supervisor(usuario_id):
+    try:
+        usuario = Usuario.objects.get(id=usuario_id)
+        return usuario.turno  # ej: 'Mañana 6:00am - 2:00pm'
+    except Usuario.DoesNotExist:
+        return None
+
+
+def get_empleados_de_turno_supervisor(turno_horario):
+    from datetime import timedelta
+    hoy     = timezone.now().date()
+    lunes   = hoy - timedelta(days=hoy.weekday())
+    domingo = lunes + timedelta(days=6)
+
+    try:
+        turno_obj = Turno.objects.get(horario=turno_horario)
+    except Turno.DoesNotExist:
+        return []
+
+    ids = RotacionTurno.objects.filter(
+        turno=turno_obj,
+        fecha_inicio__lte=domingo,
+        fecha_fin__gte=lunes,
+    ).values_list('empleado_id', flat=True)
+
+    return list(ids)
+
+
+# ======================================================
 # GESTIÓN DE SUPERVISORES
 # ======================================================
 
@@ -464,7 +497,9 @@ def carga_masiva_supervisores(request):
             )
 
     import csv as csv_module
-    reader  = csv_module.DictReader(BytesIO(contenido.encode()).read().decode().__class__(contenido).splitlines())
+    reader  = csv_module.DictReader(
+        BytesIO(contenido.encode()).read().decode().__class__(contenido).splitlines()
+    )
     headers = [h.strip().lower() for h in (reader.fieldnames or [])]
 
     REQUERIDOS = ['nombre', 'email', 'contrasena', 'estado']
@@ -476,7 +511,7 @@ def carga_masiva_supervisores(request):
         )
 
     ESTADOS_VALIDOS = {'Activo', 'Inactivo', 'Suspendido', 'Incapacitado'}
-    TURNOS_VALIDOS = {'Mañana 6:00am - 2:00pm', 'Tarde 2:00pm - 10:00pm'}
+    TURNOS_VALIDOS  = {'Mañana 6:00am - 2:00pm', 'Tarde 2:00pm - 10:00pm'}
     patron_correo   = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
 
     creados  = 0
@@ -512,6 +547,15 @@ def carga_masiva_supervisores(request):
         if Usuario.objects.filter(email=email).exists():
             omitidos += 1
             continue
+
+        # Crear usuario Django para el login
+        if not User.objects.filter(email=email).exists():
+            User.objects.create_user(
+                username   = email,
+                email      = email,
+                password   = contrasena,
+                first_name = nombre,
+            )
 
         Usuario.objects.create(
             nombre     = nombre,
@@ -614,6 +658,70 @@ def dashboard_supervisor(request):
 
     return render(request, 'dashboard_supervisor.html', context)
 
+
+# ========================
+# API STATS SUPERVISOR
+# ========================
+
+@login_required(login_url='login')
+def api_stats_supervisor(request):
+
+    hoy           = timezone.now().date()
+    usuario_id    = request.session.get('usuario_id')
+    turno_horario = get_turno_supervisor(usuario_id)
+
+    if turno_horario:
+        ids_empleados = get_empleados_de_turno_supervisor(turno_horario)
+    else:
+        ids_empleados = []
+
+    empleados_de_mi_turno = Empleado.objects.filter(id__in=ids_empleados)
+
+    sin_turno = Empleado.objects.filter(
+        estado='Activo'
+    ).exclude(
+        id__in=RotacionTurno.objects.values_list('empleado_id', flat=True)
+    ).count()
+
+    turno = Turno.objects.filter(horario=turno_horario).first() if turno_horario else None
+
+    data = {
+        'total_empleados':          empleados_de_mi_turno.count(),
+        'empleados_activos':        empleados_de_mi_turno.filter(estado='Activo').count(),
+        'asignaciones_hoy':         Asignacion.objects.filter(
+                                        fecha_asignacion=hoy,
+                                        empleado_id__in=ids_empleados
+                                    ).count(),
+        'sin_turno':                sin_turno,
+        'lotes_totales':            Lote.objects.filter(
+                                        produccion__empleado_responsable_id__in=ids_empleados
+                                    ).count(),
+        'exportaciones_pendientes': Exportacion.objects.filter(
+                                        estado='Pendiente',
+                                        produccion__empleado_responsable_id__in=ids_empleados
+                                    ).count(),
+        'exportaciones_enviadas':   Exportacion.objects.filter(
+                                        estado='Enviado',
+                                        produccion__empleado_responsable_id__in=ids_empleados
+                                    ).count(),
+        'bitacora_hoy':             Bitacora.objects.filter(
+                                        fecha_registro=hoy,
+                                        supervisor_id=usuario_id
+                                    ).count(),
+        'bitacora_pendientes':      Bitacora.objects.filter(
+                                        fecha_registro=hoy,
+                                        estado='Borrador',
+                                        supervisor_id=usuario_id
+                                    ).count(),
+        'bitacora_enviados':        Bitacora.objects.filter(
+                                        fecha_registro=hoy,
+                                        estado='Enviado',
+                                        supervisor_id=usuario_id
+                                    ).count(),
+        'turno_nombre':             turno.horario if turno else 'Sin turno asignado',
+    }
+
+    return JsonResponse(data)
 
 # ========================
 # API STATS SUPERVISOR
@@ -1699,6 +1807,7 @@ def guardar_produccion(request):
             messages.error(request, "Los ingredientes son obligatorios.")
             return redirect('producciones')
 
+        # Validar que fecha_limite no sea anterior a fecha_entrega
         if fecha_limite < fecha_entrega:
             messages.error(request, "La fecha límite no puede ser anterior a la fecha de entrega.")
             return redirect('producciones')
@@ -1710,12 +1819,12 @@ def guardar_produccion(request):
         else:
             produccion = Produccion()
 
-        produccion.producto             = producto
-        produccion.ingredientes         = ingredientes
-        produccion.cantidad_requerida   = cantidad_requerida
-        produccion.fecha_entrega        = fecha_entrega
-        produccion.fecha_limite         = fecha_limite
-        produccion.estado               = estado
+        produccion.producto           = producto
+        produccion.ingredientes       = ingredientes
+        produccion.cantidad_requerida = cantidad_requerida
+        produccion.fecha_entrega      = fecha_entrega
+        produccion.fecha_limite       = fecha_limite
+        produccion.estado             = estado
         produccion.empleado_responsable = empleado
         produccion.creado_por           = usuario_perfil
 
@@ -1730,12 +1839,20 @@ def guardar_produccion(request):
 
 @login_required(login_url='login')
 def inactivar_produccion(request, id):
-    produccion        = get_object_or_404(Produccion, id=id)
+    produccion = get_object_or_404(Produccion, id=id)
+
+    # Validar ANTES de modificar nada
+    if produccion.estado == 'Finalizado':
+        messages.error(
+            request,
+            "No se puede cancelar una producción finalizada."
+        )
+        return redirect('producciones')
+
     produccion.estado = 'Cancelado'
     produccion.save()
     messages.success(request, "Producción cancelada.")
     return redirect('producciones')
-
 
 @login_required(login_url='login')
 def generar_reporte_producciones(request):
@@ -1890,60 +2007,177 @@ def exportaciones_supervisor(request):
 def guardar_exportacion(request):
     if request.method == 'POST':
 
+        import re
+        from datetime import datetime
+        from decimal import Decimal, InvalidOperation
+
         usuario_id = request.session.get('usuario_id')
         if not usuario_id:
             messages.error(request, "Sesión inválida.")
             return redirect('login')
+
         try:
             Usuario.objects.get(id=usuario_id)
         except Usuario.DoesNotExist:
             messages.error(request, "No se encontró tu perfil.")
             return redirect('login')
 
-        exp_id        = request.POST.get('id', '').strip()
-        destino       = request.POST.get('destino', '').strip()
-        pais          = request.POST.get('pais', 'Colombia').strip()
-        producto      = request.POST.get('producto', '').strip()
-        fecha_envio   = request.POST.get('fecha_envio', '').strip()
-        fecha_entrega = request.POST.get('fecha_entrega', '').strip()
-        estado        = request.POST.get('estado', '').strip()
-        produccion_id = request.POST.get('produccion_id', '').strip()
+        exp_id               = request.POST.get('id', '').strip()
+        destino              = request.POST.get('destino', '').strip()
+        pais                 = request.POST.get('pais', '').strip()
+        nombre_producto      = request.POST.get('nombre_producto', '').strip()
+        fecha_envio          = request.POST.get('fecha_envio', '').strip()
+        fecha_entrega        = request.POST.get('fecha_entrega', '').strip()
+        estado               = request.POST.get('estado', '').strip()
+        produccion_id        = request.POST.get('produccion_id', '').strip()
+        lote_id              = request.POST.get('lote_id', '').strip()
+        cantidad_cajas       = request.POST.get('cantidad_cajas', '').strip()
+        unidades_por_caja    = request.POST.get('unidades_por_caja', '').strip()
+        peso_caja            = request.POST.get('peso_caja', '').strip()
+        peso_total           = request.POST.get('peso_total', '').strip()
+        empresa_exportadora  = request.POST.get('empresa_exportadora', '').strip()
+        numero_contenedor    = request.POST.get('numero_contenedor', '').strip()
+        observaciones        = request.POST.get('observaciones', '').strip()
 
-        if not destino or not fecha_envio or not fecha_entrega or not estado:
-            messages.error(request, "Destino, fechas y estado son obligatorios.")
+        # ── 1. Campos de texto obligatorios ────────────────────────────────────
+        if not all([destino, pais, fecha_envio, fecha_entrega, estado]):
+            messages.error(request, "Los campos Destino, País, Fechas y Estado son obligatorios.")
             return redirect('gestionar_exportaciones')
 
-        if fecha_entrega < fecha_envio:
-            messages.error(request, 'La fecha de entrega no puede ser anterior a la de envío.')
+        # ── 2. Producción y Lote OBLIGATORIOS ──────────────────────────────────
+        if not produccion_id:
+            messages.error(request, "Debes seleccionar una producción asociada.")
             return redirect('gestionar_exportaciones')
 
-        produccion = Produccion.objects.filter(id=produccion_id).first() if produccion_id else None
+        if not lote_id:
+            messages.error(request, "Debes seleccionar un lote asociado.")
+            return redirect('gestionar_exportaciones')
 
-        if exp_id:
-            exp               = get_object_or_404(Exportacion, pk=exp_id)
-            exp.destino       = destino
-            exp.pais          = pais
-            exp.producto      = producto
-            exp.fecha_envio   = fecha_envio
-            exp.fecha_entrega = fecha_entrega
-            exp.estado        = estado
-            exp.produccion    = produccion
-            exp.save()
-            messages.success(request, 'Exportación actualizada correctamente.')
-        else:
-            Exportacion.objects.create(
-                destino       = destino,
-                pais          = pais,
-                producto      = producto,
-                fecha_envio   = fecha_envio,
-                fecha_entrega = fecha_entrega,
-                estado        = estado,
-                produccion    = produccion,
+        # ── 3. Solo letras en destino y país ───────────────────────────────────
+        patron_texto = r'^[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s]+$'
+        if not re.match(patron_texto, destino):
+            messages.error(request, "El destino solo puede contener letras.")
+            return redirect('gestionar_exportaciones')
+        if not re.match(patron_texto, pais):
+            messages.error(request, "El país solo puede contener letras.")
+            return redirect('gestionar_exportaciones')
+        if nombre_producto and not re.match(patron_texto, nombre_producto):
+            messages.error(request, "El nombre del producto solo puede contener letras.")
+            return redirect('gestionar_exportaciones')
+
+        # ── 4. Enteros opcionales ──────────────────────────────────────────────
+        cantidad_cajas_val = None
+        if cantidad_cajas:
+            if not cantidad_cajas.isdigit() or int(cantidad_cajas) <= 0:
+                messages.error(request, "La cantidad de cajas debe ser un número entero positivo.")
+                return redirect('gestionar_exportaciones')
+            cantidad_cajas_val = int(cantidad_cajas)
+
+        unidades_por_caja_val = None
+        if unidades_por_caja:
+            if not unidades_por_caja.isdigit() or int(unidades_por_caja) <= 0:
+                messages.error(request, "Las unidades por caja deben ser un número entero positivo.")
+                return redirect('gestionar_exportaciones')
+            unidades_por_caja_val = int(unidades_por_caja)
+
+        # ── 5. Decimales opcionales ────────────────────────────────────────────
+        peso_caja_val = None
+        if peso_caja:
+            try:
+                peso_caja_val = Decimal(peso_caja)
+                if peso_caja_val <= 0:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                messages.error(request, "El peso por caja debe ser un número decimal positivo.")
+                return redirect('gestionar_exportaciones')
+
+        peso_total_val = None
+        if peso_total:
+            try:
+                peso_total_val = Decimal(peso_total)
+                if peso_total_val <= 0:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                messages.error(request, "El peso total debe ser un número decimal positivo.")
+                return redirect('gestionar_exportaciones')
+
+        # ── 6. Parsear fechas de la exportación ────────────────────────────────
+        try:
+            fecha_envio_obj   = datetime.strptime(fecha_envio, '%Y-%m-%d').date()
+            fecha_entrega_obj = datetime.strptime(fecha_entrega, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, "Las fechas ingresadas no son válidas.")
+            return redirect('gestionar_exportaciones')
+
+        if fecha_entrega_obj < fecha_envio_obj:
+            messages.error(request, "La fecha de entrega no puede ser anterior a la fecha de envío.")
+            return redirect('gestionar_exportaciones')
+
+        # ── 7. Validar Producción y sus fechas ─────────────────────────────────
+        produccion = get_object_or_404(Produccion, pk=produccion_id)
+
+        # La fecha de envío no puede ser anterior a la fecha de entrega de la producción
+        if fecha_envio_obj < produccion.fecha_entrega:
+            messages.error(
+                request,
+                f"La fecha de envío ({fecha_envio_obj}) no puede ser anterior a la fecha "
+                f"de entrega de la producción ({produccion.fecha_entrega})."
             )
-            messages.success(request, 'Exportación creada correctamente.')
+            return redirect('gestionar_exportaciones')
+
+        # ── 8. Validar Lote y sus fechas ───────────────────────────────────────
+        lote = get_object_or_404(Lote, pk=lote_id)
+
+        # El lote debe pertenecer a la producción seleccionada
+        if lote.produccion_id != produccion.id:
+            messages.error(request, "El lote seleccionado no pertenece a la producción elegida.")
+            return redirect('gestionar_exportaciones')
+
+        # La fecha de envío no puede ser anterior a la fecha de producción del lote
+        if fecha_envio_obj < lote.fecha_produccion:
+            messages.error(
+                request,
+                f"La fecha de envío ({fecha_envio_obj}) no puede ser anterior a la fecha "
+                f"de producción del lote ({lote.fecha_produccion})."
+            )
+            return redirect('gestionar_exportaciones')
+
+        # La fecha de entrega de la exportación no puede superar la fecha de vencimiento del lote
+        if fecha_entrega_obj > lote.fecha_vencimiento:
+            messages.error(
+                request,
+                f"La fecha de entrega ({fecha_entrega_obj}) no puede ser posterior a la fecha "
+                f"de vencimiento del lote ({lote.fecha_vencimiento})."
+            )
+            return redirect('gestionar_exportaciones')
+
+        # ── 9. Guardar ─────────────────────────────────────────────────────────
+        if exp_id:
+            exp = get_object_or_404(Exportacion, pk=exp_id)
+        else:
+            exp = Exportacion()
+
+        exp.destino             = destino
+        exp.pais                = pais
+        exp.nombre_producto     = nombre_producto or None
+        exp.fecha_envio         = fecha_envio_obj
+        exp.fecha_entrega       = fecha_entrega_obj
+        exp.estado              = estado
+        exp.produccion          = produccion
+        exp.lote                = lote
+        exp.cantidad_cajas      = cantidad_cajas_val
+        exp.unidades_por_caja   = unidades_por_caja_val
+        exp.peso_caja           = peso_caja_val
+        exp.peso_total          = peso_total_val
+        exp.empresa_exportadora = empresa_exportadora or None
+        exp.numero_contenedor   = numero_contenedor or None
+        exp.observaciones       = observaciones or None
+        exp.save()
+
+        accion = "actualizada" if exp_id else "creada"
+        messages.success(request, f"Exportación {accion} correctamente.")
 
     return redirect('gestionar_exportaciones')
-
 
 @login_required(login_url='login')
 def inactivar_exportacion(request, id):
@@ -2071,50 +2305,93 @@ def guardar_lote(request):
             return redirect('login')
 
         lote_id           = request.POST.get('id', '').strip()
-        codigo_lote       = request.POST.get('codigo_lote', '').strip()
+        codigo_lote       = request.POST.get('codigo_lote', '').strip().upper()
+        origen_cacao      = request.POST.get('origen_cacao', '').strip()
         cantidad          = request.POST.get('cantidad', '').strip()
+        unidad            = request.POST.get('unidad', '').strip()
+        nombre_producto   = request.POST.get('nombre_producto', '').strip()
         fecha_produccion  = request.POST.get('fecha_produccion', '').strip()
         fecha_vencimiento = request.POST.get('fecha_vencimiento', '').strip()
         produccion_id     = request.POST.get('produccion_id', '').strip()
         exportacion_id    = request.POST.get('exportacion_id', '').strip()
 
-        if not all([codigo_lote, cantidad, fecha_produccion, fecha_vencimiento, produccion_id, exportacion_id]):
-            messages.error(request, "Todos los campos son obligatorios.")
+        # Campos obligatorios (produccion_id incluido)
+        if not all([codigo_lote, cantidad, fecha_produccion, fecha_vencimiento, produccion_id]):
+            messages.error(request, "Todos los campos obligatorios deben estar completos, incluyendo la producción.")
             return redirect('gestionar_lotes')
 
-        if fecha_vencimiento < fecha_produccion:
-            messages.error(request, "La fecha de vencimiento no puede ser anterior a la de producción.")
+        # Formato código XX-000
+        if not re.fullmatch(r'[A-Z]{2}-\d{3}', codigo_lote):
+            messages.error(request, "El código debe tener el formato XX-000 (2 letras y 3 números). Ej: CH-001, AB-123.")
             return redirect('gestionar_lotes')
 
-        produccion  = get_object_or_404(Produccion,  pk=produccion_id)
-        exportacion = get_object_or_404(Exportacion, pk=exportacion_id)
+        # Cantidad numérica
+        if not cantidad.isdigit():
+            messages.error(request, "La cantidad debe contener únicamente números.")
+            return redirect('gestionar_lotes')
 
+        # Unidad válida
+        if unidad not in ['Kilogramos', 'Gramos', '']:
+            messages.error(request, "La unidad seleccionada no es válida.")
+            return redirect('gestionar_lotes')
+
+        # Fechas
+        try:
+            fecha_prod = datetime.strptime(fecha_produccion, '%Y-%m-%d').date()
+            fecha_venc = datetime.strptime(fecha_vencimiento, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, "Las fechas ingresadas no son válidas.")
+            return redirect('gestionar_lotes')
+
+        # Producción obligatoria
+        produccion = get_object_or_404(Produccion, pk=produccion_id)
+
+        # Fecha de producción del lote debe coincidir con fecha de entrega de la producción
+        if fecha_prod != produccion.fecha_entrega:
+            messages.error(
+                request,
+                f"La fecha de producción del lote ({fecha_prod}) debe coincidir "
+                f"con la fecha de entrega de la producción seleccionada ({produccion.fecha_entrega})."
+            )
+            return redirect('gestionar_lotes')
+
+        # Fecha vencimiento no anterior a fecha de producción
+        if fecha_venc < fecha_prod:
+            messages.error(request, "La fecha de vencimiento no puede ser anterior a la fecha de producción.")
+            return redirect('gestionar_lotes')
+
+        # Exportación opcional
+        exportacion = None
+        if exportacion_id:
+            exportacion = get_object_or_404(Exportacion, pk=exportacion_id)
+
+        # Editar o crear
         if lote_id:
-            lote                   = get_object_or_404(Lote, pk=lote_id)
-            lote.codigo_lote       = codigo_lote
-            lote.cantidad          = cantidad
-            lote.fecha_produccion  = fecha_produccion
-            lote.fecha_vencimiento = fecha_vencimiento
-            lote.produccion        = produccion
-            lote.exportacion       = exportacion
-            lote.save()
-            messages.success(request, f"Lote '{codigo_lote}' actualizado correctamente.")
+            if Lote.objects.filter(codigo_lote=codigo_lote).exclude(pk=lote_id).exists():
+                messages.error(request, f"Ya existe un lote con el código '{codigo_lote}'.")
+                return redirect('gestionar_lotes')
+            lote = get_object_or_404(Lote, pk=lote_id)
         else:
             if Lote.objects.filter(codigo_lote=codigo_lote).exists():
                 messages.error(request, f"Ya existe un lote con el código '{codigo_lote}'.")
                 return redirect('gestionar_lotes')
-            Lote.objects.create(
-                codigo_lote       = codigo_lote,
-                cantidad          = cantidad,
-                fecha_produccion  = fecha_produccion,
-                fecha_vencimiento = fecha_vencimiento,
-                produccion        = produccion,
-                exportacion       = exportacion,
-            )
-            messages.success(request, f"Lote '{codigo_lote}' creado correctamente.")
+            lote = Lote()
+
+        lote.codigo_lote       = codigo_lote
+        lote.origen_cacao      = origen_cacao or None
+        lote.cantidad          = cantidad
+        lote.unidad            = unidad or None
+        lote.nombre_producto   = nombre_producto or None
+        lote.fecha_produccion  = fecha_prod
+        lote.fecha_vencimiento = fecha_venc
+        lote.produccion        = produccion
+        lote.exportacion       = exportacion
+        lote.save()
+
+        accion = "actualizado" if lote_id else "creado"
+        messages.success(request, f"Lote '{codigo_lote}' {accion} correctamente.")
 
     return redirect('gestionar_lotes')
-
 
 @login_required(login_url='login')
 def eliminar_lote(request, id):
@@ -2431,3 +2708,141 @@ Con base en estos datos reales, responde la siguiente pregunta:
             return JsonResponse({'error': f'Error al consultar la IA: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+# ====================
+# LOGICA DE CORREOS
+# ====================
+from django.core.mail import send_mail
+from django.utils import timezone
+from datetime import timedelta
+
+@login_required(login_url='login')
+def correos_vista(request):
+    from datetime import timedelta
+
+    hoy     = timezone.now().date()
+    lunes   = hoy - timedelta(days=hoy.weekday())
+    domingo = lunes + timedelta(days=6)
+
+    empleados = Empleado.objects.filter(estado='Activo').exclude(email='')
+    historial = HistorialCorreo.objects.select_related('empleado').order_by('-fecha_envio')
+
+    # Armar info de cada empleado para mostrar en la tabla
+    empleados_info = []
+    for emp in empleados:
+        rotacion = RotacionTurno.objects.filter(
+            empleado=emp,
+            fecha_inicio__lte=domingo,
+            fecha_fin__gte=lunes
+        ).select_related('turno').first()
+
+        asignaciones = Asignacion.objects.filter(
+            empleado=emp,
+            fecha_asignacion__range=(lunes, domingo)
+        ).select_related('turno').order_by('fecha_asignacion')
+
+        empleados_info.append({
+            'empleado':    emp,
+            'turno':       rotacion.turno.horario if rotacion else None,
+            'asignaciones': asignaciones,
+        })
+
+    return render(request, 'modulos/correos/correos.html', {
+        'historial':      historial,
+        'empleados_info': empleados_info,
+    })
+
+
+@login_required(login_url='login')
+def enviar_correos_masivos(request):
+    if request.method != 'POST':
+        return redirect('correos_vista')
+
+    from datetime import timedelta
+
+    hoy     = timezone.now().date()
+    lunes   = hoy - timedelta(days=hoy.weekday())
+    domingo = lunes + timedelta(days=6)
+
+    # IDs seleccionados en el formulario
+    ids_seleccionados = request.POST.getlist('empleados_ids')
+
+    if not ids_seleccionados:
+        messages.error(request, "No seleccionaste ningún empleado.")
+        return redirect('correos_vista')
+
+    empleados = Empleado.objects.filter(
+        id__in=ids_seleccionados,
+        estado='Activo'
+    ).exclude(email='')
+
+    enviados = 0
+    errores  = 0
+
+    for emp in empleados:
+        try:
+            rotacion = RotacionTurno.objects.filter(
+                empleado=emp,
+                fecha_inicio__lte=domingo,
+                fecha_fin__gte=lunes
+            ).select_related('turno').first()
+
+            turno_txt = rotacion.turno.horario if rotacion else 'Sin turno asignado esta semana'
+
+            asignaciones = Asignacion.objects.filter(
+                empleado=emp,
+                fecha_asignacion__range=(lunes, domingo)
+            ).select_related('turno').order_by('fecha_asignacion')
+
+            if asignaciones.exists():
+                lista_asig = '\n'.join([
+                    f"  - {a.fecha_asignacion.strftime('%d/%m/%Y')} | {a.tarea} | Turno: {a.turno.horario} | Estado: {a.estado}"
+                    for a in asignaciones
+                ])
+            else:
+                lista_asig = '  Sin asignaciones para esta semana.'
+
+            asunto  = f"ChocoFlow - Tu turno y asignaciones del {lunes.strftime('%d/%m/%Y')} al {domingo.strftime('%d/%m/%Y')}"
+            mensaje = (
+                f"Hola {emp.nombre},\n\n"
+                f"Te informamos tu turno y asignaciones para la semana "
+                f"del {lunes.strftime('%d/%m/%Y')} al {domingo.strftime('%d/%m/%Y')}:\n\n"
+                f"Turno asignado: {turno_txt}\n\n"
+                f"Asignaciones de la semana:\n{lista_asig}\n\n"
+                f"Si tienes alguna duda, comunicate con tu supervisor.\n\n"
+                f"Saludos,\n"
+                f"Equipo ChocoFlow"
+            )
+
+            send_mail(
+                subject=asunto,
+                message=mensaje,
+                from_email=None,
+                recipient_list=[emp.email],
+                fail_silently=False,
+            )
+
+            HistorialCorreo.objects.create(
+                empleado=emp,
+                asunto=asunto,
+                mensaje=mensaje,
+                estado='Enviado',
+            )
+            enviados += 1
+
+        except Exception as ex:
+            HistorialCorreo.objects.create(
+                empleado=emp,
+                asunto=f"Intento semana {lunes.strftime('%d/%m/%Y')}",
+                mensaje='',
+                estado='Error',
+                error_detalle=str(ex),
+            )
+            errores += 1
+
+    if enviados:
+        messages.success(request, f"✅ {enviados} correo(s) enviado(s) correctamente.")
+    if errores:
+        messages.warning(request, f"⚠️ {errores} correo(s) fallaron. Revisa el historial.")
+
+    return redirect('correos_vista')

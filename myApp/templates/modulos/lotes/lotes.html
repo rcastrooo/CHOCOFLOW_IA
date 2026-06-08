@@ -5,220 +5,457 @@
 
 {% block content %}
 
-{# ============================================================ #}
-{#  Hoja de estilos específica del módulo de lotes              #}
-{# ============================================================ #}
-<link rel="stylesheet" href="{% static 'css/lotes.css' %}">
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<section class="container mt-5">
-<div class="container-custom shadow">
+<div class="main-content">
 
-    {# ----------- Título principal del módulo ----------- #}
-    <h2 class="text-center section-title mb-4">
-        🏷️ Gestión de Lotes
-    </h2>
+  <!-- TOPBAR -->
+  <div class="topbar" style="margin-bottom:0;">
+    <span class="topbar-title">
+      <i class="bi bi-tags"></i> GESTIÓN DE LOTES
+    </span>
+  </div>
 
-    {# ----------- Mensajes de alerta (éxito, error, etc.) ----------- #}
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-tag"></i> Lotes</h5>
+    <p>Registra y controla los lotes de producción, fechas y exportaciones asociadas.</p>
+  </div>
+
+  <!-- MENSAJES -->
+  {% if messages %}
     {% for msg in messages %}
-        <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
-            {{ msg }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
     {% endfor %}
+  {% endif %}
 
-    {# ============================================================ #}
-    {#  CABECERA: botón nuevo lote + formulario de búsqueda         #}
-    {# ============================================================ #}
-    <div class="cabecera-lotes">
+  <!-- ACCIONES -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
 
-        {# Botón que abre el modal para crear un nuevo lote #}
-        <button class="btn btn-caramel"
+    <button class="btn-choco"
+            style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;"
             data-bs-toggle="modal"
-            data-bs-target="#modalLote">
-            + Nuevo Lote
-        </button>
+            data-bs-target="#modalLote"
+            onclick="limpiarModal()">
+      <i class="bi bi-plus-lg"></i> Nuevo Lote
+    </button>
 
-        {# Formulario de búsqueda por código de lote #}
-        <form method="GET" class="form-filtros">
-            <input type="text" name="q" class="form-control"
-                placeholder="Buscar código de lote..."
-                value="{{ q }}">
-            <button class="btn btn-choco">Filtrar</button>
-        </form>
+    <form method="GET" class="d-flex gap-2 flex-wrap">
+      <input type="text"
+             name="q"
+             class="form-control"
+             placeholder="Buscar código de lote..."
+             value="{{ q }}"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:200px;">
+      <button class="btn-caramel"
+              style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </form>
 
-    </div>
+  </div>
 
-    {# ============================================================ #}
-    {#  TABLA de lotes registrados                                  #}
-    {# ============================================================ #}
-    <div class="table-responsive">
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Código Lote</th>
-                <th>Cantidad</th>
-                <th>Fecha Producción</th>
-                <th>Fecha Vencimiento</th>
-                <th>Producción</th>
-                <th>Exportación</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Listado de lotes
+  </h6>
 
-        {# Iterar sobre cada lote recibido desde la vista #}
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Código Lote</th>
+          <th>Origen Cacao</th>
+          <th>Cantidad</th>
+          <th>Unidad</th>
+          <th>Nombre Producto</th>
+          <th>Fecha Producción</th>
+          <th>Fecha Vencimiento</th>
+          <th>Producción</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
         {% for lote in lotes %}
         <tr>
-            <td>{{ lote.codigo_lote }}</td>
-            <td>{{ lote.cantidad }}</td>
-            <td>{{ lote.fecha_produccion }}</td>
-            <td>{{ lote.fecha_vencimiento }}</td>
-
-            {# Muestra el __str__ de la producción asociada: "producto - estado" #}
-            <td>{{ lote.produccion }}</td>
-
-            {# Muestra el __str__ de la exportación asociada: "destino - estado" #}
-            <td>{{ lote.exportacion }}</td>
-
-            <td>
-                {# Botón editar: pre-carga el modal con los datos del lote #}
-                <button class="btn btn-sm btn-primary"
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-tag" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ lote.codigo_lote }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.origen_cacao|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.cantidad }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.unidad|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.nombre_producto|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.fecha_produccion }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.fecha_vencimiento }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ lote.produccion }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1"
+                    style="border-radius:8px;"
+                    title="Editar"
                     onclick="editarLote(
-                        '{{ lote.id }}',
-                        '{{ lote.codigo_lote }}',
-                        '{{ lote.cantidad }}',
-                        '{{ lote.fecha_produccion }}',
-                        '{{ lote.fecha_vencimiento }}',
-                        '{{ lote.produccion.id }}',
-                        '{{ lote.exportacion.id }}'
-                    )">✏️
-                </button>
-
-                {# Botón eliminar: borra el lote definitivamente (no es soft delete) #}
-                <a href="{% url 'eliminar_lote' lote.id %}"
-                   class="btn btn-sm btn-danger"
-                   onclick="return confirm('¿Eliminar el lote {{ lote.codigo_lote }}? Esta acción no se puede deshacer.')">
-                   🗑️
-                </a>
-            </td>
+                      '{{ lote.id }}',
+                      '{{ lote.codigo_lote|escapejs }}',
+                      '{{ lote.origen_cacao|default:""  |escapejs }}',
+                      '{{ lote.cantidad|escapejs }}',
+                      '{{ lote.unidad|default:"" }}',
+                      '{{ lote.nombre_producto|default:""|escapejs }}',
+                      '{{ lote.fecha_produccion|date:"Y-m-d" }}',
+                      '{{ lote.fecha_vencimiento|date:"Y-m-d" }}',
+                      '{{ lote.produccion.id }}'
+                    )">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <a href="{% url 'eliminar_lote' lote.id %}"
+               class="btn btn-sm btn-outline-danger"
+               style="border-radius:8px;"
+               title="Eliminar"
+               onclick="return confirm('¿Eliminar el lote {{ lote.codigo_lote }}? Esta acción no se puede deshacer.')">
+              <i class="bi bi-trash"></i>
+            </a>
+          </td>
         </tr>
-
-        {# Mensaje cuando no existen lotes registrados #}
         {% empty %}
         <tr>
-            <td colspan="7" class="text-center">
-                No hay lotes registrados.
-            </td>
+          <!-- CORRECCIÓN: colspan 9 (antes era 10, la tabla tiene 9 columnas) -->
+          <td colspan="9" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No hay lotes registrados
+          </td>
         </tr>
         {% endfor %}
-
-        </tbody>
+      </tbody>
     </table>
-    </div>
+  </div>
 
-    {# Botón para generar el reporte PDF, pasa el filtro de búsqueda activo #}
-    <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
-        <a href="{% url 'reporte_lotes' %}?busqueda={{ q }}"
-           class="btn btn-reporte custom-bottom-btn">
-            📄 Generar Reporte
-        </a>
-    </div>
+  <!-- BOTONES INFERIORES -->
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'reporte_lotes' %}?busqueda={{ q }}"
+       class="btn-choco"
+       style="border-radius:12px; padding:0 20px; text-decoration:none; font-size:0.88rem; height:44px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-file-earmark-text"></i> Generar Reporte
+    </a>
+  </div>
 
-</div>
-</section>
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    El código debe tener el formato XX-000 (ej: CH-001). La fecha de producción debe coincidir con la fecha de entrega de la producción asociada.
+  </p>
 
-
-{# ============================================================ #}
-{#  MODAL: Crear / Editar lote                                  #}
-{# ============================================================ #}
-<div class="modal fade" id="modalLote">
-<div class="modal-dialog">
-<div class="modal-content">
-
-    {# Formulario que envía datos a la vista guardar_lote vía POST #}
-    <form method="POST" action="{% url 'guardar_lote' %}">
-    {% csrf_token %}
-
-    <div class="modal-header">
-        <h5 class="modal-title">Lote</h5>
-        <button type="button" class="btn-close btn-close-white"
-                data-bs-dismiss="modal"></button>
-    </div>
-
-    <div class="modal-body">
-
-        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
-        <input type="hidden" name="id" id="lote_id">
-
-        {# Campo: código único que identifica el lote #}
-        <input type="text" name="codigo_lote" id="lote_codigo"
-            class="form-control mb-2"
-            placeholder="Código de lote" required>
-
-        {# Campo: cantidad producida en el lote (CharField en el modelo) #}
-        <input type="text" name="cantidad" id="lote_cantidad"
-            class="form-control mb-2"
-            placeholder="Cantidad" required>
-
-        {# Campo: fecha en que se produjo el lote #}
-        <label class="form-label mb-0">Fecha de Producción</label>
-        <input type="date" name="fecha_produccion" id="lote_fecha_produccion"
-            class="form-control mb-2" required>
-
-        {# Campo: fecha límite de consumo del lote #}
-        <label class="form-label mb-0">Fecha de Vencimiento</label>
-        <input type="date" name="fecha_vencimiento" id="lote_fecha_vencimiento"
-            class="form-control mb-2" required>
-
-        {# Select: producción a la que pertenece este lote (FK obligatoria) #}
-        <label class="form-label mb-0">Producción</label>
-        <select name="produccion_id" id="lote_produccion" class="form-select mb-2">
-            <option value="">-- Seleccionar Producción --</option>
-            {% for p in producciones %}
-                <option value="{{ p.id }}">{{ p }}</option>
-            {% endfor %}
-        </select>
-
-        {# Select: exportación a la que pertenece este lote (FK obligatoria) #}
-        <label class="form-label mb-0">Exportación</label>
-        <select name="exportacion_id" id="lote_exportacion" class="form-select">
-            <option value="">-- Seleccionar Exportación --</option>
-            {% for e in exportaciones %}
-                <option value="{{ e.id }}">{{ e }}</option>
-            {% endfor %}
-        </select>
-
-    </div>
-
-    <div class="modal-footer">
-        <button class="btn btn-caramel">Guardar</button>
-        <button type="button" class="btn btn-secondary"
-            data-bs-dismiss="modal">Cancelar</button>
-    </div>
-
-    </form>
-</div>
-</div>
 </div>
 
 
-{# ============================================================ #}
-{#  SCRIPT: pre-carga los datos de un lote en el modal          #}
-{#  para poder editarlo                                         #}
-{# ============================================================ #}
+<!-- ============================================================ -->
+<!--  MODAL: Crear / Editar lote                                  -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalLote" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+
+      <form method="POST" action="{% url 'guardar_lote' %}" id="formLote" novalidate>
+        {% csrf_token %}
+
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title" id="modalTitulo">
+            <i class="bi bi-plus-circle"></i> Nuevo Lote
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body" style="background:#fdf9f6;">
+
+          <input type="hidden" name="id" id="lote_id">
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Código de Lote <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="codigo_lote" id="lote_codigo"
+                     class="form-control"
+                     placeholder="Ej: CH-001"
+                     maxlength="100"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; text-transform:uppercase;">
+              <div class="invalid-feedback" id="err-codigo"></div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Origen del Cacao
+              </label>
+              <input type="text" name="origen_cacao" id="lote_origen"
+                     class="form-control"
+                     placeholder="Ej: Colombia, Ecuador"
+                     maxlength="100"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Cantidad <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="cantidad" id="lote_cantidad"
+                     class="form-control"
+                     placeholder="Ej: 500"
+                     maxlength="255"
+                     inputmode="numeric"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-cantidad"></div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Unidad
+              </label>
+              <select name="unidad" id="lote_unidad"
+                      class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="">-- Seleccionar Unidad --</option>
+                <option value="Kilogramos">Kilogramos</option>
+                <option value="Gramos">Gramos</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-12 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Nombre del Producto
+              </label>
+              <input type="text" name="nombre_producto" id="lote_nombre_producto"
+                     class="form-control"
+                     placeholder="Ej: Chocolate negro 70%"
+                     maxlength="100"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Fecha de Producción <span class="text-danger">*</span>
+              </label>
+              <input type="date" name="fecha_produccion" id="lote_fecha_produccion"
+                     class="form-control"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-fecha_produccion"></div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Fecha de Vencimiento <span class="text-danger">*</span>
+              </label>
+              <input type="date" name="fecha_vencimiento" id="lote_fecha_vencimiento"
+                     class="form-control"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-fecha_vencimiento"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Producción <span class="text-danger">*</span>
+              </label>
+              <!-- CORRECCIÓN: data-fecha-entrega en cada opción para validar fecha de producción en JS -->
+              <select name="produccion_id" id="lote_produccion"
+                      class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="">-- Seleccionar Producción --</option>
+                {% for p in producciones %}
+                  <option value="{{ p.id }}" data-fecha-entrega="{{ p.fecha_entrega|date:'Y-m-d' }}">{{ p }}</option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback" id="err-produccion"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
+            <i class="bi bi-save"></i> Guardar
+          </button>
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px; padding:8px 16px;"
+                  data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function editarLote(id, codigo, cantidad, fecha_produccion, fecha_vencimiento, produccion_id, exportacion_id) {
-    // Asignar los valores recibidos a cada campo del modal
-    document.getElementById('lote_id').value                = id;
-    document.getElementById('lote_codigo').value            = codigo;
-    document.getElementById('lote_cantidad').value          = cantidad;
-    document.getElementById('lote_fecha_produccion').value  = fecha_produccion;
-    document.getElementById('lote_fecha_vencimiento').value = fecha_vencimiento;
-    document.getElementById('lote_produccion').value        = produccion_id;
-    document.getElementById('lote_exportacion').value       = exportacion_id;
+// ── Forzar mayúsculas en código de lote ──────────────────────────
+document.getElementById('lote_codigo').addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+});
 
-    // Abrir el modal con Bootstrap
+// ── Solo números en cantidad ─────────────────────────────────────
+document.getElementById('lote_cantidad').addEventListener('keypress', function(e) {
+    if (!/\d/.test(e.key) && e.key !== 'Backspace') e.preventDefault();
+});
+document.getElementById('lote_cantidad').addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '');
+});
+
+// ── Validación al enviar ─────────────────────────────────────────
+document.getElementById('formLote').addEventListener('submit', function(e) {
+    let valido = true;
+
+    // Código de lote: formato XX-000 (2 letras + guion + 3 números)
+    const codigo    = document.getElementById('lote_codigo');
+    const errCodigo = document.getElementById('err-codigo');
+    if (!/^[A-Z]{2}-\d{3}$/.test(codigo.value.trim())) {
+        codigo.classList.add('is-invalid');
+        errCodigo.textContent = 'El código debe tener el formato XX-000 (2 letras y 3 números). Ej: CH-001, AB-123.';
+        valido = false;
+    } else {
+        codigo.classList.remove('is-invalid');
+        codigo.classList.add('is-valid');
+        errCodigo.textContent = '';
+    }
+
+    // Cantidad: solo números, obligatoria
+    const cantidad    = document.getElementById('lote_cantidad');
+    const errCantidad = document.getElementById('err-cantidad');
+    if (!cantidad.value.trim() || !/^\d+$/.test(cantidad.value.trim())) {
+        cantidad.classList.add('is-invalid');
+        errCantidad.textContent = 'La cantidad debe ser un número entero positivo.';
+        valido = false;
+    } else {
+        cantidad.classList.remove('is-invalid');
+        cantidad.classList.add('is-valid');
+        errCantidad.textContent = '';
+    }
+
+    // Producción: obligatoria (se valida primero para poder leer su fecha)
+    const produccion    = document.getElementById('lote_produccion');
+    const errProduccion = document.getElementById('err-produccion');
+    if (!produccion.value) {
+        produccion.classList.add('is-invalid');
+        errProduccion.textContent = 'Debes seleccionar una producción.';
+        valido = false;
+    } else {
+        produccion.classList.remove('is-invalid');
+        errProduccion.textContent = '';
+    }
+
+    // Fecha producción: obligatoria y debe coincidir con fecha_entrega de la producción
+    const fechaProd    = document.getElementById('lote_fecha_produccion');
+    const errFechaProd = document.getElementById('err-fecha_produccion');
+    if (!fechaProd.value) {
+        fechaProd.classList.add('is-invalid');
+        errFechaProd.textContent = 'La fecha de producción es obligatoria.';
+        valido = false;
+    } else if (produccion.value) {
+        // CORRECCIÓN: validar que coincida con la fecha de entrega de la producción seleccionada
+        const fechaEntregaProduccion = produccion.options[produccion.selectedIndex].dataset.fechaEntrega;
+        if (fechaEntregaProduccion && fechaProd.value !== fechaEntregaProduccion) {
+            fechaProd.classList.add('is-invalid');
+            errFechaProd.textContent = `La fecha de producción debe coincidir con la fecha de entrega de la producción seleccionada (${fechaEntregaProduccion}).`;
+            valido = false;
+        } else {
+            fechaProd.classList.remove('is-invalid');
+            errFechaProd.textContent = '';
+        }
+    } else {
+        fechaProd.classList.remove('is-invalid');
+        errFechaProd.textContent = '';
+    }
+
+    // Fecha vencimiento: obligatoria y no anterior a fecha de producción
+    const fechaVenc    = document.getElementById('lote_fecha_vencimiento');
+    const errFechaVenc = document.getElementById('err-fecha_vencimiento');
+    if (!fechaVenc.value) {
+        fechaVenc.classList.add('is-invalid');
+        errFechaVenc.textContent = 'La fecha de vencimiento es obligatoria.';
+        valido = false;
+    } else if (fechaProd.value && fechaVenc.value < fechaProd.value) {
+        fechaVenc.classList.add('is-invalid');
+        errFechaVenc.textContent = 'La fecha de vencimiento no puede ser anterior a la de producción.';
+        valido = false;
+    } else {
+        fechaVenc.classList.remove('is-invalid');
+        errFechaVenc.textContent = '';
+    }
+
+    if (!valido) e.preventDefault();
+});
+
+// ── Limpiar clases en vivo ───────────────────────────────────────
+['lote_codigo','lote_cantidad','lote_fecha_produccion','lote_fecha_vencimiento','lote_produccion'].forEach(id => {
+    document.getElementById(id).addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+    });
+    document.getElementById(id).addEventListener('change', function() {
+        this.classList.remove('is-invalid');
+    });
+});
+
+// ── Al cambiar producción, auto-rellenar fecha de producción ─────
+document.getElementById('lote_produccion').addEventListener('change', function() {
+    const fechaEntrega = this.options[this.selectedIndex].dataset.fechaEntrega;
+    const campofecha   = document.getElementById('lote_fecha_produccion');
+    if (fechaEntrega) {
+        campofecha.value = fechaEntrega;
+        campofecha.classList.remove('is-invalid');
+        document.getElementById('err-fecha_produccion').textContent = '';
+    } else {
+        campofecha.value = '';
+    }
+});
+
+// ── Pre-cargar datos para edición ────────────────────────────────
+function editarLote(id, codigo, origen, cantidad, unidad, nombreProducto,
+                    fechaProd, fechaVenc, produccionId) {
+    limpiarModal();
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-pencil-square"></i> Editar Lote';
+    document.getElementById('lote_id').value                 = id;
+    document.getElementById('lote_codigo').value             = codigo;
+    document.getElementById('lote_origen').value             = origen;
+    document.getElementById('lote_cantidad').value           = cantidad;
+    document.getElementById('lote_unidad').value             = unidad;
+    document.getElementById('lote_nombre_producto').value    = nombreProducto;
+    document.getElementById('lote_fecha_produccion').value   = fechaProd;
+    document.getElementById('lote_fecha_vencimiento').value  = fechaVenc;
+    document.getElementById('lote_produccion').value         = produccionId;
     new bootstrap.Modal(document.getElementById('modalLote')).show();
+}
+
+// ── Limpiar modal para nuevo lote ────────────────────────────────
+function limpiarModal() {
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-plus-circle"></i> Nuevo Lote';
+    ['lote_id','lote_codigo','lote_origen','lote_cantidad',
+     'lote_nombre_producto','lote_fecha_produccion','lote_fecha_vencimiento'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.value = ''; el.classList.remove('is-invalid','is-valid'); }
+    });
+    document.getElementById('lote_unidad').value      = '';
+    document.getElementById('lote_produccion').value  = '';
+    ['err-codigo','err-cantidad','err-fecha_produccion','err-fecha_vencimiento','err-produccion'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
 }
 </script>
 

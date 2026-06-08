@@ -197,6 +197,26 @@ class Produccion(models.Model):
     def __str__(self):
         return f"{self.producto} - {self.estado}"
 
+# -------------------------
+# Lote
+# -------------------------
+class Lote(models.Model):
+    UNIDAD_CHOICES = [
+        ('Kilogramos', 'Kilogramos'),
+        ('Gramos', 'Gramos'),
+    ]
+
+    codigo_lote      = models.CharField(max_length=100, unique=True)
+    origen_cacao     = models.CharField(max_length=100, null=True, blank=True)
+    cantidad         = models.CharField(max_length=255)
+    unidad           = models.CharField(max_length=20, choices=UNIDAD_CHOICES, null=True, blank=True)
+    fecha_produccion  = models.DateField()
+    fecha_vencimiento = models.DateField()
+    nombre_producto  = models.CharField(max_length=100, null=True, blank=True)
+    produccion  = models.ForeignKey(Produccion, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.codigo_lote
 
 # -------------------------
 # Exportacion
@@ -215,6 +235,7 @@ class Exportacion(models.Model):
     fecha_entrega        = models.DateField()
     estado               = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     produccion           = models.ForeignKey(Produccion, on_delete=models.CASCADE, db_column='produccion_id', null=True, blank=True)
+    lote                 = models.ForeignKey(Lote, on_delete=models.SET_NULL, null=True, blank=True, db_column='lote_id')  # ← agregar esto
     nombre_producto      = models.CharField(max_length=100, null=True, blank=True)  # era 'producto' en versión anterior
     cantidad_cajas       = models.IntegerField(null=True, blank=True)
     unidades_por_caja    = models.IntegerField(null=True, blank=True)
@@ -227,28 +248,6 @@ class Exportacion(models.Model):
     def __str__(self):
         return f"{self.destino} - {self.estado}"
 
-
-# -------------------------
-# Lote
-# -------------------------
-class Lote(models.Model):
-    UNIDAD_CHOICES = [
-        ('Kilogramos', 'Kilogramos'),
-        ('Gramos', 'Gramos'),
-    ]
-
-    codigo_lote      = models.CharField(max_length=100, unique=True)
-    origen_cacao     = models.CharField(max_length=100, null=True, blank=True)
-    cantidad         = models.CharField(max_length=255)
-    unidad           = models.CharField(max_length=20, choices=UNIDAD_CHOICES, null=True, blank=True)
-    fecha_produccion  = models.DateField()
-    fecha_vencimiento = models.DateField()
-    nombre_producto  = models.CharField(max_length=100, null=True, blank=True)
-    produccion  = models.ForeignKey(Produccion, on_delete=models.CASCADE)
-    exportacion = models.ForeignKey(Exportacion, on_delete=models.SET_NULL, null=True, blank=True)
-
-    def __str__(self):
-        return self.codigo_lote
 
 
 # -------------------------
@@ -281,3 +280,21 @@ class Bitacora(models.Model):
 
     def __str__(self):
         return f"{self.titulo} - {self.fecha_registro}"
+    
+# --------------------
+# Historial de correos
+# --------------------
+class HistorialCorreo(models.Model):
+    ESTADO_CHOICES = [
+        ('Enviado', 'Enviado'),
+        ('Error', 'Error'),
+    ]
+    empleado   = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    asunto     = models.CharField(max_length=200)
+    mensaje    = models.TextField(blank=True)
+    fecha_envio = models.DateTimeField(auto_now_add=True)
+    estado     = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    error_detalle = models.TextField(blank=True, null=True)  # guarda el traceback si falla
+
+    def __str__(self):
+        return f"{self.empleado.nombre} — {self.asunto} ({self.estado})"    
