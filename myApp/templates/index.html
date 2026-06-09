@@ -1,120 +1,271 @@
-{% extends 'layouts/base.html' %}
+<!DOCTYPE html>
+<html lang="es">
+{% load static %}
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inicio | ChocoFlow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/index.css' %}">
+</head>
+<body>
 
-{% block title %}
-Inicio | ChocoFlow
-{% endblock %}
-
-
-{% block content %}
-
-<!-- SERVICIOS -->
-<section class="container mt-5">
-<h2 class="text-center section-title">
-¿Qué puedes hacer?
-</h2>
-
-<div class="row mt-4 text-center">
-
-<div class="col-md-4">
-<div class="card card-custom p-4 shadow">
-<h4>📦 Producción</h4>
-<p>Gestiona productos y procesos productivos</p>
-</div>
-</div>
-
-
-<div class="col-md-4">
-<div class="card card-custom p-4 shadow">
-<h4>🚚 Exportación</h4>
-<p>Controla envíos y estados de entrega</p>
-</div>
-</div>
-
-
-<div class="col-md-4">
-<div class="card card-custom p-4 shadow">
-<h4>📊 Reportes</h4>
-<p>Analiza el rendimiento de tu empresa</p>
-</div>
-</div>
-
-</div>
+<!-- ══════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-7">
+        <div class="hero-badge">🍫 Sistema de Gestión Chocolatera</div>
+        <h1 class="hero-title">
+          Bienvenido a<br>
+          <span>ChocoFlow</span>
+        </h1>
+        <p class="hero-sub">
+          Plataforma integral para la gestión de producción, exportación y personal
+          de tu empresa chocolatera. Todo en un solo lugar, en tiempo real.
+        </p>
+        <div class="hero-actions">
+          <a href="{% url 'login' %}" class="btn-hero-primary">
+            <i class="bi bi-box-arrow-in-right"></i> Iniciar sesión
+          </a>
+        </div>
+        <div class="hero-stats">
+          <div>
+            <div class="hero-stat-num">100%</div>
+            <div class="hero-stat-label">Trazabilidad</div>
+          </div>
+          <div>
+            <div class="hero-stat-num">2</div>
+            <div class="hero-stat-label">Roles de acceso</div>
+          </div>
+          <div>
+            <div class="hero-stat-num">∞</div>
+            <div class="hero-stat-label">Lotes & Exportaciones</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5 text-center d-none d-lg-block">
+        <div class="hero-deco">🍫</div>
+      </div>
+    </div>
+  </div>
 </section>
 
-
-
-<!-- PRODUCCIÓN -->
-<section class="container mt-5">
-
-<h2 class="section-title text-center">
-Producciones recientes
-</h2>
-
-<div class="row mt-4">
-
-{% for p in producciones %}
-<div class="col-md-4">
-<div class="card card-custom p-3 shadow">
-
-<h5>{{ p.producto }}</h5>
-
-<p>
-Estado: {{ p.estado }}
-</p>
-
-<p>
-Cantidad: {{ p.cantidad_producida }}
-</p>
-
-</div>
-</div>
-
-{% empty %}
-
-<p class="text-center">
-No hay producciones registradas
-</p>
-
-{% endfor %}
-
-</div>
+<!-- ══════════════════════════════════════════════
+     FEATURES
+══════════════════════════════════════════════ -->
+<section class="py-5 mt-2">
+  <div class="container">
+    <div class="text-center mb-5 fade-up">
+      <div class="section-label">Módulos principales</div>
+      <h2 class="section-title-main">¿Qué puedes hacer con ChocoFlow?</h2>
+      <p class="section-desc mx-auto">
+        Desde la producción hasta la exportación, ChocoFlow centraliza toda
+        la operación de tu empresa con herramientas precisas y fáciles de usar.
+      </p>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-4 fade-up" style="transition-delay:0.1s">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="bi bi-gear-wide-connected"></i></div>
+          <div class="feature-title">Producción</div>
+          <p class="feature-desc">Registra y controla órdenes de producción, asigna responsables, gestiona ingredientes y realiza seguimiento por estado en tiempo real.</p>
+        </div>
+      </div>
+      <div class="col-md-4 fade-up" style="transition-delay:0.2s">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="bi bi-tags"></i></div>
+          <div class="feature-title">Lotes</div>
+          <p class="feature-desc">Crea y administra lotes de producción con trazabilidad completa: origen del cacao, fechas de producción y vencimiento, y vinculación a exportaciones.</p>
+        </div>
+      </div>
+      <div class="col-md-4 fade-up" style="transition-delay:0.3s">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="bi bi-airplane"></i></div>
+          <div class="feature-title">Exportaciones</div>
+          <p class="feature-desc">Controla envíos internacionales, empresas exportadoras, contenedores, pesos y destinos. Desde Pendiente hasta Entregado.</p>
+        </div>
+      </div>
+      <div class="col-md-4 fade-up" style="transition-delay:0.4s">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="bi bi-people"></i></div>
+          <div class="feature-title">Empleados & Turnos</div>
+          <p class="feature-desc">Gestiona tu equipo, asigna turnos de mañana o tarde, controla rotaciones semanales y envía notificaciones automáticas por correo.</p>
+        </div>
+      </div>
+      <div class="col-md-4 fade-up" style="transition-delay:0.5s">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="bi bi-clipboard-data"></i></div>
+          <div class="feature-title">Bitácoras</div>
+          <p class="feature-desc">Los supervisores registran informes diarios y semanales. Los administradores los aprueban o rechazan con observaciones.</p>
+        </div>
+      </div>
+      <div class="col-md-4 fade-up" style="transition-delay:0.6s">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="bi bi-file-earmark-text"></i></div>
+          <div class="feature-title">Reportes PDF</div>
+          <p class="feature-desc">Genera reportes profesionales en PDF de producción, lotes, exportaciones, empleados y supervisores con un solo clic.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
-
-
-<!-- EXPORTACIONES -->
-<section class="container mt-5 mb-5">
-
-<h2 class="section-title text-center">
-Exportaciones recientes
-</h2>
-
-<div class="row mt-4">
-
-{% for e in exportaciones %}
-
-<div class="col-md-4">
-<div class="card card-custom p-3 shadow">
-
-<h5>{{ e.destino }}</h5>
-
-<p>País: {{ e.pais }}</p>
-
-<p>Estado: {{ e.estado }}</p>
-
-</div>
-</div>
-
-{% empty %}
-
-<p class="text-center">
-No hay exportaciones registradas
-</p>
-
-{% endfor %}
-
-</div>
-
+<!-- ══════════════════════════════════════════════
+     DATOS RECIENTES
+══════════════════════════════════════════════ -->
+<section class="py-4">
+  <div class="container">
+    <div class="text-center mb-4 fade-up">
+      <div class="section-label">Actividad reciente</div>
+      <h2 class="section-title-main">Últimos registros</h2>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-6 fade-up" style="transition-delay:0.1s">
+        <div class="data-card">
+          <div class="data-card-header">
+            <div class="data-card-icon"><i class="bi bi-gear-wide-connected"></i></div>
+            <p class="data-card-title">Producciones recientes</p>
+          </div>
+          {% for p in producciones %}
+          <div class="data-item">
+            <span class="data-item-name">{{ p.producto|default:"Sin nombre" }}</span>
+            <span class="data-badge
+              {% if p.estado == 'Pendiente' %}badge-pendiente
+              {% elif p.estado == 'En Proceso' %}badge-proceso
+              {% elif p.estado == 'Finalizado' %}badge-finalizado
+              {% else %}badge-cancelado{% endif %}">
+              {{ p.estado }}
+            </span>
+          </div>
+          {% empty %}
+          <p class="text-center text-muted fst-italic py-3" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="display:block;font-size:1.4rem;opacity:0.3;margin-bottom:6px;"></i>
+            No hay producciones registradas
+          </p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col-md-6 fade-up" style="transition-delay:0.2s">
+        <div class="data-card">
+          <div class="data-card-header">
+            <div class="data-card-icon"><i class="bi bi-airplane"></i></div>
+            <p class="data-card-title">Exportaciones recientes</p>
+          </div>
+          {% for e in exportaciones %}
+          <div class="data-item">
+            <span class="data-item-name">{{ e.destino }} — {{ e.pais }}</span>
+            <span class="data-badge
+              {% if e.estado == 'Pendiente' %}badge-pendiente
+              {% elif e.estado == 'Enviado' %}badge-enviado
+              {% elif e.estado == 'Entregado' %}badge-entregado
+              {% else %}badge-cancelado{% endif %}">
+              {{ e.estado }}
+            </span>
+          </div>
+          {% empty %}
+          <p class="text-center text-muted fst-italic py-3" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="display:block;font-size:1.4rem;opacity:0.3;margin-bottom:6px;"></i>
+            No hay exportaciones registradas
+          </p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
-{% endblock %}
+<!-- ══════════════════════════════════════════════
+     CTA
+══════════════════════════════════════════════ -->
+<section class="py-5">
+  <div class="container">
+    <div class="cta-section fade-up">
+      <div style="font-size:3rem; margin-bottom:20px; animation: floatIcon 3s ease-in-out infinite;">🍫</div>
+      <h2 class="cta-title">¿Listo para gestionar tu producción?</h2>
+      <p class="cta-sub">
+        Inicia sesión y toma el control total de tu empresa chocolatera.
+        Producción, lotes, exportaciones y equipo, todo desde ChocoFlow.
+      </p>
+      <a href="{% url 'login' %}" class="btn-hero-primary" style="display:inline-flex;">
+        <i class="bi bi-box-arrow-in-right"></i> Comenzar ahora
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="row g-5">
+
+      <!-- Marca -->
+      <div class="col-lg-4">
+        <div class="footer-brand">
+          🍫 <span>Choco</span>Flow
+        </div>
+        <p class="footer-desc">
+          Plataforma integral de gestión para empresas chocolateras.
+          Producción, lotes, exportaciones y equipo en un solo lugar.
+        </p>
+      </div>
+
+      <!-- Información general -->
+      <div class="col-lg-4">
+        <div class="footer-heading">Información</div>
+        <div class="footer-info-item">
+          <i class="bi bi-clock"></i>
+          <span>Lunes a viernes · 6:00 am – 10:00 pm</span>
+        </div>
+        <div class="footer-info-item">
+          <i class="bi bi-geo-alt"></i>
+          <span>Colombia</span>
+        </div>
+        <div class="footer-info-item">
+          <i class="bi bi-envelope"></i>
+          <span>contacto@chocoflow.co</span>
+        </div>
+      </div>
+
+      <!-- Contacto WhatsApp -->
+      <div class="col-lg-4">
+        <div class="footer-heading">Soporte & Contacto</div>
+        <p style="font-size:0.88rem; color:rgba(255,255,255,0.5); margin-bottom:16px; line-height:1.6;">
+          ¿Tienes dudas o necesitas ayuda con la plataforma?
+          Escríbenos directamente por WhatsApp.
+        </p>
+        <a href="https://wa.me/573001234567" target="_blank" class="footer-whatsapp">
+          <i class="bi bi-whatsapp"></i> Escribir por WhatsApp
+        </a>
+      </div>
+
+    </div>
+
+    <hr class="footer-divider">
+
+    <div class="footer-bottom">
+      <span>© 2025 <span class="footer-bottom-brand">ChocoFlow</span>. Todos los derechos reservados.</span>
+      <span>Hecho con 🍫 para la industria chocolatera</span>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

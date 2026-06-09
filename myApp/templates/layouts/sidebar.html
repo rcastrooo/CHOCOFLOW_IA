@@ -227,9 +227,11 @@
             <a href="{% url 'registro' %}" class="topbar-btn" title="Agregar persona">
                 <i class="bi bi-person-fill-add"></i>
             </a>
-            <a href="{% url 'registro' %}" class="topbar-btn" title="Enviar correos">
-                <i class="bi bi-envelope-at-fill"></i>
-            </a>
+        <a href="{% url 'correos_vista' %}"
+   title="Enviar correos masivos"
+   style="color:#603C1C; text-decoration:none;">
+  <i class="bi bi-envelope-at" style="font-size:1.3rem;"></i>
+</a>
             <div class="notif-wrapper" id="notifWrapper">
                 <button class="topbar-btn notif-btn" id="notifBtn" title="Notificaciones">
                     <i class="bi bi-bell-fill"></i>

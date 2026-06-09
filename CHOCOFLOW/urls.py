@@ -18,6 +18,12 @@ urlpatterns = [
 
     # SUPERVISORES
     path('supervisores/', views.gestionar_supervisores, name='gestionar_supervisores'),
+    path('supervisores/turno/<int:supervisor_id>/', views.asignar_turno_supervisor, name='asignar_turno_supervisor'),
+    path('supervisores/editar/', views.editar_supervisor, name='editar_supervisor'),
+    path('supervisores/inactivar/<int:supervisor_id>/', views.inactivar_supervisor, name='inactivar_supervisor'),
+    path('supervisores/carga-masiva/', views.carga_masiva_supervisores, name='carga_masiva_supervisores'),
+    path('supervisores/reporte/', views.reporte_supervisores, name='reporte_supervisores'),
+   
 
     # EMPLEADOS
     path('empleados/', views.empleados, name='empleados'),
@@ -25,8 +31,6 @@ urlpatterns = [
     path('empleados/inactivar/<int:id>/', views.inactivar_empleado, name='inactivar_empleado'),
     path('empleados/reporte/', views.generar_reporte_empleados, name='reporte_empleados'),
     path('empleados/supervisor/', views.empleados_supervisor, name='empleados_supervisor'),
-    path('supervisores/',views.gestionar_supervisores,name='supervisores'),
-    path('supervisores/reporte/',views.reporte_supervisores,name='reporte_supervisores'),
 
     # TURNOS
     path('turnos/', views.turnos, name='turnos'),
@@ -82,4 +86,8 @@ urlpatterns = [
     path('bitacora/enviar/<int:id>/', views.enviar_bitacora, name='enviar_bitacora'),
     path('bitacora/admin/', views.listar_bitacoras, name='listar_bitacoras'),
     path('bitacora/revisar/<int:id>/', views.revisar_bitacora, name='revisar_bitacora'),
+    
+    #CORREOS
+    path('correos/', views.correos_vista, name='correos_vista'),
+    path('correos/enviar/', views.enviar_correos_masivos, name='enviar_correos_masivos'),
 ]

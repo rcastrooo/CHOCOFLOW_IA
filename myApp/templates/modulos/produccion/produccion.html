@@ -3,263 +3,415 @@
 
 {% block title %}Gestión de Producción{% endblock %}
 
-{% block extra_css %}
-
-<link rel="stylesheet" href="{% static 'css/produccion.css' %}">
-{% endblock %}
-
 {% block content %}
 
-<section class="container mt-5">
-<div class="container-custom shadow">
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <h2 class="text-center section-title mb-4">
-        🏭 Gestión de Producción
-    </h2>
+<div class="main-content">
 
+  <!-- TOPBAR -->
+  <div class="topbar" style="margin-bottom:0;">
+    <span class="topbar-title">
+      <i class="bi bi-box-seam"></i> GESTIÓN DE PRODUCCIÓN
+    </span>
+  </div>
 
-    {% if messages %}
-        {% for msg in messages %}
-            <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">
-                {{ msg }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        {% endfor %}
-    {% endif %}
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-gear-wide-connected"></i> Producciones</h5>
+    <p>Registra y gestiona las órdenes de producción, responsables y estados.</p>
+  </div>
 
-  
-    <div class="cabecera-produccion">
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
 
-        {# Botón que abre el modal para crear una nueva producción #}
-        <button class="btn btn-caramel"
-                data-bs-toggle="modal"
-                data-bs-target="#modalProduccion">
-            + Nueva Producción
-        </button>
+  <!-- ACCIONES -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
 
-        {# Formulario de búsqueda por nombre de producto y filtro por estado #}
-        <form method="GET" class="form-filtros">
-            <input type="text" name="q" class="form-control"
-                   placeholder="Buscar producto..."
-                   value="{{ request.GET.q }}">
+    <button class="btn-choco"
+            style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;"
+            data-bs-toggle="modal"
+            data-bs-target="#modalProduccion"
+            onclick="limpiarModal()">
+      <i class="bi bi-plus-lg"></i> Nueva Producción
+    </button>
 
-            {# Select para filtrar por estado según ESTADO_CHOICES del modelo #}
-            <select name="estado" class="form-select">
-                <option value="">Todos</option>
-                <option value="Pendiente"  {% if request.GET.estado == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
-                <option value="En Proceso" {% if request.GET.estado == 'En Proceso' %}selected{% endif %}>En Proceso</option>
-                <option value="Finalizado" {% if request.GET.estado == 'Finalizado' %}selected{% endif %}>Finalizado</option>
-                <option value="Cancelado"  {% if request.GET.estado == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
-            </select>
+    <form method="GET" class="d-flex gap-2 flex-wrap">
+      <input type="text"
+             name="q"
+             class="form-control"
+             placeholder="Buscar producto..."
+             value="{{ request.GET.q }}"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:180px;">
 
-            <button class="btn btn-choco">Filtrar</button>
-        </form>
+      <select name="estado"
+              class="form-select"
+              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:140px;">
+        <option value="">Todos</option>
+        <option value="Pendiente"  {% if request.GET.estado == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
+        <option value="En Proceso" {% if request.GET.estado == 'En Proceso' %}selected{% endif %}>En Proceso</option>
+        <option value="Finalizado" {% if request.GET.estado == 'Finalizado' %}selected{% endif %}>Finalizado</option>
+        <option value="Cancelado"  {% if request.GET.estado == 'Cancelado'  %}selected{% endif %}>Cancelado</option>
+      </select>
 
-    </div>
+      <button class="btn-caramel"
+              style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </form>
 
-    {# ============================================================ #}
-    {#  TABLA de producciones registradas                           #}
-    {# ============================================================ #}
-    <div class="table-responsive">
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Producto</th>
-                <th>Ingredientes</th>
-                <th>Cant. Requerida</th>
-                <th>Responsable</th>
-                <th>Fecha Entrega</th>
-                <th>Fecha Límite</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
+  </div>
 
-        {# Iterar sobre cada producción recibida desde la vista #}
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Listado de producciones
+  </h6>
+
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Ingredientes</th>
+          <th>Cant. Requerida</th>
+          <th>Responsable</th>
+          <th>Fecha Entrega</th>
+          <th>Fecha Límite</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
         {% for p in producciones %}
         <tr>
-            <td>{{ p.producto }}</td>
-
-            <td>{{ p.ingredientes }}</td>
-
-            <td>{{ p.cantidad_requerida }}</td>
-
-            <td>{{ p.empleado_responsable.nombre }}</td>
-
-            <td>{{ p.fecha_entrega }}</td>
-            <td>{{ p.fecha_limite }}</td>
-            <td>
-                {% if p.estado == 'Finalizado' %}
-                    <span class="badge bg-success">{{ p.estado }}</span>
-                {% elif p.estado == 'En Proceso' %}
-                    <span class="badge bg-warning text-dark">{{ p.estado }}</span>
-                {% elif p.estado == 'Pendiente' %}
-                    <span class="badge bg-info text-dark">{{ p.estado }}</span>
-                {% else %}
-                   
-                    <span class="badge bg-danger">{{ p.estado }}</span>
-                {% endif %}
-            </td>
-
-            <td>
-              
-                <button class="btn btn-sm btn-primary"
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-box" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ p.producto }}</span>
+            </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ p.ingredientes }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ p.cantidad_requerida }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ p.empleado_responsable.nombre }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ p.fecha_entrega }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ p.fecha_limite }}</td>
+          <td>
+            {% if p.estado == 'Finalizado' %}
+              <span class="badge bg-success">{{ p.estado }}</span>
+            {% elif p.estado == 'En Proceso' %}
+              <span class="badge bg-warning text-dark">{{ p.estado }}</span>
+            {% elif p.estado == 'Pendiente' %}
+              <span class="badge bg-info text-dark">{{ p.estado }}</span>
+            {% else %}
+              <span class="badge bg-danger">{{ p.estado }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1"
+                    style="border-radius:8px;"
+                    title="Editar"
                     onclick="editarProduccion(
-                        '{{ p.id }}',
-                        '{{ p.producto }}',
-                        '{{ p.ingredientes }}',
-                        '{{ p.cantidad_requerida }}',
-                        '{{ p.fecha_entrega|date:"Y-m-d" }}',
-                        '{{ p.fecha_limite|date:"Y-m-d" }}',
-                        '{{ p.estado }}',
-                        '{{ p.empleado_responsable.id }}'
-                    )">✏️
-                </button>
-
-                
-                <a href="{% url 'inactivar_produccion' p.id %}"
-                   class="btn btn-sm btn-danger"
-                   onclick="return confirm('¿Cancelar esta producción?')">
-                   🗑️
-                </a>
-            </td>
+                      '{{ p.id }}',
+                      '{{ p.producto|escapejs }}',
+                      '{{ p.ingredientes|escapejs }}',
+                      '{{ p.cantidad_requerida|escapejs }}',
+                      '{{ p.fecha_entrega|date:"Y-m-d" }}',
+                      '{{ p.fecha_limite|date:"Y-m-d" }}',
+                      '{{ p.estado }}',
+                      '{{ p.empleado_responsable.id }}'
+                    )">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <a href="{% url 'inactivar_produccion' p.id %}"
+               class="btn btn-sm btn-outline-danger"
+               style="border-radius:8px;"
+               title="Cancelar"
+               onclick="return confirm('¿Cancelar esta producción?')">
+              <i class="bi bi-trash"></i>
+            </a>
+          </td>
         </tr>
-
-        {# Mensaje cuando no existen producciones registradas #}
         {% empty %}
         <tr>
-            <td colspan="8" class="text-center">No hay producciones registradas</td>
+          <td colspan="8" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No hay producciones registradas
+          </td>
         </tr>
         {% endfor %}
-
-        </tbody>
+      </tbody>
     </table>
-    </div>
+  </div>
 
-    
-    <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
-        <a href="{% url 'reporte_producciones' %}"
-           class="btn btn-reporte custom-bottom-btn">
-            📄 Generar Reporte
-        </a>
-    </div>
+  <!-- BOTONES INFERIORES -->
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'reporte_producciones' %}"
+       class="btn-choco"
+       style="border-radius:12px; padding:0 20px; text-decoration:none; font-size:0.88rem; height:44px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-file-earmark-text"></i> Generar Reporte
+    </a>
+  </div>
 
-</div>
-</section>
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Puedes filtrar por nombre de producto o estado. La fecha límite no puede ser anterior a la fecha de entrega.
+  </p>
 
-
-
-<div class="modal fade" id="modalProduccion">
-<div class="modal-dialog modal-lg">
-<div class="modal-content">
-
-    
-    <form method="POST" action="{% url 'guardar_produccion' %}">
-    {% csrf_token %}
-
-    <div class="modal-header">
-        <h5>Producción</h5>
-    </div>
-
-    <div class="modal-body">
-
-        {# Campo oculto: si tiene valor es edición, si está vacío es creación #}
-        <input type="hidden" name="id" id="id">
-
-        <div class="row">
-            <div class="col-md-6">
-                {# Campo: nombre del producto a producir (nullable en el modelo) #}
-                <input type="text" name="producto" id="producto"
-                       class="form-control mb-2"
-                       placeholder="Nombre del producto">
-            </div>
-            <div class="col-md-6">
-                {# Campo: lista de ingredientes necesarios #}
-                <input type="text" name="ingredientes" id="ingredientes"
-                       class="form-control mb-2"
-                       placeholder="Ingredientes">
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6">
-                <input type="text" name="cantidad_requerida" id="cantidad_requerida"
-                       class="form-control mb-2"
-                       placeholder="Cantidad requerida">
-            </div>
-            <div class="col-md-6">
-                {# Select: estado según ESTADO_CHOICES del modelo Produccion #}
-                <select name="estado" id="estado" class="form-select mb-2">
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="En Proceso">En Proceso</option>
-                    <option value="Finalizado">Finalizado</option>
-                    <option value="Cancelado">Cancelado</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6">
-                {# CORRECCIÓN: fecha_entrega es el campo real del modelo #}
-                <label class="form-label text-muted" style="font-size:13px;">Fecha de entrega</label>
-                <input type="date" name="fecha_entrega" id="fecha_entrega"
-                       class="form-control mb-2">
-            </div>
-            <div class="col-md-6">
-                {# CORRECCIÓN: fecha_limite es el campo real del modelo #}
-                <label class="form-label text-muted" style="font-size:13px;">Fecha límite</label>
-                <input type="date" name="fecha_limite" id="fecha_limite"
-                       class="form-control mb-2">
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-12">
-                {# Select: empleados activos disponibles como responsables #}
-                <select name="empleado_responsable" id="empleado_responsable"
-                        class="form-select mb-2">
-                    <option value="">-- Seleccionar Responsable --</option>
-                    {% for emp in empleados %}
-                        <option value="{{ emp.id }}">{{ emp.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="modal-footer">
-        <button class="btn btn-caramel">Guardar</button>
-        <button type="button" class="btn btn-secondary"
-            data-bs-dismiss="modal">Cancelar</button>
-    </div>
-
-    </form>
-</div>
-</div>
 </div>
 
 
+<!-- ============================================================ -->
+<!--  MODAL: Crear / Editar producción                           -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalProduccion" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
+
+      <form method="POST" action="{% url 'guardar_produccion' %}" id="formProduccion" novalidate>
+        {% csrf_token %}
+
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title" id="modalTitulo">
+            <i class="bi bi-plus-circle"></i> Nueva Producción
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body" style="background:#fdf9f6;">
+
+          <input type="hidden" name="id" id="id">
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Producto <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="producto" id="producto"
+                     class="form-control"
+                     placeholder="Ej: Chocolate negro 70%"
+                     maxlength="255"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-producto"></div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Ingredientes <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="ingredientes" id="ingredientes"
+                     class="form-control"
+                     placeholder="Ej: Cacao, azúcar, manteca"
+                     maxlength="255"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-ingredientes"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Cantidad requerida
+              </label>
+              <input type="text" name="cantidad_requerida" id="cantidad_requerida"
+                     class="form-control"
+                     placeholder="Ej: 500 kg"
+                     maxlength="255"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Estado <span class="text-danger">*</span>
+              </label>
+              <select name="estado" id="estado"
+                      class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="Pendiente">Pendiente</option>
+                <option value="En Proceso">En Proceso</option>
+                <option value="Finalizado">Finalizado</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Fecha de entrega <span class="text-danger">*</span>
+              </label>
+              <input type="date" name="fecha_entrega" id="fecha_entrega"
+                     class="form-control"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-fecha_entrega"></div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Fecha límite <span class="text-danger">*</span>
+              </label>
+              <input type="date" name="fecha_limite" id="fecha_limite"
+                     class="form-control"
+                     style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <div class="invalid-feedback" id="err-fecha_limite"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-12 mb-1">
+              <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+                Responsable <span class="text-danger">*</span>
+              </label>
+              <select name="empleado_responsable" id="empleado_responsable"
+                      class="form-select"
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+                <option value="">-- Seleccionar Responsable --</option>
+                {% for emp in empleados %}
+                  <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback" id="err-empleado_responsable"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
+            <i class="bi bi-save"></i> Guardar
+          </button>
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px; padding:8px 16px;"
+                  data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// ── Validación al enviar ──────────────────────────────────────────
+document.getElementById('formProduccion').addEventListener('submit', function(e) {
+    let valido = true;
+
+    // Campos obligatorios de texto
+    ['producto', 'ingredientes'].forEach(id => {
+        const el  = document.getElementById(id);
+        const err = document.getElementById('err-' + id);
+        if (!el.value.trim()) {
+            el.classList.add('is-invalid');
+            if (err) err.textContent = 'Este campo es obligatorio.';
+            valido = false;
+        } else {
+            el.classList.remove('is-invalid');
+            el.classList.add('is-valid');
+            if (err) err.textContent = '';
+        }
+    });
+
+    // Fechas
+    const fechaEntrega = document.getElementById('fecha_entrega').value;
+    const fechaLimite  = document.getElementById('fecha_limite').value;
+    const errFE = document.getElementById('err-fecha_entrega');
+    const errFL = document.getElementById('err-fecha_limite');
+
+    if (!fechaEntrega) {
+        document.getElementById('fecha_entrega').classList.add('is-invalid');
+        if (errFE) errFE.textContent = 'La fecha de entrega es obligatoria.';
+        valido = false;
+    } else {
+        document.getElementById('fecha_entrega').classList.remove('is-invalid');
+        if (errFE) errFE.textContent = '';
+    }
+
+    if (!fechaLimite) {
+        document.getElementById('fecha_limite').classList.add('is-invalid');
+        if (errFL) errFL.textContent = 'La fecha límite es obligatoria.';
+        valido = false;
+    } else if (fechaEntrega && fechaLimite < fechaEntrega) {
+        document.getElementById('fecha_limite').classList.add('is-invalid');
+        if (errFL) errFL.textContent = 'La fecha límite no puede ser anterior a la fecha de entrega.';
+        valido = false;
+    } else {
+        document.getElementById('fecha_limite').classList.remove('is-invalid');
+        if (errFL) errFL.textContent = '';
+    }
+
+    // Responsable
+    const emp    = document.getElementById('empleado_responsable');
+    const errEmp = document.getElementById('err-empleado_responsable');
+    if (!emp.value) {
+        emp.classList.add('is-invalid');
+        if (errEmp) errEmp.textContent = 'Debes seleccionar un responsable.';
+        valido = false;
+    } else {
+        emp.classList.remove('is-invalid');
+        if (errEmp) errEmp.textContent = '';
+    }
+
+    if (!valido) e.preventDefault();
+});
+
+// ── Limpiar validaciones en vivo ──────────────────────────────────
+['producto', 'ingredientes', 'fecha_entrega', 'fecha_limite', 'empleado_responsable'].forEach(id => {
+    document.getElementById(id).addEventListener('change', function() {
+        this.classList.remove('is-invalid', 'is-valid');
+    });
+    document.getElementById(id).addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+    });
+});
+
+// ── Pre-cargar datos para edición ────────────────────────────────
 function editarProduccion(id, producto, ingredientes, cantRequerida,
                            fechaEntrega, fechaLimite, estado, empId) {
+    limpiarModal();
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-pencil-square"></i> Editar Producción';
+    document.getElementById('id').value                      = id;
+    document.getElementById('producto').value                = producto;
+    document.getElementById('ingredientes').value            = ingredientes;
+    document.getElementById('cantidad_requerida').value      = cantRequerida;
+    document.getElementById('fecha_entrega').value           = fechaEntrega;
+    document.getElementById('fecha_limite').value            = fechaLimite;
+    document.getElementById('estado').value                  = estado;
+    document.getElementById('empleado_responsable').value    = empId;
+    new bootstrap.Modal(document.getElementById('modalProduccion')).show();
+}
 
-    // Asignar los valores recibidos a cada campo del modal
-    document.getElementById('id').value                   = id;
-    document.getElementById('producto').value             = producto;
-    document.getElementById('ingredientes').value         = ingredientes;
-    document.getElementById('cantidad_requerida').value   = cantRequerida;
-    document.getElementById('fecha_entrega').value        = fechaEntrega;
-    document.getElementById('fecha_limite').value         = fechaLimite;
-    document.getElementById('estado').value               = estado;
-    document.getElementById('empleado_responsable').value = empId;
-
-    // Abrir el modal con Bootstrap
-    var modal = new bootstrap.Modal(
-        document.getElementById('modalProduccion')
-    );
-    modal.show();
+// ── Limpiar modal para nueva producción ──────────────────────────
+function limpiarModal() {
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-plus-circle"></i> Nueva Producción';
+    ['id', 'producto', 'ingredientes', 'cantidad_requerida', 'fecha_entrega', 'fecha_limite'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = '';
+            el.classList.remove('is-invalid', 'is-valid');
+        }
+    });
+    document.getElementById('estado').value               = 'Pendiente';
+    document.getElementById('empleado_responsable').value = '';
+    ['err-producto','err-ingredientes','err-fecha_entrega','err-fecha_limite','err-empleado_responsable'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
 }
 </script>
 
