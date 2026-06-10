@@ -64,6 +64,7 @@ urlpatterns = [
     path('producciones/inactivar/<int:id>/', views.inactivar_produccion, name='inactivar_produccion'),
     path('producciones/reporte/', views.generar_reporte_producciones, name='reporte_producciones'),
     path('produccion/supervisor/', views.producciones_supervisor, name='producciones_supervisor'),
+    path('guardar-produccion-supervisor/', views.guardar_produccion_supervisor, name='guardar_produccion_supervisor'),
 
     # EXPORTACIONES — sin select_related('creado_por') porque el modelo no tiene ese campo
     path('exportaciones/', views.gestionar_exportaciones, name='gestionar_exportaciones'),

@@ -45,7 +45,7 @@
       <input type="text"
              name="q"
              value="{{ busqueda }}"
-             placeholder="Buscar por destino o producto..."
+             placeholder="Buscar por destino..."
              class="form-control"
              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; background:#fdf9f6;">
 
@@ -89,6 +89,11 @@
           <th>Destino</th>
           <th>País</th>
           <th>Producto</th>
+          <th>Lote</th>
+          <th>Empresa</th>
+          <th>Nº Contenedor</th>
+          <th>Cajas</th>
+          <th>Peso Total</th>
           <th>Fecha Envío</th>
           <th>Fecha Entrega</th>
           <th>Estado</th>
@@ -106,7 +111,26 @@
             </div>
           </td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.pais }}</td>
-          <td style="font-size:0.85rem; color:#666;">{{ exp.producto }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.nombre_producto|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if exp.lote %}
+              <span class="badge" style="background:#f0e6dc; color:#603C1C; font-size:0.78rem;">
+                {{ exp.lote.codigo_lote }}
+              </span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.empresa_exportadora|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ exp.numero_contenedor|default:"—" }}</td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if exp.cantidad_cajas %}
+              {{ exp.cantidad_cajas }}{% if exp.unidades_por_caja %} ({{ exp.unidades_por_caja }} u/c){% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if exp.peso_total %}{{ exp.peso_total }} kg{% else %}—{% endif %}
+          </td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.fecha_envio }}</td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.fecha_entrega }}</td>
           <td>
@@ -123,7 +147,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+          <td colspan="11" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
             <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
             {% if busqueda or estado_filtro %}
               No se encontraron exportaciones con los filtros aplicados

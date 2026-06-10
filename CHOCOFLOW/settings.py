@@ -1,5 +1,8 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv  # ← agregar
+
+load_dotenv()  # ← agregar
 
 # Ruta base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent

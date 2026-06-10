@@ -15,12 +15,12 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 from io import BytesIO
 from dotenv import load_dotenv
+load_dotenv()
 from google import genai
 import os
 import json
 import re
 
-load_dotenv()
 
 from datetime import date
 from .models import (
@@ -1812,6 +1812,14 @@ def guardar_produccion(request):
             messages.error(request, "La fecha límite no puede ser anterior a la fecha de entrega.")
             return redirect('producciones')
 
+        # Validar que fecha_entrega no sea de una semana anterior a la actual
+        hoy            = timezone.now().date()
+        inicio_semana  = hoy - timedelta(days=hoy.weekday())  # lunes de esta semana
+        fecha_entrega_date = date.fromisoformat(fecha_entrega)
+        if fecha_entrega_date < inicio_semana:
+            messages.error(request, "La fecha de entrega no puede ser de una semana anterior a la actual.")
+            return redirect('producciones')
+
         empleado = get_object_or_404(Empleado, id=emp_id)
 
         if produccion_id:
@@ -1841,7 +1849,6 @@ def guardar_produccion(request):
 def inactivar_produccion(request, id):
     produccion = get_object_or_404(Produccion, id=id)
 
-    # Validar ANTES de modificar nada
     if produccion.estado == 'Finalizado':
         messages.error(
             request,
@@ -1853,6 +1860,7 @@ def inactivar_produccion(request, id):
     produccion.save()
     messages.success(request, "Producción cancelada.")
     return redirect('producciones')
+
 
 @login_required(login_url='login')
 def generar_reporte_producciones(request):
@@ -1939,6 +1947,77 @@ def producciones_supervisor(request):
     })
 
 
+@login_required(login_url='login')
+def guardar_produccion_supervisor(request):
+    if request.method == 'POST':
+
+        # Validar sesión
+        usuario_id = request.session.get('usuario_id')
+        if not usuario_id:
+            messages.error(request, "Sesión inválida.")
+            return redirect('login')
+        try:
+            usuario_perfil = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            messages.error(request, "No se encontró tu perfil.")
+            return redirect('login')
+
+        produccion_id      = request.POST.get('id', '').strip()
+        producto           = request.POST.get('producto', '').strip()
+        ingredientes       = request.POST.get('ingredientes', '').strip()
+        cantidad_requerida = request.POST.get('cantidad_requerida', '').strip()
+        fecha_entrega      = request.POST.get('fecha_entrega', '').strip()
+        fecha_limite       = request.POST.get('fecha_limite', '').strip()
+        estado             = request.POST.get('estado', '').strip()
+        emp_id             = request.POST.get('empleado_responsable', '').strip()
+
+        # Campos obligatorios
+        if not producto or not emp_id or not fecha_entrega or not fecha_limite or not estado:
+            messages.error(request, "Los campos obligatorios no pueden estar vacíos.")
+            return redirect('producciones_supervisor')
+
+        # Ingredientes obligatorios
+        if not ingredientes:
+            messages.error(request, "Los ingredientes son obligatorios.")
+            return redirect('producciones_supervisor')
+
+        # Validar que fecha_limite no sea anterior a fecha_entrega
+        if fecha_limite < fecha_entrega:
+            messages.error(request, "La fecha límite no puede ser anterior a la fecha de entrega.")
+            return redirect('producciones_supervisor')
+
+        # Validar que fecha_entrega no sea de una semana anterior a la actual
+        hoy                = timezone.now().date()
+        inicio_semana      = hoy - timedelta(days=hoy.weekday())  # lunes de esta semana
+        fecha_entrega_date = date.fromisoformat(fecha_entrega)
+        if fecha_entrega_date < inicio_semana:
+            messages.error(request, "La fecha de entrega no puede ser de una semana anterior a la actual.")
+            return redirect('producciones_supervisor')
+
+        empleado = get_object_or_404(Empleado, id=emp_id)
+
+        if produccion_id:
+            produccion = get_object_or_404(Produccion, id=produccion_id)
+        else:
+            produccion = Produccion()
+
+        produccion.producto             = producto
+        produccion.ingredientes         = ingredientes
+        produccion.cantidad_requerida   = cantidad_requerida
+        produccion.fecha_entrega        = fecha_entrega
+        produccion.fecha_limite         = fecha_limite
+        produccion.estado               = estado
+        produccion.empleado_responsable = empleado
+        produccion.creado_por           = usuario_perfil
+
+        try:
+            produccion.save()
+            messages.success(request, "Producción guardada correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al guardar: {str(e)}")
+
+    return redirect('producciones_supervisor')
+
 # ===================
 # EXPORTACIONES
 # ===================
@@ -1988,8 +2067,7 @@ def exportaciones_supervisor(request):
 
     if busqueda:
         lista = lista.filter(
-            Q(destino__icontains=busqueda) |
-            Q(producto__icontains=busqueda)
+            Q(destino__icontains=busqueda)
         )
     if estado_filtro and estado_filtro != 'Todos':
         lista = lista.filter(estado=estado_filtro)
@@ -2039,12 +2117,10 @@ def guardar_exportacion(request):
         numero_contenedor    = request.POST.get('numero_contenedor', '').strip()
         observaciones        = request.POST.get('observaciones', '').strip()
 
-        # ── 1. Campos de texto obligatorios ────────────────────────────────────
         if not all([destino, pais, fecha_envio, fecha_entrega, estado]):
             messages.error(request, "Los campos Destino, País, Fechas y Estado son obligatorios.")
             return redirect('gestionar_exportaciones')
 
-        # ── 2. Producción y Lote OBLIGATORIOS ──────────────────────────────────
         if not produccion_id:
             messages.error(request, "Debes seleccionar una producción asociada.")
             return redirect('gestionar_exportaciones')
@@ -2053,7 +2129,6 @@ def guardar_exportacion(request):
             messages.error(request, "Debes seleccionar un lote asociado.")
             return redirect('gestionar_exportaciones')
 
-        # ── 3. Solo letras en destino y país ───────────────────────────────────
         patron_texto = r'^[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s]+$'
         if not re.match(patron_texto, destino):
             messages.error(request, "El destino solo puede contener letras.")
@@ -2065,7 +2140,6 @@ def guardar_exportacion(request):
             messages.error(request, "El nombre del producto solo puede contener letras.")
             return redirect('gestionar_exportaciones')
 
-        # ── 4. Enteros opcionales ──────────────────────────────────────────────
         cantidad_cajas_val = None
         if cantidad_cajas:
             if not cantidad_cajas.isdigit() or int(cantidad_cajas) <= 0:
@@ -2080,7 +2154,6 @@ def guardar_exportacion(request):
                 return redirect('gestionar_exportaciones')
             unidades_por_caja_val = int(unidades_por_caja)
 
-        # ── 5. Decimales opcionales ────────────────────────────────────────────
         peso_caja_val = None
         if peso_caja:
             try:
@@ -2101,7 +2174,6 @@ def guardar_exportacion(request):
                 messages.error(request, "El peso total debe ser un número decimal positivo.")
                 return redirect('gestionar_exportaciones')
 
-        # ── 6. Parsear fechas de la exportación ────────────────────────────────
         try:
             fecha_envio_obj   = datetime.strptime(fecha_envio, '%Y-%m-%d').date()
             fecha_entrega_obj = datetime.strptime(fecha_entrega, '%Y-%m-%d').date()
@@ -2113,10 +2185,8 @@ def guardar_exportacion(request):
             messages.error(request, "La fecha de entrega no puede ser anterior a la fecha de envío.")
             return redirect('gestionar_exportaciones')
 
-        # ── 7. Validar Producción y sus fechas ─────────────────────────────────
         produccion = get_object_or_404(Produccion, pk=produccion_id)
 
-        # La fecha de envío no puede ser anterior a la fecha de entrega de la producción
         if fecha_envio_obj < produccion.fecha_entrega:
             messages.error(
                 request,
@@ -2125,15 +2195,12 @@ def guardar_exportacion(request):
             )
             return redirect('gestionar_exportaciones')
 
-        # ── 8. Validar Lote y sus fechas ───────────────────────────────────────
         lote = get_object_or_404(Lote, pk=lote_id)
 
-        # El lote debe pertenecer a la producción seleccionada
         if lote.produccion_id != produccion.id:
             messages.error(request, "El lote seleccionado no pertenece a la producción elegida.")
             return redirect('gestionar_exportaciones')
 
-        # La fecha de envío no puede ser anterior a la fecha de producción del lote
         if fecha_envio_obj < lote.fecha_produccion:
             messages.error(
                 request,
@@ -2142,7 +2209,6 @@ def guardar_exportacion(request):
             )
             return redirect('gestionar_exportaciones')
 
-        # La fecha de entrega de la exportación no puede superar la fecha de vencimiento del lote
         if fecha_entrega_obj > lote.fecha_vencimiento:
             messages.error(
                 request,
@@ -2151,7 +2217,6 @@ def guardar_exportacion(request):
             )
             return redirect('gestionar_exportaciones')
 
-        # ── 9. Guardar ─────────────────────────────────────────────────────────
         if exp_id:
             exp = get_object_or_404(Exportacion, pk=exp_id)
         else:
@@ -2178,6 +2243,7 @@ def guardar_exportacion(request):
         messages.success(request, f"Exportación {accion} correctamente.")
 
     return redirect('gestionar_exportaciones')
+
 
 @login_required(login_url='login')
 def inactivar_exportacion(request, id):
@@ -2213,7 +2279,7 @@ def generar_reporte_exportaciones(request):
         datos.append([
             exp.destino,
             exp.pais,
-            exp.producto,
+            exp.nombre_producto or '',
             str(exp.fecha_envio),
             str(exp.fecha_entrega),
             exp.estado,
@@ -2249,7 +2315,7 @@ def generar_reporte_exportaciones(request):
 def gestionar_lotes(request):
 
     q     = request.GET.get('q', '')
-    lotes = Lote.objects.select_related('produccion', 'exportacion').all()
+    lotes = Lote.objects.select_related('produccion').all()  # ← quitado 'exportacion'
 
     if q:
         lotes = lotes.filter(codigo_lote__icontains=q)
@@ -2278,7 +2344,7 @@ def lotes_supervisor(request):
             empleado_responsable_id__in=ids_empleados
         ).values_list('id', flat=True)
         lista = Lote.objects.select_related(
-            'produccion', 'exportacion'
+            'produccion'                          # ← quitado 'exportacion'
         ).filter(produccion_id__in=ids_producciones).order_by('-fecha_produccion')
     else:
         lista = Lote.objects.none()
@@ -2313,29 +2379,23 @@ def guardar_lote(request):
         fecha_produccion  = request.POST.get('fecha_produccion', '').strip()
         fecha_vencimiento = request.POST.get('fecha_vencimiento', '').strip()
         produccion_id     = request.POST.get('produccion_id', '').strip()
-        exportacion_id    = request.POST.get('exportacion_id', '').strip()
 
-        # Campos obligatorios (produccion_id incluido)
         if not all([codigo_lote, cantidad, fecha_produccion, fecha_vencimiento, produccion_id]):
             messages.error(request, "Todos los campos obligatorios deben estar completos, incluyendo la producción.")
             return redirect('gestionar_lotes')
 
-        # Formato código XX-000
         if not re.fullmatch(r'[A-Z]{2}-\d{3}', codigo_lote):
             messages.error(request, "El código debe tener el formato XX-000 (2 letras y 3 números). Ej: CH-001, AB-123.")
             return redirect('gestionar_lotes')
 
-        # Cantidad numérica
         if not cantidad.isdigit():
             messages.error(request, "La cantidad debe contener únicamente números.")
             return redirect('gestionar_lotes')
 
-        # Unidad válida
         if unidad not in ['Kilogramos', 'Gramos', '']:
             messages.error(request, "La unidad seleccionada no es válida.")
             return redirect('gestionar_lotes')
 
-        # Fechas
         try:
             fecha_prod = datetime.strptime(fecha_produccion, '%Y-%m-%d').date()
             fecha_venc = datetime.strptime(fecha_vencimiento, '%Y-%m-%d').date()
@@ -2343,10 +2403,8 @@ def guardar_lote(request):
             messages.error(request, "Las fechas ingresadas no son válidas.")
             return redirect('gestionar_lotes')
 
-        # Producción obligatoria
         produccion = get_object_or_404(Produccion, pk=produccion_id)
 
-        # Fecha de producción del lote debe coincidir con fecha de entrega de la producción
         if fecha_prod != produccion.fecha_entrega:
             messages.error(
                 request,
@@ -2355,17 +2413,10 @@ def guardar_lote(request):
             )
             return redirect('gestionar_lotes')
 
-        # Fecha vencimiento no anterior a fecha de producción
         if fecha_venc < fecha_prod:
             messages.error(request, "La fecha de vencimiento no puede ser anterior a la fecha de producción.")
             return redirect('gestionar_lotes')
 
-        # Exportación opcional
-        exportacion = None
-        if exportacion_id:
-            exportacion = get_object_or_404(Exportacion, pk=exportacion_id)
-
-        # Editar o crear
         if lote_id:
             if Lote.objects.filter(codigo_lote=codigo_lote).exclude(pk=lote_id).exists():
                 messages.error(request, f"Ya existe un lote con el código '{codigo_lote}'.")
@@ -2385,13 +2436,13 @@ def guardar_lote(request):
         lote.fecha_produccion  = fecha_prod
         lote.fecha_vencimiento = fecha_venc
         lote.produccion        = produccion
-        lote.exportacion       = exportacion
         lote.save()
 
         accion = "actualizado" if lote_id else "creado"
         messages.success(request, f"Lote '{codigo_lote}' {accion} correctamente.")
 
     return redirect('gestionar_lotes')
+
 
 @login_required(login_url='login')
 def eliminar_lote(request, id):
@@ -2405,7 +2456,7 @@ def eliminar_lote(request, id):
 @login_required(login_url='login')
 def generar_reporte_lotes(request):
 
-    lotes    = Lote.objects.select_related('produccion', 'exportacion').all()
+    lotes    = Lote.objects.select_related('produccion').all()  # ← quitado 'exportacion'
     busqueda = request.GET.get('busqueda', '')
 
     if busqueda:
@@ -2419,7 +2470,7 @@ def generar_reporte_lotes(request):
     elementos.append(Paragraph("Reporte de Lotes - ChocoFlow", estilos['Title']))
     elementos.append(Spacer(1, 20))
 
-    datos = [['Código Lote', 'Cantidad', 'Fecha Producción', 'Fecha Vencimiento', 'Producción', 'Exportación']]
+    datos = [['Código Lote', 'Cantidad', 'Fecha Producción', 'Fecha Vencimiento', 'Producción']]
     for lote in lotes:
         datos.append([
             lote.codigo_lote,
@@ -2427,7 +2478,6 @@ def generar_reporte_lotes(request):
             str(lote.fecha_produccion),
             str(lote.fecha_vencimiento),
             str(lote.produccion),
-            str(lote.exportacion),
         ])
 
     tabla = Table(datos)
@@ -2450,7 +2500,6 @@ def generar_reporte_lotes(request):
     response['Content-Disposition'] = 'attachment; filename="reporte_lotes.pdf"'
     response.write(pdf)
     return response
-
 
 # ========================
 # BITÁCORA DE PRODUCCIÓN
@@ -2647,68 +2696,6 @@ def revisar_bitacora(request, id):
 
     return redirect('listar_bitacoras')
 
-
-# ========================
-# ASISTENTE IA CON GEMINI
-# ========================
-
-@login_required(login_url='login')
-def consultar_ia(request):
-
-    if request.method == 'POST':
-
-        pregunta = request.POST.get('pregunta', '').strip()
-
-        if not pregunta:
-            return JsonResponse({'error': 'La pregunta no puede estar vacía.'}, status=400)
-
-        if len(pregunta) < 5:
-            return JsonResponse({'error': 'La pregunta es demasiado corta.'}, status=400)
-
-        empleados_activos        = Empleado.objects.filter(estado='Activo').count()
-        empleados_suspendidos    = Empleado.objects.filter(estado='Suspendido').count()
-        producciones_proceso     = Produccion.objects.filter(estado='En Proceso').count()
-        producciones_finalizadas = Produccion.objects.filter(estado='Finalizado').count()
-        exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
-        total_lotes              = Lote.objects.count()
-        total_asignaciones       = Asignacion.objects.count()
-        bitacoras_pendientes     = Bitacora.objects.filter(estado='Enviado').count()
-
-        contexto = f"""
-Eres un asistente experto en gestión de producción de chocolate llamado ChocoBot.
-Respondes en español, de forma clara, profesional y con recomendaciones prácticas.
-
-Datos actuales de la empresa ChocoFlow:
-- Empleados activos: {empleados_activos}
-- Empleados suspendidos: {empleados_suspendidos}
-- Producciones en proceso: {producciones_proceso}
-- Producciones finalizadas: {producciones_finalizadas}
-- Exportaciones pendientes: {exportaciones_pendientes}
-- Total de lotes: {total_lotes}
-- Total de asignaciones: {total_asignaciones}
-- Bitácoras pendientes de revisión: {bitacoras_pendientes}
-
-Con base en estos datos reales, responde la siguiente pregunta:
-{pregunta}
-        """
-
-        try:
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                return JsonResponse({'error': 'API key de Gemini no configurada.'}, status=500)
-
-            cliente   = genai.Client(api_key=api_key)
-            respuesta = cliente.models.generate_content(
-                model    = "gemini-2.0-flash",
-                contents = contexto
-            )
-            return JsonResponse({'respuesta': respuesta.text})
-
-        except Exception as e:
-            return JsonResponse({'error': f'Error al consultar la IA: {str(e)}'}, status=500)
-
-    return JsonResponse({'error': 'Método no permitido.'}, status=405)
-
 # ====================
 # LOGICA DE CORREOS
 # ====================
@@ -2846,3 +2833,167 @@ def enviar_correos_masivos(request):
         messages.warning(request, f"⚠️ {errores} correo(s) fallaron. Revisa el historial.")
 
     return redirect('correos_vista')
+
+# ========================
+# ASISTENTE IA CON GEMINI
+# ========================
+
+@login_required(login_url='login')
+def consultar_ia(request):
+
+    if request.method == 'POST':
+
+        pregunta = request.POST.get('pregunta', '').strip()
+
+        if not pregunta:
+            return JsonResponse({'error': 'La pregunta no puede estar vacía.'}, status=400)
+
+        if len(pregunta) < 5:
+            return JsonResponse({'error': 'La pregunta es demasiado corta.'}, status=400)
+
+        # ── Datos generales ────────────────────────────────────────────
+        empleados_activos        = Empleado.objects.filter(estado='Activo').count()
+        empleados_suspendidos    = Empleado.objects.filter(estado='Suspendido').count()
+        empleados_incapacitados  = Empleado.objects.filter(estado='Incapacitado').count()
+        empleados_inactivos      = Empleado.objects.filter(estado='Inactivo').count()
+
+        producciones_pendientes  = Produccion.objects.filter(estado='Pendiente').count()
+        producciones_proceso     = Produccion.objects.filter(estado='En Proceso').count()
+        producciones_finalizadas = Produccion.objects.filter(estado='Finalizado').count()
+        producciones_canceladas  = Produccion.objects.filter(estado='Cancelado').count()
+
+        exportaciones_pendientes = Exportacion.objects.filter(estado='Pendiente').count()
+        exportaciones_enviadas   = Exportacion.objects.filter(estado='Enviado').count()
+        exportaciones_entregadas = Exportacion.objects.filter(estado='Entregado').count()
+        exportaciones_canceladas = Exportacion.objects.filter(estado='Cancelado').count()
+
+        total_lotes              = Lote.objects.count()
+        total_asignaciones       = Asignacion.objects.count()
+        asignaciones_pendientes  = Asignacion.objects.filter(estado='Pendiente').count()
+        asignaciones_proceso     = Asignacion.objects.filter(estado='En Proceso').count()
+        asignaciones_finalizadas = Asignacion.objects.filter(estado='Finalizado').count()
+
+        bitacoras_pendientes     = Bitacora.objects.filter(estado='Enviado').count()
+        bitacoras_aprobadas      = Bitacora.objects.filter(estado='Aprobado').count()
+        bitacoras_rechazadas     = Bitacora.objects.filter(estado='Rechazado').count()
+
+        solicitudes_pendientes   = Solicitud.objects.filter(estado='Pendiente').count()
+        solicitudes_aprobadas    = Solicitud.objects.filter(estado='Aprobado').count()
+        solicitudes_rechazadas   = Solicitud.objects.filter(estado='Rechazado').count()
+
+        # ── Datos detallados ───────────────────────────────────────────
+        hoy           = timezone.now().date()
+        inicio_semana = hoy - timedelta(days=hoy.weekday())
+        fin_semana    = inicio_semana + timedelta(days=6)
+
+        asignaciones_semana = Asignacion.objects.filter(
+            fecha_asignacion__range=[inicio_semana, fin_semana]
+        ).count()
+
+        producciones_recientes = Produccion.objects.select_related(
+            'empleado_responsable'
+        ).order_by('-id')[:5]
+
+        detalle_producciones = "\n".join([
+            f"  • {p.producto} | Responsable: {p.empleado_responsable.nombre} | "
+            f"Estado: {p.estado} | Entrega: {p.fecha_entrega} | Límite: {p.fecha_limite}"
+            for p in producciones_recientes
+        ])
+
+        lotes_proximos = Lote.objects.filter(
+            fecha_vencimiento__range=[hoy, hoy + timedelta(days=30)]
+        ).order_by('fecha_vencimiento')[:5]
+
+        detalle_lotes = "\n".join([
+            f"  • Lote: {l.codigo_lote} | Producto: {l.nombre_producto or '—'} | "
+            f"Vence: {l.fecha_vencimiento} | Cantidad: {l.cantidad} {l.unidad or ''}"
+            for l in lotes_proximos
+        ]) or "  • Ninguno próximo a vencer en los próximos 30 días."
+
+        exportaciones_recientes = Exportacion.objects.order_by('-id')[:5]
+        detalle_exportaciones = "\n".join([
+            f"  • Destino: {e.destino} ({e.pais}) | Estado: {e.estado} | "
+            f"Envío: {e.fecha_envio} | Entrega: {e.fecha_entrega}"
+            for e in exportaciones_recientes
+        ])
+
+        contexto = f"""
+Eres ChocoBot, un asistente experto en gestión de producción de chocolate para la empresa ChocoFlow.
+Respondes siempre en español, de forma clara, profesional y con recomendaciones prácticas y accionables.
+Puedes hacer predicciones, detectar alertas, sugerir mejoras y analizar tendencias basándote en los datos reales.
+Usa emojis con moderación para hacer la respuesta más legible.
+Estructura tu respuesta con secciones cuando sea pertinente.
+
+════════════════════════════════════════
+📊 DATOS ACTUALES DE CHOCOFLOW
+════════════════════════════════════════
+
+👥 EMPLEADOS:
+  - Activos: {empleados_activos}
+  - Suspendidos: {empleados_suspendidos}
+  - Incapacitados: {empleados_incapacitados}
+  - Inactivos: {empleados_inactivos}
+
+🏭 PRODUCCIONES:
+  - Pendientes: {producciones_pendientes}
+  - En Proceso: {producciones_proceso}
+  - Finalizadas: {producciones_finalizadas}
+  - Canceladas: {producciones_canceladas}
+
+  Últimas 5 producciones:
+{detalle_producciones}
+
+📦 LOTES:
+  - Total registrados: {total_lotes}
+  - Próximos a vencer (30 días):
+{detalle_lotes}
+
+✈️ EXPORTACIONES:
+  - Pendientes: {exportaciones_pendientes}
+  - Enviadas: {exportaciones_enviadas}
+  - Entregadas: {exportaciones_entregadas}
+  - Canceladas: {exportaciones_canceladas}
+
+  Últimas 5 exportaciones:
+{detalle_exportaciones}
+
+📋 ASIGNACIONES:
+  - Total: {total_asignaciones}
+  - Pendientes: {asignaciones_pendientes}
+  - En Proceso: {asignaciones_proceso}
+  - Finalizadas: {asignaciones_finalizadas}
+  - Esta semana ({inicio_semana} al {fin_semana}): {asignaciones_semana}
+
+📓 BITÁCORAS:
+  - Pendientes de revisión: {bitacoras_pendientes}
+  - Aprobadas: {bitacoras_aprobadas}
+  - Rechazadas: {bitacoras_rechazadas}
+
+📩 SOLICITUDES DE TURNO:
+  - Pendientes: {solicitudes_pendientes}
+  - Aprobadas: {solicitudes_aprobadas}
+  - Rechazadas: {solicitudes_rechazadas}
+
+📅 Fecha actual: {hoy}
+
+════════════════════════════════════════
+Con base en estos datos reales, responde de forma útil y accionable:
+{pregunta}
+        """
+
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                return JsonResponse({'error': 'API Key no configurada.'}, status=500)
+
+            cliente   = genai.Client(api_key=api_key)
+            respuesta = cliente.models.generate_content(
+                model    = "gemini-2.0-flash",
+                contents = contexto
+            )
+            return JsonResponse({'respuesta': respuesta.text})
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error al consultar la IA: {str(e)}'}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
