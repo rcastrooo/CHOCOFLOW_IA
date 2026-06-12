@@ -8,11 +8,22 @@ from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
 from datetime import date, datetime, timedelta
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Paragraph,
+    Spacer
+)
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter, landscape
 from .ia.analisis import (obtener_resumen_empresa,detectar_alertas)
+from myApp.ia.predicciones import (predecir_proxima_produccion)
+from myApp.ia.alertas import (detectar_vencimientos_lotes,detectar_retrasos_exportaciones)
+from myApp.ia.exportaciones import (predecir_exportaciones)
+from myApp.ia.rendimiento import (analizar_rendimiento)
+from myApp.ia.anomalias import (detectar_anomalias)
 
 from io import BytesIO
 from dotenv import load_dotenv
@@ -267,7 +278,6 @@ def registro(request):
         return redirect('login')
 
     return render(request, 'auth/registro.html')
-
 
 # =======================
 # DASHBOARD ADMINISTRADOR
@@ -580,17 +590,140 @@ def carga_masiva_supervisores(request):
 
 @login_required(login_url='login')
 def reporte_supervisores(request):
-    supervisores = Usuario.objects.filter(rol='Supervisor').order_by('nombre')
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    supervisores = Usuario.objects.filter(
+        rol='Supervisor'
+    ).order_by('nombre')
+
+    total_supervisores = supervisores.count()
+    activos = supervisores.filter(estado='Activo').count()
+    inactivos = supervisores.filter(estado='Inactivo').count()
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=25,
+        bottomMargin=25
+    )
+
     elementos = []
-    estilos   = getSampleStyleSheet()
+    estilos = getSampleStyleSheet()
 
-    elementos.append(Paragraph("Reporte de Supervisores - ChocoFlow", estilos['Title']))
+    # ==================================================
+    # ESTILOS
+    # ==================================================
+
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723'),
+        spaceAfter=10
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        fontSize=10,
+        alignment=1,
+        textColor=colors.HexColor('#7A6A5D')
+    )
+
+    resumen_style = ParagraphStyle(
+        'Resumen',
+        parent=estilos['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        alignment=1,
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        fontSize=8,
+        alignment=1,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    # ==================================================
+    # ENCABEZADO
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "REPORTE DE SUPERVISORES",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==================================================
+    # TARJETAS RESUMEN
+    # ==================================================
+
+    resumen = Table([
+        [
+            Paragraph(
+                f"<b>Total Supervisores</b><br/>{total_supervisores}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Activos</b><br/>{activos}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Inactivos</b><br/>{inactivos}",
+                resumen_style
+            ),
+        ]
+    ], colWidths=[170, 170, 170])
+
+    resumen.setStyle(TableStyle([
+
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#5D4037')),
+        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#6D4C41')),
+        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#8D6E63')),
+
+        ('BOX', (0, 0), (-1, -1), 0, colors.white),
+
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+    ]))
+
+    elementos.append(resumen)
     elementos.append(Spacer(1, 20))
 
-    datos = [['Nombre', 'Email', 'Teléfono', 'Dirección', 'Turno', 'Estado']]
+    # ==================================================
+    # TABLA PRINCIPAL
+    # ==================================================
+
+    datos = [[
+        'Nombre',
+        'Email',
+        'Teléfono',
+        'Dirección',
+        'Turno',
+        'Estado'
+    ]]
+
     for s in supervisores:
         datos.append([
             s.nombre,
@@ -601,25 +734,74 @@ def reporte_supervisores(request):
             s.estado,
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+    datos,
+    colWidths=[90, 130, 80, 90, 110, 50])
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        # ENCABEZADO
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4E342E')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        # CUERPO
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#333333')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+
+        # ALINEACIÓN
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # BORDES
+        ('GRID', (0, 0), (-1, -1), 0.6, colors.HexColor('#D7CCC8')),
+
+        # ESPACIADO
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        # FILAS ALTERNAS
+        ('ROWBACKGROUNDS',
+         (0, 1),
+         (-1, -1),
+         [
+             colors.HexColor('#FAF7F2'),
+             colors.HexColor('#F2ECE5')
+         ]),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==================================================
+    # PIE DE PÁGINA
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
     buffer.close()
 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'inline; filename="reporte_supervisores.pdf"'
+    response = HttpResponse(
+        content_type='application/pdf'
+    )
+
+    response['Content-Disposition'] = (
+        'inline; filename="reporte_supervisores.pdf"'
+    )
+
     response.write(pdf)
+
     return response
 
 
@@ -938,48 +1120,225 @@ def inactivar_empleado(request, id):
     messages.success(request, f"{empleado.nombre} fue inactivado.")
     return redirect('empleados')
 
-
 @login_required(login_url='login')
 def generar_reporte_empleados(request):
 
-    lista    = Empleado.objects.all()
+    lista = Empleado.objects.all()
     busqueda = request.GET.get('busqueda', '')
-    estado   = request.GET.get('estado', '')
+    estado = request.GET.get('estado', '')
 
     if busqueda:
         lista = lista.filter(nombre__icontains=busqueda)
+
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
-    elementos = []
-    estilos   = getSampleStyleSheet()
+    buffer = BytesIO()
 
-    elementos.append(Paragraph("Reporte de Empleados - ChocoFlow", estilos['Title']))
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=40,
+        bottomMargin=30
+    )
+
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # ==========================
+    # MÉTRICAS
+    # ==========================
+    total_empleados = lista.count()
+    empleados_activos = lista.filter(estado='Activo').count()
+    empleados_inactivos = total_empleados - empleados_activos
+
+    # ==========================
+    # ENCABEZADO EMPRESA
+    # ==========================
+    empresa_style = ParagraphStyle(
+        'Empresa',
+        parent=estilos['Title'],
+        fontSize=28,
+        leading=32,
+        alignment=1,
+        textColor=colors.HexColor('#4E342E')
+    )
+
+    elementos.append(
+        Paragraph(
+            "CHOCOFLOW",
+            empresa_style
+        )
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=10,
+        textColor=colors.HexColor('#7A6A5D')
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema Inteligente de Gestión de Producción y Exportación",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==========================
+    # TITULO REPORTE
+    # ==========================
+    titulo_style = ParagraphStyle(
+        'TituloReporte',
+        parent=estilos['Heading1'],
+        fontSize=18,
+        alignment=1,
+        textColor=colors.HexColor('#5D4037')
+    )
+
+    elementos.append(
+        Paragraph(
+            "REPORTE DE EMPLEADOS",
+            titulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==========================
+    # KPI CARDS
+    # ==========================
+    kpi_data = [[
+        f"Total={total_empleados}",
+        f"Activos={empleados_activos}",
+        f"Inactivos={empleados_inactivos}"
+    ]]
+
+    kpi = Table(
+        kpi_data,
+        colWidths=[170, 170, 170]
+    )
+
+    kpi.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#6D4C41')),
+        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#4E342E')),
+        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#8D6E63')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('TOPPADDING', (0, 0), (-1, -1), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
+    ]))
+
+    elementos.append(kpi)
+
     elementos.append(Spacer(1, 20))
 
+    # ==========================
+    # RESUMEN EJECUTIVO
+    # ==========================
+    resumen_style = ParagraphStyle(
+        'Resumen',
+        parent=estilos['Normal'],
+        fontSize=10,
+        leading=18,
+        textColor=colors.HexColor('#333333')
+    )
+
+    resumen = f"""
+    <b>Resumen Ejecutivo</b><br/><br/>
+
+    Actualmente existen <b>{total_empleados}</b> empleados registrados.
+    De ellos, <b>{empleados_activos}</b> están activos y
+    <b>{empleados_inactivos}</b> presentan otro estado.
+
+    Este reporte fue generado automáticamente por ChocoFlow para apoyar
+    la gestión y toma de decisiones.
+    """
+
+    elementos.append(
+        Paragraph(
+            resumen,
+            resumen_style
+        )
+    )
+
+    elementos.append(Spacer(1, 20))
+
+    # ==========================
+    # TABLA EMPLEADOS
+    # ==========================
     datos = [['Cédula', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Estado']]
+
     for emp in lista:
         datos.append([
-            emp.cedula    or '',
+            emp.cedula or '',
             emp.nombre,
             emp.email,
-            emp.telefono  or '',
+            emp.telefono or '',
             emp.direccion or '',
             emp.estado,
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[75, 85, 120, 80, 90, 60]
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#5D4037')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D7CCC8')),
+
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        ('ROWBACKGROUNDS',
+            (0, 1),
+            (-1, -1),
+            [
+                colors.HexColor('#FAFAFA'),
+                colors.HexColor('#F3F3F3')
+            ]
+        ),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==========================
+    # PIE DE PÁGINA
+    # ==========================
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=colors.HexColor('#7A6A5D')
+    )
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
@@ -988,6 +1347,7 @@ def generar_reporte_empleados(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_empleados.pdf"'
     response.write(pdf)
+
     return response
 
 
@@ -1204,32 +1564,146 @@ def generar_reporte_turnos(request):
 
     lista = Turno.objects.filter(activo=True)
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
-    elementos = []
-    estilos   = getSampleStyleSheet()
+    total_turnos = lista.count()
+    activos = lista.filter(activo=True).count()
+    inactivos = Turno.objects.filter(activo=False).count()
 
-    elementos.append(Paragraph("Reporte de Turnos - ChocoFlow", estilos['Title']))
-    elementos.append(Spacer(1, 20))
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=25,
+        bottomMargin=25
+    )
+
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723')
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=10,
+        textColor=colors.HexColor('#7A6A5D')
+    )
+
+    resumen_style = ParagraphStyle(
+        'Resumen',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=13,
+        fontName='Helvetica-Bold',
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    elementos.append(
+        Paragraph("REPORTE DE TURNOS", titulo_style)
+    )
+
+    elementos.append(
+        Paragraph("Sistema de Gestión ChocoFlow", subtitulo_style)
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    resumen = Table([
+        [
+            Paragraph(
+                f"<b>Total Turnos</b><br/>{total_turnos}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Activos</b><br/>{activos}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Inactivos</b><br/>{inactivos}",
+                resumen_style
+            ),
+        ]
+    ], colWidths=[170,170,170])
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(0,0),colors.HexColor('#5D4037')),
+        ('BACKGROUND',(1,0),(1,0),colors.HexColor('#6D4C41')),
+        ('BACKGROUND',(2,0),(2,0),colors.HexColor('#8D6E63')),
+        ('ALIGN',(0,0),(-1,-1),'CENTER'),
+        ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('TOPPADDING',(0,0),(-1,-1),15),
+        ('BOTTOMPADDING',(0,0),(-1,-1),15),
+    ]))
+
+    elementos.append(resumen)
+    elementos.append(Spacer(1,20))
 
     datos = [['Horario', 'Estado']]
+
     for t in lista:
         datos.append([
             t.horario,
-            'Activo' if t.activo else 'Inactivo',
+            'Activo' if t.activo else 'Inactivo'
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[350,150]
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#4E342E')),
+        ('TEXTCOLOR',(0,0),(-1,0),colors.white),
+
+        ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),
+
+        ('GRID',(0,0),(-1,-1),0.6,colors.HexColor('#D7CCC8')),
+
+        ('ALIGN',(0,0),(-1,-1),'CENTER'),
+        ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+
+        ('TOPPADDING',(0,0),(-1,-1),8),
+        ('BOTTOMPADDING',(0,0),(-1,-1),8),
+
+        ('ROWBACKGROUNDS',
+         (0,1),
+         (-1,-1),
+         [
+             colors.HexColor('#FAF7F2'),
+             colors.HexColor('#F2ECE5')
+         ])
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1,20))
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
@@ -1238,23 +1712,126 @@ def generar_reporte_turnos(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_turnos.pdf"'
     response.write(pdf)
-    return response
 
+    return response
 
 @login_required(login_url='login')
 def generar_reporte_rotacion(request):
 
-    lista = RotacionTurno.objects.select_related('empleado', 'turno').all()
+    lista = RotacionTurno.objects.select_related(
+        'empleado',
+        'turno'
+    ).all()
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    total_rotaciones = lista.count()
+    sabados = lista.filter(sabado_asignado=True).count()
+    activas = lista.filter(estado='Activo').count()
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=20,
+        leftMargin=20,
+        topMargin=25,
+        bottomMargin=25
+    )
+
     elementos = []
-    estilos   = getSampleStyleSheet()
+    estilos = getSampleStyleSheet()
 
-    elementos.append(Paragraph("Reporte de Rotación de Turnos - ChocoFlow", estilos['Title']))
-    elementos.append(Spacer(1, 20))
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723')
+    )
 
-    datos = [['Empleado', 'Turno', 'Semana', 'Fecha Inicio', 'Fecha Fin', 'Sábado', 'Horario Sábado', 'Estado']]
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=10,
+        textColor=colors.HexColor('#7A6A5D')
+    )
+
+    resumen_style = ParagraphStyle(
+        'Resumen',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=13,
+        fontName='Helvetica-Bold',
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    elementos.append(
+        Paragraph(
+            "REPORTE DE ROTACIÓN DE TURNOS",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1,15))
+
+    resumen = Table([
+        [
+            Paragraph(
+                f"<b>Total Rotaciones</b><br/>{total_rotaciones}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Sábados Asignados</b><br/>{sabados}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Activas</b><br/>{activas}",
+                resumen_style
+            ),
+        ]
+    ], colWidths=[220,220,220])
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(0,0),colors.HexColor('#5D4037')),
+        ('BACKGROUND',(1,0),(1,0),colors.HexColor('#6D4C41')),
+        ('BACKGROUND',(2,0),(2,0),colors.HexColor('#8D6E63')),
+        ('ALIGN',(0,0),(-1,-1),'CENTER'),
+        ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('TOPPADDING',(0,0),(-1,-1),15),
+        ('BOTTOMPADDING',(0,0),(-1,-1),15),
+    ]))
+
+    elementos.append(resumen)
+    elementos.append(Spacer(1,20))
+
+    datos = [[
+        'Empleado',
+        'Turno',
+        'Semana',
+        'Inicio',
+        'Fin',
+        'Sábado',
+        'Horario Sábado',
+        'Estado'
+    ]]
+
     for r in lista:
         datos.append([
             r.empleado.nombre,
@@ -1267,17 +1844,46 @@ def generar_reporte_rotacion(request):
             r.estado,
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[120,120,60,80,80,60,120,80]
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#4E342E')),
+        ('TEXTCOLOR',(0,0),(-1,0),colors.white),
+
+        ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),
+
+        ('GRID',(0,0),(-1,-1),0.6,colors.HexColor('#D7CCC8')),
+
+        ('ALIGN',(0,0),(-1,-1),'CENTER'),
+        ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+
+        ('TOPPADDING',(0,0),(-1,-1),8),
+        ('BOTTOMPADDING',(0,0),(-1,-1),8),
+
+        ('ROWBACKGROUNDS',
+         (0,1),
+         (-1,-1),
+         [
+             colors.HexColor('#FAF7F2'),
+             colors.HexColor('#F2ECE5')
+         ])
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1,20))
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
@@ -1286,8 +1892,8 @@ def generar_reporte_rotacion(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_rotacion.pdf"'
     response.write(pdf)
-    return response
 
+    return response
 
 # ===================
 # SOLICITUDES
@@ -1370,7 +1976,6 @@ def revisar_solicitud(request, id):
             return redirect('solicitudes')
 
         solicitud.estado       = nuevo_estado
-        solicitud.revisado_por = usuario
         solicitud.save()
 
         messages.success(request, f"Solicitud {solicitud.estado.lower()} correctamente.")
@@ -1382,49 +1987,216 @@ def revisar_solicitud(request, id):
 def generar_reporte_solicitudes(request):
 
     lista = Solicitud.objects.select_related(
-        'empleado', 'turno_actual', 'turno_solicitado', 'revisado_por'
+        'empleado',
+        'turno_actual',
+        'turno_solicitado'
     ).all()
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
-    elementos = []
-    estilos   = getSampleStyleSheet()
+    total_solicitudes = lista.count()
+    pendientes = lista.filter(estado='Pendiente').count()
+    aprobadas = lista.filter(estado='Aprobada').count()
 
-    elementos.append(Paragraph("Reporte de Solicitudes - ChocoFlow", estilos['Title']))
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=20,
+        leftMargin=20,
+        topMargin=25,
+        bottomMargin=25
+    )
+
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # ==================================================
+    # ESTILOS
+    # ==================================================
+
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723')
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        fontSize=10,
+        alignment=1,
+        textColor=colors.HexColor('#7A6A5D')
+    )
+
+    resumen_style = ParagraphStyle(
+        'Resumen',
+        parent=estilos['Normal'],
+        fontSize=13,
+        alignment=1,
+        fontName='Helvetica-Bold',
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        fontSize=8,
+        alignment=1,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    # ==================================================
+    # ENCABEZADO
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "REPORTE DE SOLICITUDES",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==================================================
+    # TARJETAS RESUMEN
+    # ==================================================
+
+    resumen = Table([
+        [
+            Paragraph(
+                f"<b>Total Solicitudes</b><br/>{total_solicitudes}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Pendientes</b><br/>{pendientes}",
+                resumen_style
+            ),
+            Paragraph(
+                f"<b>Aprobadas</b><br/>{aprobadas}",
+                resumen_style
+            ),
+        ]
+    ], colWidths=[220, 220, 220])
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#5D4037')),
+        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#6D4C41')),
+        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#8D6E63')),
+
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+    ]))
+
+    elementos.append(resumen)
+
     elementos.append(Spacer(1, 20))
 
-    datos = [['Empleado', 'Turno Actual', 'Turno Solicitado', 'Motivo', 'Estado', 'Revisado por']]
+    # ==================================================
+    # TABLA
+    # ==================================================
+
+    datos = [[
+        'Empleado',
+        'Turno Actual',
+        'Turno Solicitado',
+        'Motivo',
+        'Estado'
+    ]]
+
     for s in lista:
+
         datos.append([
             s.empleado.nombre,
             s.turno_actual.horario,
             s.turno_solicitado.horario,
-            s.motivo[:50],
-            s.estado,
-            s.revisado_por.nombre if s.revisado_por else 'Pendiente',
+            (s.motivo[:80] + "...") if len(s.motivo) > 80 else s.motivo,
+            s.estado
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[120, 130, 130, 130, 80, 120]
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        # ENCABEZADO
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4E342E')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        # CUERPO
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#333333')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+
+        # ALINEACIÓN
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # BORDES
+        ('GRID', (0, 0), (-1, -1), 0.6, colors.HexColor('#D7CCC8')),
+
+        # ESPACIADO
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        # FILAS ALTERNAS
+        ('ROWBACKGROUNDS',
+         (0, 1),
+         (-1, -1),
+         [
+             colors.HexColor('#FAF7F2'),
+             colors.HexColor('#F2ECE5')
+         ]),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==================================================
+    # PIE DE PÁGINA
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
     buffer.close()
 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_solicitudes.pdf"'
-    response.write(pdf)
-    return response
+    response = HttpResponse(
+        content_type='application/pdf'
+    )
 
+    response['Content-Disposition'] = (
+        'attachment; filename="reporte_solicitudes.pdf"'
+    )
+
+    response.write(pdf)
+
+    return response
 
 # ===================
 # ASIGNACIONES
@@ -1701,7 +2473,9 @@ def generar_reporte_asignaciones(request):
     query = request.GET.get('q', '')
 
     lista = Asignacion.objects.select_related(
-        'empleado', 'turno', 'asignado_por'
+        'empleado',
+        'turno',
+        'asignado_por'
     ).exclude(estado='Finalizado')
 
     if query:
@@ -1710,15 +2484,119 @@ def generar_reporte_asignaciones(request):
             Q(empleado__nombre__icontains=query)
         )
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
-    elementos = []
-    estilos   = getSampleStyleSheet()
+    total_asignaciones = lista.count()
 
-    elementos.append(Paragraph("Reporte de Asignaciones - ChocoFlow", estilos['Title']))
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=35,
+        bottomMargin=25
+    )
+
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # ==================================================
+    # ESTILOS
+    # ==================================================
+
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=30,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723')
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        fontSize=10,
+        alignment=1,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    tarjeta_style = ParagraphStyle(
+        'Tarjeta',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=11,
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    # ==================================================
+    # ENCABEZADO
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Reporte de Asignaciones",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==================================================
+    # TARJETA RESUMEN
+    # ==================================================
+
+    resumen = Table(
+        [[
+            Paragraph(
+                f"<b>Total Asignaciones Activas</b><br/>{total_asignaciones}",
+                tarjeta_style
+            )
+        ]],
+        colWidths=[250]
+    )
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#6D4C41')),
+        ('BOX', (0, 0), (-1, -1), 0, colors.white),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+    ]))
+
+    elementos.append(resumen)
     elementos.append(Spacer(1, 20))
 
-    datos = [['Tarea', 'Empleado', 'Turno', 'Fecha', 'Estado', 'Asignado por']]
+    # ==================================================
+    # TABLA
+    # ==================================================
+
+    datos = [[
+        'Tarea',
+        'Empleado',
+        'Turno',
+        'Fecha',
+        'Estado',
+        'Asignado Por'
+    ]]
+
     for a in lista:
         datos.append([
             a.tarea,
@@ -1729,25 +2607,73 @@ def generar_reporte_asignaciones(request):
             a.asignado_por.nombre,
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[180, 120, 140, 90, 90, 120],
+        repeatRows=1
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        # Encabezado
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#5D4037')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        # Contenido
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#2C2C2C')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+
+        # Bordes
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D7CCC8')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#BCAAA4')),
+
+        # Alineación
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # Espaciado
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        # Filas alternadas
+        ('ROWBACKGROUNDS',
+         (0, 1),
+         (-1, -1),
+         [
+             colors.HexColor('#FAFAFA'),
+             colors.HexColor('#F5F5F5')
+         ]),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==================================================
+    # PIE DE PÁGINA
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
     buffer.close()
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_asignaciones.pdf"'
+    response['Content-Disposition'] = (
+        'attachment; filename="reporte_asignaciones.pdf"'
+    )
     response.write(pdf)
+
     return response
 
 
@@ -1859,53 +2785,210 @@ def inactivar_produccion(request, id):
 @login_required(login_url='login')
 def generar_reporte_producciones(request):
 
-    lista  = Produccion.objects.select_related('empleado_responsable').all()
-    query  = request.GET.get('q', '')
+    lista = Produccion.objects.select_related(
+        'empleado_responsable'
+    ).all()
+
+    query = request.GET.get('q', '')
     estado = request.GET.get('estado', '')
 
     if query:
         lista = lista.filter(producto__icontains=query)
+
     if estado and estado != 'Todos':
         lista = lista.filter(estado=estado)
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
-    elementos = []
-    estilos   = getSampleStyleSheet()
+    total_producciones = lista.count()
 
-    elementos.append(Paragraph("Reporte de Producciones - ChocoFlow", estilos['Title']))
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=35,
+        bottomMargin=25
+    )
+
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # ==================================================
+    # ESTILOS
+    # ==================================================
+
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=30,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723')
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        fontSize=10,
+        alignment=1,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    tarjeta_style = ParagraphStyle(
+        'Tarjeta',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=11,
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    # ==================================================
+    # ENCABEZADO
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Reporte de Producciones",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==================================================
+    # TARJETA RESUMEN
+    # ==================================================
+
+    resumen = Table(
+        [[
+            Paragraph(
+                f"<b>Total Producciones</b><br/>{total_producciones}",
+                tarjeta_style
+            )
+        ]],
+        colWidths=[250]
+    )
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#6D4C41')),
+        ('BOX', (0, 0), (-1, -1), 0, colors.white),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+    ]))
+
+    elementos.append(resumen)
+
     elementos.append(Spacer(1, 20))
 
-    datos = [['Producto', 'Responsable', 'Cant. Requerida', 'Fecha Entrega', 'Fecha Límite', 'Estado']]
+    # ==================================================
+    # TABLA
+    # ==================================================
+
+    datos = [[
+        'Producto',
+        'Responsable',
+        'Cantidad Requerida',
+        'Fecha Entrega',
+        'Fecha Límite',
+        'Estado'
+    ]]
+
     for p in lista:
         datos.append([
-            p.producto or '',
+            p.producto or '—',
             p.empleado_responsable.nombre,
-            p.cantidad_requerida or '',
+            p.cantidad_requerida or '—',
             str(p.fecha_entrega),
             str(p.fecha_limite),
             p.estado,
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[180, 150, 130, 110, 110, 90],
+        repeatRows=1
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        # Encabezado
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#5D4037')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        # Contenido
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#2C2C2C')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+
+        # Bordes
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D7CCC8')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#BCAAA4')),
+
+        # Alineación
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # Espaciado
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        # Filas alternadas
+        ('ROWBACKGROUNDS',
+         (0, 1),
+         (-1, -1),
+         [
+             colors.HexColor('#FAFAFA'),
+             colors.HexColor('#F5F5F5')
+         ]),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==================================================
+    # PIE DE PÁGINA
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
     buffer.close()
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_producciones.pdf"'
+    response['Content-Disposition'] = (
+        'attachment; filename="reporte_producciones.pdf"'
+    )
     response.write(pdf)
+
     return response
 
 
@@ -2194,52 +3277,217 @@ def inactivar_exportacion(request, id):
 def generar_reporte_exportaciones(request):
 
     exportaciones = Exportacion.objects.all()
-    busqueda      = request.GET.get('busqueda', '')
-    estado        = request.GET.get('estado', '')
+
+    busqueda = request.GET.get('busqueda', '')
+    estado = request.GET.get('estado', '')
 
     if busqueda:
-        exportaciones = exportaciones.filter(destino__icontains=busqueda)
+        exportaciones = exportaciones.filter(
+            destino__icontains=busqueda
+        )
+
     if estado and estado != "Todos":
-        exportaciones = exportaciones.filter(estado=estado)
+        exportaciones = exportaciones.filter(
+            estado=estado
+        )
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    total_exportaciones = exportaciones.count()
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=35,
+        bottomMargin=25
+    )
+
     elementos = []
-    estilos   = getSampleStyleSheet()
+    estilos = getSampleStyleSheet()
 
-    elementos.append(Paragraph("Reporte de Exportaciones - ChocoFlow", estilos['Title']))
+    # ==================================================
+    # ESTILOS
+    # ==================================================
+
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=30,
+        alignment=1,
+        textColor=colors.HexColor('#3E2723')
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        fontSize=10,
+        alignment=1,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    tarjeta_style = ParagraphStyle(
+        'Tarjeta',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=11,
+        textColor=colors.white
+    )
+
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=colors.HexColor('#8D6E63')
+    )
+
+    # ==================================================
+    # ENCABEZADO
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Reporte de Exportaciones",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(Spacer(1, 15))
+
+    # ==================================================
+    # TARJETA RESUMEN
+    # ==================================================
+
+    resumen = Table(
+        [[
+            Paragraph(
+                f"<b>Total Exportaciones</b><br/>{total_exportaciones}",
+                tarjeta_style
+            )
+        ]],
+        colWidths=[250]
+    )
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#6D4C41')),
+        ('BOX', (0, 0), (-1, -1), 0, colors.white),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+    ]))
+
+    elementos.append(resumen)
+
     elementos.append(Spacer(1, 20))
 
-    datos = [['Destino', 'País', 'Producto', 'Fecha Envío', 'Fecha Entrega', 'Estado']]
+    # ==================================================
+    # TABLA
+    # ==================================================
+
+    datos = [[
+        'Destino',
+        'País',
+        'Producto',
+        'Lote',
+        'Fecha Envío',
+        'Fecha Entrega',
+        'Estado'
+    ]]
+
     for exp in exportaciones:
         datos.append([
-            exp.destino,
-            exp.pais,
-            exp.producto,
+            exp.destino or '—',
+            exp.pais or '—',
+            exp.nombre_producto or '—',
+            exp.lote or '-',
             str(exp.fecha_envio),
             str(exp.fecha_entrega),
             exp.estado,
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        colWidths=[100, 100, 100, 110, 100, 90],
+        repeatRows=1
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        # ENCABEZADO
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#5D4037')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        # CUERPO
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#2C2C2C')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+
+        # BORDES
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D7CCC8')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#BCAAA4')),
+
+        # ALINEACIÓN
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # ESPACIADO
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        # FILAS ALTERNADAS
+        ('ROWBACKGROUNDS',
+         (0, 1),
+         (-1, -1),
+         [
+             colors.HexColor('#FAFAFA'),
+             colors.HexColor('#F5F5F5')
+         ]),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==================================================
+    # PIE DE PÁGINA
+    # ==================================================
+
+    elementos.append(
+        Paragraph(
+            "Documento generado automáticamente por ChocoFlow",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
     buffer.close()
 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_exportaciones.pdf"'
+    response = HttpResponse(
+        content_type='application/pdf'
+    )
+
+    response['Content-Disposition'] = (
+        'attachment; filename="reporte_exportaciones.pdf"'
+    )
+
     response.write(pdf)
+
     return response
 
 
@@ -2407,50 +3655,203 @@ def eliminar_lote(request, id):
 @login_required(login_url='login')
 def generar_reporte_lotes(request):
 
-    lotes    = Lote.objects.select_related('produccion', 'exportacion').all()
+    lotes = Lote.objects.select_related(
+        'produccion'
+    ).all()
+
     busqueda = request.GET.get('busqueda', '')
 
     if busqueda:
-        lotes = lotes.filter(codigo_lote__icontains=busqueda)
+        lotes = lotes.filter(
+            codigo_lote__icontains=busqueda
+        )
 
-    buffer    = BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter)
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=35,
+        bottomMargin=25
+    )
+
     elementos = []
-    estilos   = getSampleStyleSheet()
+    estilos = getSampleStyleSheet()
 
-    elementos.append(Paragraph("Reporte de Lotes - ChocoFlow", estilos['Title']))
+    # ==========================
+    # COLORES
+    # ==========================
+    COLOR_PRIMARIO = colors.HexColor('#5D4037')
+    COLOR_SECUNDARIO = colors.HexColor('#8D6E63')
+    COLOR_CLARO = colors.HexColor('#F8F5F2')
+    COLOR_BORDE = colors.HexColor('#D7CCC8')
+    COLOR_TEXTO = colors.HexColor('#3E2723')
+
+    # ==========================
+    # TITULO
+    # ==========================
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=estilos['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        alignment=1,
+        textColor=COLOR_PRIMARIO,
+        spaceAfter=10
+    )
+
+    subtitulo_style = ParagraphStyle(
+        'Subtitulo',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=10,
+        textColor=colors.grey
+    )
+
+    elementos.append(
+        Paragraph(
+            "📦 REPORTE DE LOTES",
+            titulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Sistema de Gestión ChocoFlow",
+            subtitulo_style
+        )
+    )
+
     elementos.append(Spacer(1, 20))
 
-    datos = [['Código Lote', 'Cantidad', 'Fecha Producción', 'Fecha Vencimiento', 'Producción', 'Exportación']]
+    # ==========================
+    # RESUMEN
+    # ==========================
+    total_lotes = lotes.count()
+
+    resumen = Table([
+        ['Total Lotes', str(total_lotes)]
+    ], colWidths=[120, 120])
+
+    resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), COLOR_PRIMARIO),
+        ('TEXTCOLOR', (0, 0), (0, 0), colors.white),
+
+        ('BACKGROUND', (1, 0), (1, 0), COLOR_CLARO),
+
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+
+        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDE),
+        ('GRID', (0, 0), (-1, -1), 0.5, COLOR_BORDE),
+
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+
+    elementos.append(resumen)
+    elementos.append(Spacer(1, 20))
+
+    # ==========================
+    # TABLA
+    # ==========================
+    datos = [[
+        'Código',
+        'Cantidad',
+        'Fecha Producción',
+        'Fecha Vencimiento',
+        'Producción'
+    ]]
+
     for lote in lotes:
         datos.append([
             lote.codigo_lote,
             str(lote.cantidad),
             str(lote.fecha_produccion),
             str(lote.fecha_vencimiento),
-            str(lote.produccion),
-            str(lote.exportacion),
+            str(lote.produccion)
         ])
 
-    tabla = Table(datos)
+    tabla = Table(
+        datos,
+        repeatRows=1,
+        colWidths=[90, 70, 95, 95, 180, 180]
+    )
+
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#603C1C')),
-        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-        ('GRID',       (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+
+        # Encabezado
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_PRIMARIO),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+
+        # Cuerpo
+        ('TEXTCOLOR', (0, 1), (-1, -1), COLOR_TEXTO),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+
+        # Bordes
+        ('GRID', (0, 0), (-1, -1), 0.5, COLOR_BORDE),
+        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDE),
+
+        # Alineación
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # Espaciado
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+
+        # Filas alternadas
+        ('ROWBACKGROUNDS',
+         (0, 1),
+         (-1, -1),
+         [
+             colors.white,
+             COLOR_CLARO
+         ]),
     ]))
 
     elementos.append(tabla)
+
+    elementos.append(Spacer(1, 20))
+
+    # ==========================
+    # PIE
+    # ==========================
+    pie_style = ParagraphStyle(
+        'Pie',
+        parent=estilos['Normal'],
+        alignment=1,
+        fontSize=8,
+        textColor=COLOR_SECUNDARIO
+    )
+
+    elementos.append(
+        Paragraph(
+            f"Documento generado automáticamente por ChocoFlow | Total registros: {total_lotes}",
+            pie_style
+        )
+    )
+
     doc.build(elementos)
 
     pdf = buffer.getvalue()
     buffer.close()
 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_lotes.pdf"'
+    response = HttpResponse(
+        content_type='application/pdf'
+    )
+
+    response['Content-Disposition'] = (
+        'attachment; filename="reporte_lotes.pdf"'
+    )
+
     response.write(pdf)
+
     return response
 
 
@@ -2679,9 +4080,49 @@ def consultar_ia(request):
         resumen = obtener_resumen_empresa()
         alertas = detectar_alertas()
 
+        # Predicción con Scikit-Learn
+        prediccion = predecir_proxima_produccion()
+        alertas_lotes = detectar_vencimientos_lotes()
+        alertas_exportaciones = (detectar_retrasos_exportaciones())
+        rendimiento = analizar_rendimiento()
+        pred_exportaciones = (predecir_exportaciones())
+        anomalias = detectar_anomalias()
         contexto = f"""
 Eres un asistente experto en gestión de producción de chocolate llamado ChocoBot.
+========================
+RENDIMIENTO
+========================
 
+- Mejor empleado:
+{rendimiento.get('mejor_empleado', 'N/A')}
+
+- Producciones realizadas:
+{rendimiento.get('producciones_mejor', 0)}
+
+========================
+PREDICCIÓN EXPORTACIONES
+========================
+
+- Exportaciones futuras estimadas:
+{pred_exportaciones}
+
+========================
+ALERTAS LOTES
+========================
+
+{chr(10).join(alertas_lotes)}
+
+========================
+ALERTAS EXPORTACIONES
+========================
+
+{chr(10).join(alertas_exportaciones)}
+
+========================
+ANOMALÍAS
+========================
+
+{chr(10).join(anomalias)}
 IMPORTANTE:
 - Responde siempre en español.
 - Sé claro, profesional y práctico.
@@ -2702,6 +4143,7 @@ DATOS ACTUALES
 - Total de lotes: {total_lotes}
 - Total de asignaciones: {total_asignaciones}
 - Bitácoras pendientes de revisión: {bitacoras_pendientes}
+- Próxima producción estimada: {prediccion}
 
 ========================
 ANÁLISIS INTELIGENTE
@@ -2713,6 +4155,7 @@ ANÁLISIS INTELIGENTE
 - Producciones finalizadas detectadas: {resumen['producciones_finalizadas']}
 - Exportaciones pendientes detectadas: {resumen['exportaciones_pendientes']}
 - Total de lotes detectados: {resumen['total_lotes']}
+prediccion = predecir_proxima_produccion()
 
 ========================
 ALERTAS DETECTADAS

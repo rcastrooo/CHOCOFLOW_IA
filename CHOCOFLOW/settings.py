@@ -1,5 +1,8 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv  # ← agregar
+
+load_dotenv()  # ← agregar
 
 # Ruta base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,6 +51,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'myApp.context_processors.bitacoras_pendientes',
             ],
         },
     },
@@ -108,3 +112,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Tipo de clave primaria
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ============================================================
+# CONFIGURACIÓN DE CORREO — Gmail
+# ============================================================
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp.gmail.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+EMAIL_HOST_USER     = 'castromatallana2006@gmail.com'        # ← tu correo Gmail
+EMAIL_HOST_PASSWORD = 'tmdb xvlz lndj viek'       # ← contraseña de aplicación (no tu contraseña normal)
+DEFAULT_FROM_EMAIL  = 'ChocoFlow <castromatallana2006@gmail.com>'

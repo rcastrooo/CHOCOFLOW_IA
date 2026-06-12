@@ -1,353 +1,366 @@
 {% extends 'layouts/sidebar.html' %}
 {% load static %}
-{% block titulo %}Solicitudes{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/solicitudes.css' %}">
-{% endblock %}
+{% block title %}Gestión de Solicitudes{% endblock %}
 
 {% block content %}
 
+<link rel="stylesheet" href="{% static 'css/supervisor.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<div class="contenedor-solicitudes">
+<div class="main-content">
 
-    <!-- HEADER -->
-    <div class="header-solicitudes">
+  <!-- TOPBAR -->
+  <div class="topbar" style="margin-bottom:0;">
+    <span class="topbar-title">
+      <i class="bi bi-arrow-left-right"></i> GESTIÓN DE SOLICITUDES
+    </span>
+  </div>
 
-        <div>
-            <h1>Gestión de Solicitudes</h1>
-            <p>Administración de cambios de turnos de empleados</p>
-        </div>
+  <!-- BIENVENIDA -->
+  <div class="bienvenida">
+    <h5><i class="bi bi-clipboard-check"></i> Solicitudes</h5>
+    <p>Administración de cambios de turnos de empleados.</p>
+  </div>
 
-        <div class="acciones-header">
+  <!-- MENSAJES -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-3" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
 
-            <a href="{% url 'generar_reporte_solicitudes' %}" class="btn-reporte">
-                <i class="fas fa-file-pdf"></i>
-                Reporte PDF
-            </a>
+  <!-- ACCIONES -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
 
-            <button class="btn-agregar" onclick="abrirModal()">
-                <i class="fas fa-plus"></i>
-                Nueva Solicitud
-            </button>
+    <button class="btn-choco"
+            style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;"
+            data-bs-toggle="modal"
+            data-bs-target="#modalSolicitud"
+            onclick="limpiarModal()">
+      <i class="bi bi-plus-lg"></i> Nueva Solicitud
+    </button>
 
-        </div>
+    <form method="GET" class="d-flex gap-2 flex-wrap">
+      <input type="text"
+             name="q"
+             class="form-control"
+             placeholder="Buscar empleado..."
+             value="{{ request.GET.q }}"
+             style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:180px;">
 
-    </div>
+      <select name="estado"
+              class="form-select"
+              style="border-radius:12px; border:1.5px solid #e8ddd5; font-size:0.88rem; height:44px; min-width:140px;">
+        <option value="Todos">Todos</option>
+        <option value="Pendiente"  {% if request.GET.estado == 'Pendiente'  %}selected{% endif %}>Pendiente</option>
+        <option value="Aprobado"   {% if request.GET.estado == 'Aprobado'   %}selected{% endif %}>Aprobado</option>
+        <option value="Rechazado"  {% if request.GET.estado == 'Rechazado'  %}selected{% endif %}>Rechazado</option>
+      </select>
 
-    <!-- ALERTAS -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alerta {{ message.tags }}">
-                {{ message }}
+      <button class="btn-caramel"
+              style="border-radius:12px; padding:0 20px; font-size:0.88rem; height:44px;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </form>
+
+  </div>
+
+  <!-- LABEL SECCIÓN -->
+  <h6 class="mb-2" style="font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.06em;">
+    Listado de solicitudes
+  </h6>
+
+  <!-- TABLA -->
+  <div class="table-responsive"
+       style="background:white; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); overflow:hidden;">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Empleado</th>
+          <th>Turno Actual</th>
+          <th>Turno Solicitado</th>
+          <th>Motivo</th>
+          <th>Fecha</th>
+          <th>Estado</th>
+          <th>Revisado Por</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for solicitud in solicitudes %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#603C1C,#D88C51);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-person" style="color:white;font-size:0.78rem;"></i>
+              </div>
+              <span style="font-weight:600; color:#333; font-size:0.88rem;">{{ solicitud.empleado.nombre }}</span>
             </div>
+          </td>
+          <td style="font-size:0.85rem; color:#666;">{{ solicitud.turno_actual.horario }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ solicitud.turno_solicitado.horario }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ solicitud.motivo|truncatechars:40 }}</td>
+          <td style="font-size:0.85rem; color:#666;">{{ solicitud.fecha_solicitud }}</td>
+          <td>
+            {% if solicitud.estado == 'Pendiente' %}
+              <span class="badge bg-warning text-dark">{{ solicitud.estado }}</span>
+            {% elif solicitud.estado == 'Aprobado' %}
+              <span class="badge bg-success">{{ solicitud.estado }}</span>
+            {% else %}
+              <span class="badge bg-danger">{{ solicitud.estado }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if solicitud.revisado_por %}
+              {{ solicitud.revisado_por.nombre }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if solicitud.estado == 'Pendiente' %}
+              <div class="d-flex gap-1">
+                <form method="POST" action="{% url 'revisar_solicitud' solicitud.id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="estado" value="Aprobado">
+                  <button type="submit"
+                          class="btn btn-sm btn-success"
+                          style="border-radius:8px; font-size:0.78rem;"
+                          title="Aprobar">
+                    <i class="bi bi-check-lg"></i> Aprobar
+                  </button>
+                </form>
+                <form method="POST" action="{% url 'revisar_solicitud' solicitud.id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="estado" value="Rechazado">
+                  <button type="submit"
+                          class="btn btn-sm btn-danger"
+                          style="border-radius:8px; font-size:0.78rem;"
+                          title="Rechazar">
+                    <i class="bi bi-x-lg"></i> Rechazar
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <span style="font-size:0.82rem; color:#aaa;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+            <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No hay solicitudes registradas
+          </td>
+        </tr>
         {% endfor %}
-    {% endif %}
+      </tbody>
+    </table>
+  </div>
 
-    <!-- FILTROS -->
-    <div class="contenedor-filtros">
+  <!-- BOTONES INFERIORES -->
+  <div class="d-flex justify-content-end gap-3 mt-4 flex-wrap">
+    <a href="{% url 'generar_reporte_solicitudes' %}"
+       class="btn-choco"
+       style="border-radius:12px; padding:0 20px; text-decoration:none; font-size:0.88rem; height:44px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-file-earmark-text"></i> Generar Reporte
+    </a>
+  </div>
 
-        <form method="GET" class="filtros-form">
-
-            <div class="grupo-filtro">
-                <input type="text"
-                       name="q"
-                       placeholder="Buscar empleado..."
-                       value="{{ request.GET.q }}">
-            </div>
-
-            <div class="grupo-filtro">
-                <select name="estado">
-
-                    <option value="Todos">Todos los estados</option>
-
-                    <option value="Pendiente"
-                        {% if request.GET.estado == 'Pendiente' %}
-                            selected
-                        {% endif %}
-                    >
-                        Pendiente
-                    </option>
-
-                    <option value="Aprobado"
-                        {% if request.GET.estado == 'Aprobado' %}
-                            selected
-                        {% endif %}
-                    >
-                        Aprobado
-                    </option>
-
-                    <option value="Rechazado"
-                        {% if request.GET.estado == 'Rechazado' %}
-                            selected
-                        {% endif %}
-                    >
-                        Rechazado
-                    </option>
-
-                </select>
-            </div>
-
-            <button type="submit" class="btn-filtrar">
-                <i class="fas fa-search"></i>
-                Filtrar
-            </button>
-
-        </form>
-
-    </div>
-
-    <!-- TABLA -->
-    <div class="tabla-contenedor">
-
-        <table class="tabla-solicitudes">
-
-            <thead>
-                <tr>
-                    <th>Empleado</th>
-                    <th>Turno Actual</th>
-                    <th>Turno Solicitado</th>
-                    <th>Motivo</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Revisado Por</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for solicitud in solicitudes %}
-
-                <tr>
-
-                    <td>{{ solicitud.empleado.nombre }}</td>
-
-                    <td>
-                        {{ solicitud.turno_actual.horario }}
-                    </td>
-
-                    <td>
-                        {{ solicitud.turno_solicitado.horario }}
-                    </td>
-
-                    <td>
-                        {{ solicitud.motivo|truncatechars:40 }}
-                    </td>
-
-                    <td>
-                        {{ solicitud.fecha_solicitud }}
-                    </td>
-
-                    <td>
-                        <span class="badge 
-                            {% if solicitud.estado == 'Pendiente' %}
-                                pendiente
-                            {% elif solicitud.estado == 'Aprobado' %}
-                                aprobado
-                            {% else %}
-                                rechazado
-                            {% endif %}
-                        ">
-                            {{ solicitud.estado }}
-                        </span>
-                    </td>
-
-                    <td>
-                        {% if solicitud.revisado_por %}
-                            {{ solicitud.revisado_por.nombre }}
-                        {% else %}
-                            ---
-                        {% endif %}
-                    </td>
-
-                    <td>
-
-                        {% if solicitud.estado == 'Pendiente' %}
-
-                        <div class="acciones-tabla">
-
-                            <form method="POST"
-                                  action="{% url 'revisar_solicitud' solicitud.id %}">
-                                {% csrf_token %}
-
-                                <input type="hidden"
-                                       name="estado"
-                                       value="Aprobado">
-
-                                <button type="submit"
-                                        class="btn-aprobar">
-                                    Aprobar
-                                </button>
-
-                            </form>
-
-                            <form method="POST"
-                                  action="{% url 'revisar_solicitud' solicitud.id %}">
-                                {% csrf_token %}
-
-                                <input type="hidden"
-                                       name="estado"
-                                       value="Rechazado">
-
-                                <button type="submit"
-                                        class="btn-rechazar">
-                                    Rechazar
-                                </button>
-
-                            </form>
-
-                        </div>
-
-                        {% else %}
-                            ---
-                        {% endif %}
-
-                    </td>
-
-                </tr>
-
-                {% empty %}
-
-                <tr>
-                    <td colspan="8" class="sin-datos">
-                        No hay solicitudes registradas
-                    </td>
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
+  <!-- PIE -->
+  <p class="text-muted mt-3" style="font-size:12px;">
+    <i class="bi bi-info-circle"></i>
+    Puedes aprobar o rechazar solicitudes pendientes. Las solicitudes aprobadas o rechazadas no pueden modificarse.
+  </p>
 
 </div>
 
-<!-- MODAL -->
-<div class="modal" id="modalSolicitud">
 
-    <div class="modal-contenido">
+<!-- ============================================================ -->
+<!--  MODAL: Nueva Solicitud                                      -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalSolicitud" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:16px; overflow:hidden;">
 
-        <div class="modal-header">
-            <h2>Nueva Solicitud</h2>
+      <form method="POST" action="{% url 'guardar_solicitud' %}" id="formSolicitud" novalidate>
+        {% csrf_token %}
 
-            <button class="cerrar-modal"
-                    onclick="cerrarModal()">
-                &times;
-            </button>
+        <div class="modal-header" style="background:linear-gradient(135deg,#603C1C,#D88C51); color:white; border:none;">
+          <h5 class="modal-title" id="modalTitulo">
+            <i class="bi bi-plus-circle"></i> Nueva Solicitud
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
 
-        <form method="POST"
-              action="{% url 'guardar_solicitud' %}">
+        <div class="modal-body" style="background:#fdf9f6;">
 
-            {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              Empleado <span class="text-danger">*</span>
+            </label>
+            <select name="empleado_id" id="empleado_id" class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <option value="">-- Seleccionar Empleado --</option>
+              {% for empleado in empleados %}
+                <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+              {% endfor %}
+            </select>
+            <div class="invalid-feedback" id="err-empleado"></div>
+          </div>
 
-            <div class="grupo-input">
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              Turno Actual <span class="text-danger">*</span>
+            </label>
+            <select name="turno_actual_id" id="turno_actual_id" class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <option value="">-- Seleccionar Turno --</option>
+              {% for turno in turnos %}
+                <option value="{{ turno.id }}">{{ turno.horario }}</option>
+              {% endfor %}
+            </select>
+            <div class="invalid-feedback" id="err-turno-actual"></div>
+          </div>
 
-                <label>Empleado</label>
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              Turno Solicitado <span class="text-danger">*</span>
+            </label>
+            <select name="turno_solicitado_id" id="turno_solicitado_id" class="form-select"
+                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+              <option value="">-- Seleccionar Turno --</option>
+              {% for turno in turnos %}
+                <option value="{{ turno.id }}">{{ turno.horario }}</option>
+              {% endfor %}
+            </select>
+            <div class="invalid-feedback" id="err-turno-solicitado"></div>
+          </div>
 
-                <select name="empleado_id" required>
+          <div class="mb-1">
+            <label class="form-label" style="font-size:0.85rem; font-weight:600; color:#603C1C;">
+              Motivo <span class="text-danger">*</span>
+            </label>
+            <textarea name="motivo" id="motivo"
+                      class="form-control"
+                      rows="4"
+                      placeholder="Describe el motivo de la solicitud..."
+                      style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem; resize:vertical;"></textarea>
+            <div class="invalid-feedback" id="err-motivo"></div>
+          </div>
 
-                    <option value="">Seleccione</option>
+        </div>
 
-                    {% for empleado in empleados %}
-                        <option value="{{ empleado.id }}">
-                            {{ empleado.nombre }}
-                        </option>
-                    {% endfor %}
+        <div class="modal-footer" style="background:#fdf9f6; border-top:1px solid #e8ddd5;">
+          <button type="submit" class="btn-choco" style="border-radius:10px; padding:8px 22px;">
+            <i class="bi bi-save"></i> Guardar
+          </button>
+          <button type="button" class="btn-caramel"
+                  style="border-radius:10px; padding:8px 16px;"
+                  data-bs-dismiss="modal">
+            Cancelar
+          </button>
+        </div>
 
-                </select>
-
-            </div>
-
-            <div class="grupo-input">
-
-                <label>Turno Actual</label>
-
-                <select name="turno_actual_id" required>
-
-                    <option value="">Seleccione</option>
-
-                    {% for turno in turnos %}
-                        <option value="{{ turno.id }}">
-                            {{ turno.horario }}
-                        </option>
-                    {% endfor %}
-
-                </select>
-
-            </div>
-
-            <div class="grupo-input">
-
-                <label>Turno Solicitado</label>
-
-                <select name="turno_solicitado_id" required>
-
-                    <option value="">Seleccione</option>
-
-                    {% for turno in turnos %}
-                        <option value="{{ turno.id }}">
-                            {{ turno.horario }}
-                        </option>
-                    {% endfor %}
-
-                </select>
-
-            </div>
-
-            <div class="grupo-input">
-
-                <label>Motivo</label>
-
-                <textarea name="motivo"
-                          rows="4"
-                          required></textarea>
-
-            </div>
-
-            <div class="acciones-modal">
-
-                <button type="button"
-                        class="btn-cancelar"
-                        onclick="cerrarModal()">
-                    Cancelar
-                </button>
-
-                <button type="submit"
-                        class="btn-guardar">
-                    Guardar Solicitud
-                </button>
-
-            </div>
-
-        </form>
-
+      </form>
     </div>
-
+  </div>
 </div>
 
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// ── Validación al enviar ─────────────────────────────────────────
+document.getElementById('formSolicitud').addEventListener('submit', function(e) {
+    let valido = true;
 
-function abrirModal() {
-    document.getElementById('modalSolicitud').style.display = 'flex';
-}
-
-function cerrarModal() {
-    document.getElementById('modalSolicitud').style.display = 'none';
-}
-
-window.onclick = function(event) {
-
-    const modal = document.getElementById('modalSolicitud');
-
-    if (event.target == modal) {
-        cerrarModal();
+    // Empleado
+    const empleado    = document.getElementById('empleado_id');
+    const errEmpleado = document.getElementById('err-empleado');
+    if (!empleado.value) {
+        empleado.classList.add('is-invalid');
+        errEmpleado.textContent = 'Debes seleccionar un empleado.';
+        valido = false;
+    } else {
+        empleado.classList.remove('is-invalid');
+        errEmpleado.textContent = '';
     }
-}
 
+    // Turno actual
+    const turnoActual    = document.getElementById('turno_actual_id');
+    const errTurnoActual = document.getElementById('err-turno-actual');
+    if (!turnoActual.value) {
+        turnoActual.classList.add('is-invalid');
+        errTurnoActual.textContent = 'Debes seleccionar el turno actual.';
+        valido = false;
+    } else {
+        turnoActual.classList.remove('is-invalid');
+        errTurnoActual.textContent = '';
+    }
+
+    // Turno solicitado
+    const turnoSolicitado    = document.getElementById('turno_solicitado_id');
+    const errTurnoSolicitado = document.getElementById('err-turno-solicitado');
+    if (!turnoSolicitado.value) {
+        turnoSolicitado.classList.add('is-invalid');
+        errTurnoSolicitado.textContent = 'Debes seleccionar el turno solicitado.';
+        valido = false;
+    } else if (turnoActual.value && turnoSolicitado.value === turnoActual.value) {
+        turnoSolicitado.classList.add('is-invalid');
+        errTurnoSolicitado.textContent = 'El turno solicitado debe ser diferente al turno actual.';
+        valido = false;
+    } else {
+        turnoSolicitado.classList.remove('is-invalid');
+        errTurnoSolicitado.textContent = '';
+    }
+
+    // Motivo
+    const motivo    = document.getElementById('motivo');
+    const errMotivo = document.getElementById('err-motivo');
+    if (!motivo.value.trim()) {
+        motivo.classList.add('is-invalid');
+        errMotivo.textContent = 'El motivo es obligatorio.';
+        valido = false;
+    } else if (motivo.value.trim().length < 10) {
+        motivo.classList.add('is-invalid');
+        errMotivo.textContent = 'El motivo debe tener al menos 10 caracteres.';
+        valido = false;
+    } else {
+        motivo.classList.remove('is-invalid');
+        errMotivo.textContent = '';
+    }
+
+    if (!valido) e.preventDefault();
+});
+
+// ── Limpiar clases en vivo ───────────────────────────────────────
+['empleado_id','turno_actual_id','turno_solicitado_id','motivo'].forEach(id => {
+    document.getElementById(id).addEventListener('change', function() {
+        this.classList.remove('is-invalid');
+    });
+    document.getElementById(id).addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+    });
+});
+
+// ── Limpiar modal ────────────────────────────────────────────────
+function limpiarModal() {
+    ['empleado_id','turno_actual_id','turno_solicitado_id'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.value = ''; el.classList.remove('is-invalid'); }
+    });
+    const motivo = document.getElementById('motivo');
+    if (motivo) { motivo.value = ''; motivo.classList.remove('is-invalid'); }
+    ['err-empleado','err-turno-actual','err-turno-solicitado','err-motivo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+}
 </script>
 
 {% endblock %}
