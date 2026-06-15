@@ -241,13 +241,15 @@
               Turno <span class="text-danger">*</span>
             </label>
             <select name="turno_id" id="rot_turno"
-                    class="form-select"
-                    style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
-              <option value="">-- Seleccionar Turno --</option>
-              {% for t in turnos %}
-                <option value="{{ t.id }}">{{ t.horario }}</option>
-              {% endfor %}
-            </select>
+        class="form-select"
+        style="border-radius:10px; border:1.5px solid #e8ddd5; font-size:0.88rem;">
+  <option value="">-- Seleccionar Turno --</option>
+  {% for t in turnos %}
+    {% if 'Sábado' not in t.horario %}
+      <option value="{{ t.id }}">{{ t.horario }}</option>
+    {% endif %}
+  {% endfor %}
+</select>
             <div class="invalid-feedback" id="err-rot_turno"></div>
           </div>
 
