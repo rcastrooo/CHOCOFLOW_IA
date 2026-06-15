@@ -21,7 +21,7 @@ SECRET_KEY = os.getenv(
     'django-insecure-cambia-esto-en-produccion'
 )
 
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = False
 
 ALLOWED_HOSTS = [
     '.railway.app',
