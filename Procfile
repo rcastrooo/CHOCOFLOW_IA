@@ -1,1 +1,1 @@
-web: gunicorn CHOCOFLOW.wsgi
+web: python manage.py collectstatic --noinput && gunicorn CHOCOFLOW.wsgi
