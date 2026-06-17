@@ -12,9 +12,13 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+
 <div class="layout">
 
-    <aside class="sidebar">
+    <!-- OVERLAY MÓVIL -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="cerrarSidebar()"></div>
+
+    <aside class="sidebar" id="sidebar">
         <div class="sidebar-top">
             <div class="logo">
                 <div class="logo-icon"><i class="fa-solid fa-cube"></i></div>
@@ -223,48 +227,55 @@
 
     <main class="content">
         <div class="topbar">
+
+            <!-- Hamburger — solo visible en móvil vía CSS -->
+            <button class="topbar-hamburger" onclick="abrirSidebar()" aria-label="Abrir menú">
+                <i class="fas fa-bars"></i>
+            </button>
+
             {% if request.session.rol == 'Administrador' %}
-            <a href="{% url 'registro' %}" class="topbar-btn" title="Agregar persona">
-                <i class="bi bi-person-fill-add"></i>
-            </a>
-        <a href="{% url 'correos_vista' %}"
-   title="Enviar correos masivos"
-   style="color:#603C1C; text-decoration:none;">
-  <i class="bi bi-envelope-at" style="font-size:1.3rem;"></i>
-</a>
-            <div class="notif-wrapper" id="notifWrapper">
-                <button class="topbar-btn notif-btn" id="notifBtn" title="Notificaciones">
-                    <i class="bi bi-bell-fill"></i>
-                    {% if bitacoras_pendientes > 0 %}
-                    <span class="notif-badge">{{ bitacoras_pendientes }}</span>
-                    {% endif %}
-                </button>
-                <div class="notif-dropdown" id="notifDropdown">
-                    <div class="notif-header">
-                        <span>Notificaciones</span>
+                <a href="{% url 'registro' %}" class="topbar-btn" title="Agregar persona">
+                    <i class="bi bi-person-fill-add"></i>
+                </a>
+
+                <a href="{% url 'correos_vista' %}" class="topbar-btn" title="Enviar correos masivos">
+                    <i class="bi bi-envelope-at"></i>
+                </a>
+
+                <div class="notif-wrapper" id="notifWrapper">
+                    <button class="topbar-btn notif-btn" id="notifBtn" title="Notificaciones">
+                        <i class="bi bi-bell-fill"></i>
                         {% if bitacoras_pendientes > 0 %}
-                        <span class="notif-count-label">{{ bitacoras_pendientes }} pendiente{{ bitacoras_pendientes|pluralize }}</span>
+                            <span class="notif-badge">{{ bitacoras_pendientes }}</span>
                         {% endif %}
-                    </div>
-                    <div class="notif-body">
-                        {% if bitacoras_pendientes > 0 %}
-                        <a href="{% url 'listar_bitacoras' %}" class="notif-item">
-                            <div class="notif-icon-wrap"><i class="fa-solid fa-book"></i></div>
-                            <div class="notif-texto">
-                                <strong>Bitácoras pendientes</strong>
-                                <span>Tienes {{ bitacoras_pendientes }} bitácora{{ bitacoras_pendientes|pluralize }} por revisar</span>
-                            </div>
-                        </a>
-                        {% else %}
-                        <div class="notif-empty">
-                            <i class="bi bi-check-circle"></i>
-                            <span>Sin notificaciones</span>
+                    </button>
+                    <div class="notif-dropdown" id="notifDropdown">
+                        <div class="notif-header">
+                            <span>Notificaciones</span>
+                            {% if bitacoras_pendientes > 0 %}
+                                <span class="notif-count-label">{{ bitacoras_pendientes }} pendiente{{ bitacoras_pendientes|pluralize }}</span>
+                            {% endif %}
                         </div>
-                        {% endif %}
+                        <div class="notif-body">
+                            {% if bitacoras_pendientes > 0 %}
+                                <a href="{% url 'listar_bitacoras' %}" class="notif-item">
+                                    <div class="notif-icon-wrap"><i class="fa-solid fa-book"></i></div>
+                                    <div class="notif-texto">
+                                        <strong>Bitácoras pendientes</strong>
+                                        <span>Tienes {{ bitacoras_pendientes }} bitácora{{ bitacoras_pendientes|pluralize }} por revisar</span>
+                                    </div>
+                                </a>
+                            {% else %}
+                                <div class="notif-empty">
+                                    <i class="bi bi-check-circle"></i>
+                                    <span>Sin notificaciones</span>
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-            </div>
             {% endif %}
+
         </div>
 
         {% block content %}{% endblock %}
@@ -274,6 +285,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Notificaciones
     const notifBtn = document.getElementById('notifBtn');
     const notifDropdown = document.getElementById('notifDropdown');
     if (notifBtn) {
@@ -283,6 +295,17 @@
         });
         document.addEventListener('click', () => notifDropdown.classList.remove('show'));
         notifDropdown.addEventListener('click', (e) => e.stopPropagation());
+    }
+
+    // Sidebar móvil
+    function abrirSidebar() {
+        document.getElementById('sidebar').classList.add('sidebar-open');
+        document.getElementById('sidebarOverlay').classList.add('show');
+    }
+
+    function cerrarSidebar() {
+        document.getElementById('sidebar').classList.remove('sidebar-open');
+        document.getElementById('sidebarOverlay').classList.remove('show');
     }
 </script>
 {% block scripts %}{% endblock %}

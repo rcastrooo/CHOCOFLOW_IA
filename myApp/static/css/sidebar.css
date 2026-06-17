@@ -1,38 +1,49 @@
 /* =========================
+   LAYOUT BASE
+========================= */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+/* =========================
    SIDEBAR
 ========================= */
 
-.sidebar{
-
+.sidebar {
     width: 280px;
     height: 100vh;
-
-    background: linear-gradient(
-        180deg,
-        #4E2A12 0%,
-        #2d1607 100%
-    );
-
+    background: linear-gradient(180deg, #4E2A12 0%, #2d1607 100%);
     position: fixed;
     left: 0;
     top: 0;
-
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-
     padding: 20px 18px;
-
     overflow-y: auto;
-
     box-shadow: 5px 0px 20px rgba(0,0,0,.15);
+    z-index: 1000;
+    transition: width 0.3s ease, padding 0.3s ease, transform 0.3s ease;
+    flex-shrink: 0;
 }
 
 /* =========================
    TOP SIDEBAR
 ========================= */
 
-.sidebar-top{
+.sidebar-top {
     width: 100%;
 }
 
@@ -40,61 +51,46 @@
    LOGO
 ========================= */
 
-.logo{
-
+.logo {
     display: flex;
     align-items: center;
     gap: 14px;
-
     padding-bottom: 22px;
     margin-bottom: 25px;
-
     border-bottom: 1px solid rgba(255,255,255,.10);
 }
 
-.logo-icon{
-
+.logo-icon {
     width: 46px;
     height: 46px;
-
     border-radius: 14px;
-
     background: rgba(255,255,255,.12);
-
     display: flex;
     align-items: center;
     justify-content: center;
-
     color: white;
-
     flex-shrink: 0;
 }
 
-.logo-icon i{
+.logo-icon i {
     font-size: 18px;
 }
 
-.logo-texto{
+.logo-texto {
     display: flex;
     flex-direction: column;
 }
 
-.logo-texto h2{
-
+.logo-texto h2 {
     color: white;
-
     font-size: 24px;
     font-weight: 700;
-
     margin: 0;
 }
 
-.logo-texto span{
-
+.logo-texto span {
     color: rgba(255,255,255,.65);
-
     font-size: 12px;
-
     margin-top: 2px;
 }
 
@@ -102,64 +98,44 @@
    MENÚ
 ========================= */
 
-.menu{
+.menu {
     list-style: none;
     padding: 0;
     margin: 0;
 }
 
-.menu li{
+.menu li {
     margin-bottom: 8px;
 }
 
-.menu li a{
-
+.menu li a {
     display: flex;
     align-items: center;
     gap: 15px;
-
     padding: 14px 16px;
-
     border-radius: 14px;
-
     text-decoration: none;
-
     color: rgba(255,255,255,.85);
-
     font-size: 15px;
     font-weight: 500;
-
     transition: .3s ease;
 }
 
-/* ICONOS */
-
-.menu li a i{
-
+.menu li a i {
     width: 20px;
-
     text-align: center;
-
     font-size: 16px;
+    flex-shrink: 0;
 }
 
-/* HOVER */
-
-.menu li a:hover{
-
+.menu li a:hover {
     background: rgba(255,255,255,.12);
-
     color: white;
-
     transform: translateX(4px);
 }
 
-/* ACTIVO */
-
-.menu li a.active{
-
+.menu li a.active {
     background: rgba(255,255,255,.14);
-
     color: white;
 }
 
@@ -172,27 +148,19 @@
 }
 
 .dropdown-btn {
-
     width: 100%;
-
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 15px;
-
     padding: 14px 16px;
-
     border-radius: 14px;
     border: none;
     background: transparent;
-
     color: rgba(255,255,255,.85);
-
     font-size: 15px;
     font-weight: 500;
-
     cursor: pointer;
-
     transition: .3s ease;
 }
 
@@ -206,6 +174,7 @@
     width: 20px;
     text-align: center;
     font-size: 16px;
+    flex-shrink: 0;
 }
 
 .dropdown-btn:hover {
@@ -222,6 +191,7 @@
 .chevron-icon {
     font-size: 12px;
     transition: transform .3s ease;
+    flex-shrink: 0;
 }
 
 .dropdown-menu-custom.open .chevron-icon {
@@ -247,18 +217,12 @@
     display: flex;
     align-items: center;
     gap: 12px;
-
     padding: 11px 16px 11px 44px;
-
     border-radius: 12px;
-
     text-decoration: none;
-
     color: rgba(255,255,255,.70);
-
     font-size: 14px;
     font-weight: 400;
-
     transition: .3s ease;
 }
 
@@ -266,6 +230,7 @@
     width: 16px;
     text-align: center;
     font-size: 14px;
+    flex-shrink: 0;
 }
 
 .submenu li a:hover {
@@ -284,14 +249,10 @@
    FOOTER SIDEBAR
 ========================= */
 
-.sidebar-bottom{
-
+.sidebar-bottom {
     width: 100%;
-
     padding-top: 22px;
-
     border-top: 1px solid rgba(255,255,255,.12);
-
     margin-top: 25px;
 }
 
@@ -299,76 +260,53 @@
    PERFIL
 ========================= */
 
-.perfil-sidebar{
-
+.perfil-sidebar {
     display: flex !important;
-
     align-items: center !important;
-
     gap: 14px !important;
-
     margin-bottom: 18px;
 }
 
-.perfil-avatar{
-
+.perfil-avatar {
     width: 48px !important;
     height: 48px !important;
-
     min-width: 48px;
     min-height: 48px;
-
     border-radius: 50%;
-
     background: rgba(255,255,255,.14);
-
     display: flex !important;
-
     align-items: center !important;
     justify-content: center !important;
-
     flex-shrink: 0;
 }
 
-.perfil-avatar i{
-
+.perfil-avatar i {
     color: white;
-
     font-size: 18px;
 }
 
-.perfil-info{
-
+.perfil-info {
     display: flex !important;
-
     flex-direction: column !important;
-
     justify-content: center !important;
+    overflow: hidden;
 }
 
-.perfil-info h4{
-
+.perfil-info h4 {
     margin: 0 !important;
-
     color: white !important;
-
     font-size: 15px !important;
-
     font-weight: 600 !important;
-
     line-height: 1.2 !important;
-
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.perfil-info span{
-
+.perfil-info span {
     margin-top: 2px !important;
-
     color: rgba(255,255,255,.65) !important;
-
     font-size: 12px !important;
-
     line-height: 1.2 !important;
 }
 
@@ -376,41 +314,25 @@
    BOTÓN LOGOUT
 ========================= */
 
-.logout-btn{
-
+.logout-btn {
     width: 100%;
-
     display: flex !important;
-
     align-items: center !important;
-
     justify-content: center !important;
-
     gap: 10px;
-
     padding: 12px 15px;
-
     border-radius: 14px;
-
     border: 1px solid rgba(255,255,255,.18);
-
     text-decoration: none !important;
-
     color: rgba(255,255,255,.88) !important;
-
     font-size: 14px !important;
-
     font-weight: 500 !important;
-
     transition: .3s ease;
 }
 
-.logout-btn:hover{
-
+.logout-btn:hover {
     background: rgba(255,255,255,.12);
-
     border-color: rgba(255,255,255,.35);
-
     color: white !important;
 }
 
@@ -422,6 +344,8 @@
     margin-left: 280px;
     width: calc(100% - 280px);
     min-height: 100vh;
+    transition: margin-left 0.3s ease, width 0.3s ease;
+    min-width: 0;
 }
 
 /* =========================
@@ -437,9 +361,33 @@
     background: #fff;
     border-bottom: 1px solid #f0e8e0;
     margin-bottom: 30px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-/* Botón genérico del topbar (agregar persona, etc.) */
+/* Hamburger — oculto por defecto */
+.topbar-hamburger {
+    display: none;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    color: #5c3317;
+    font-size: 1.4rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    margin-right: auto;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.topbar-hamburger:hover {
+    background: #f5ede6;
+}
+
 .topbar-btn {
     width: 42px;
     height: 42px;
@@ -468,7 +416,6 @@
     position: relative;
 }
 
-/* El botón campanita hereda .topbar-btn y solo agrega lo extra */
 .notif-btn {
     border: none;
     background: transparent;
@@ -610,15 +557,95 @@
 }
 
 /* =========================
-   RESPONSIVE
+   OVERLAY MÓVIL
 ========================= */
 
-@media(max-width: 992px){
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+    animation: fadeIn 0.2s ease;
+}
 
-    .sidebar{
+.sidebar-overlay.show {
+    display: block;
+}
 
-        width: 90px;
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
 
+/* =========================
+   RESPONSIVE — PANTALLAS GRANDES (≥1400px)
+   Sidebar un poco más ancho, tipografía más cómoda
+========================= */
+
+@media (min-width: 1400px) {
+    .sidebar {
+        width: 300px;
+    }
+
+    .content {
+        margin-left: 300px;
+        width: calc(100% - 300px);
+    }
+
+    .logo-texto h2 {
+        font-size: 26px;
+    }
+
+    .menu li a {
+        font-size: 15px;
+        padding: 15px 18px;
+    }
+
+    .dropdown-btn {
+        font-size: 15px;
+        padding: 15px 18px;
+    }
+}
+
+/* =========================
+   RESPONSIVE — TABLET GRANDE (≤1200px)
+   Sidebar se estrecha un poco
+========================= */
+
+@media (max-width: 1200px) {
+    .sidebar {
+        width: 240px;
+    }
+
+    .content {
+        margin-left: 240px;
+        width: calc(100% - 240px);
+    }
+
+    .logo-texto h2 {
+        font-size: 20px;
+    }
+
+    .menu li a {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    .dropdown-btn {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+}
+
+/* =========================
+   RESPONSIVE — TABLET (≤992px)
+   Sidebar colapsado a solo iconos
+========================= */
+
+@media (max-width: 992px) {
+    .sidebar {
+        width: 76px;
         padding: 20px 10px;
     }
 
@@ -629,36 +656,161 @@
     .submenu,
     .chevron-icon,
     .perfil-info,
-    .logout-btn span{
-
-        display: none;
+    .logout-btn span {
+        display: none !important;
     }
 
-    .content{
-
-        margin-left: 90px;
-
-        width: calc(100% - 90px);
+    .content {
+        margin-left: 76px;
+        width: calc(100% - 76px);
     }
 
     .menu li a,
     .dropdown-btn,
-    .logout-btn{
-
+    .logout-btn {
         justify-content: center !important;
+        padding: 14px 10px;
     }
 
     .dropdown-btn .menu-left {
         justify-content: center;
     }
 
-    .logo{
+    .logo {
+        justify-content: center;
+        padding-bottom: 18px;
+        margin-bottom: 18px;
+    }
 
+    .perfil-sidebar {
         justify-content: center;
     }
 
-    .perfil-sidebar{
+    .menu li a:hover,
+    .dropdown-btn:hover {
+        transform: none;
+    }
 
-        justify-content: center;
+    /* Tooltip al hacer hover en modo colapsado */
+    .menu li a {
+        position: relative;
+    }
+}
+
+/* =========================
+   RESPONSIVE — MÓVIL (≤600px)
+   Sidebar oculto, hamburger visible
+========================= */
+
+@media (max-width: 600px) {
+    .sidebar {
+        width: 270px;
+        padding: 20px 18px;
+        transform: translateX(-100%);
+        z-index: 1000;
+    }
+
+    .sidebar.sidebar-open {
+        transform: translateX(0);
+    }
+
+    /* Restaurar todo lo que se ocultó en ≤992px */
+    .logo-texto,
+    .menu li a span,
+    .dropdown-btn .menu-left span,
+    .chevron-icon,
+    .perfil-info,
+    .logout-btn span {
+        display: flex !important;
+    }
+
+    .logo-texto {
+        flex-direction: column !important;
+    }
+
+    .perfil-info {
+        flex-direction: column !important;
+    }
+
+    .submenu {
+        display: none !important;
+    }
+
+    .dropdown-menu-custom.open .submenu {
+        display: block !important;
+    }
+
+    .menu li a,
+    .dropdown-btn,
+    .logout-btn {
+        justify-content: flex-start !important;
+        padding: 14px 16px;
+    }
+
+    .dropdown-btn .menu-left {
+        justify-content: flex-start;
+    }
+
+    .logo {
+        justify-content: flex-start;
+    }
+
+    .perfil-sidebar {
+        justify-content: flex-start;
+    }
+
+    .menu li a:hover,
+    .dropdown-btn:hover {
+        transform: translateX(4px);
+    }
+
+    .content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    .topbar {
+        padding: 10px 14px;
+    }
+
+    .topbar-hamburger {
+        display: flex;
+    }
+
+    .notif-dropdown {
+        width: 280px;
+        right: -8px;
+    }
+}
+
+/* =========================
+   RESPONSIVE — MÓVIL PEQUEÑO (≤380px)
+========================= */
+
+@media (max-width: 380px) {
+    .sidebar {
+        width: 100%;
+    }
+
+    .topbar {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+
+    .topbar-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+    }
+
+    .topbar-hamburger {
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+    }
+
+    .notif-dropdown {
+        width: calc(100vw - 20px);
+        right: -10px;
     }
 }

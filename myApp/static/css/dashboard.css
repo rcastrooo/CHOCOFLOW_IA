@@ -308,3 +308,188 @@
 .badge-warning { background: #fff3cd; color: #856404; }
 .badge-info    { background: #d1ecf1; color: #0c5460; }
 .badge-danger  { background: #f8d7da; color: #721c24; }
+
+
+/* =========================
+   RESPONSIVE — TABLET (≤768px)
+========================= */
+@media (max-width: 768px) {
+    .cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .card-stat {
+        padding: 16px;
+        gap: 12px;
+        border-radius: 12px;
+    }
+
+    .card-stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        font-size: 18px;
+    }
+
+    .card-stat-value {
+        font-size: 22px;
+    }
+
+    .panel-ia {
+        padding: 20px;
+        border-radius: 16px;
+        margin-bottom: 20px;
+    }
+
+    .panel-ia-titulo h2 {
+        font-size: 18px;
+    }
+
+    .panel-ia-titulo i {
+        font-size: 24px;
+    }
+
+    .ia-input-row input {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    .ia-input-row button {
+        padding: 12px 18px;
+        font-size: 14px;
+    }
+
+    .tablas-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .tabla-card {
+        padding: 18px;
+        border-radius: 16px;
+    }
+
+    .tabla-card table th,
+    .tabla-card table td {
+        padding: 10px 10px;
+        font-size: 13px;
+    }
+}
+
+
+/* =========================
+   RESPONSIVE — MÓVIL (≤480px)
+========================= */
+@media (max-width: 480px) {
+    .cards-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .card-stat {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 14px;
+        gap: 10px;
+        border-radius: 12px;
+    }
+
+    .card-stat-value {
+        font-size: 20px;
+    }
+
+    .card-stat-label {
+        font-size: 12px;
+    }
+
+    .panel-ia {
+        padding: 16px;
+        border-radius: 14px;
+        margin-bottom: 16px;
+    }
+
+    .panel-ia-titulo {
+        gap: 10px;
+    }
+
+    .panel-ia-titulo i {
+        font-size: 22px;
+    }
+
+    .panel-ia-titulo h2 {
+        font-size: 16px;
+    }
+
+    .panel-ia-titulo p {
+        font-size: 12px;
+    }
+
+    .ia-input-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .ia-input-row input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+
+    .ia-input-row button {
+        width: 100%;
+        justify-content: center;
+        padding: 13px 20px;
+        font-size: 15px;
+    }
+
+    .ia-chips {
+        gap: 6px;
+    }
+
+    .ia-chips span {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .ia-respuesta {
+        padding: 14px;
+        border-radius: 10px;
+    }
+
+    .ia-respuesta p {
+        font-size: 13px;
+    }
+
+    .tablas-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .tabla-card {
+        padding: 14px;
+        border-radius: 14px;
+        overflow-x: auto;
+    }
+
+    .tabla-card table {
+        min-width: 360px;
+    }
+
+    .tabla-header h3 {
+        font-size: 14px;
+    }
+
+    .tabla-ver-mas {
+        font-size: 12px;
+    }
+
+    .tabla-card table th,
+    .tabla-card table td {
+        padding: 9px 8px;
+        font-size: 12px;
+    }
+}
