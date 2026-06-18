@@ -1554,7 +1554,7 @@ def rotacion_turnos(request):
     if semana_filtro:
         lista = lista.filter(semana=semana_filtro)
 
-    return render(request, 'modulos/turnos/rotacion.html', {
+    return render(request, 'modulos/turnos/turnos.html', {
         'rotaciones': lista,
     })
 
@@ -3528,7 +3528,7 @@ def lotes_supervisor(request):
             empleado_responsable_id__in=ids_empleados
         ).values_list('id', flat=True)
         lista = Lote.objects.select_related(
-            'produccion', 'exportacion'
+            'produccion'
         ).filter(produccion_id__in=ids_producciones).order_by('-fecha_produccion')
     else:
         lista = Lote.objects.none()
