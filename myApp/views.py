@@ -4,10 +4,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
 from datetime import date, datetime, timedelta
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator
+from django.shortcuts import render
+from django.urls import reverse
+import random
+import string
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -32,6 +40,7 @@ import os
 import time
 import json
 import re
+
 
 load_dotenv()
 
@@ -166,6 +175,191 @@ def login_usuario(request):
     return render(request, 'auth/login.html')
 
 
+def olvide_password(request):
+
+    if request.method == 'POST':
+
+        correo = request.POST.get('email', '').strip()
+
+        if not correo:
+
+            messages.error(
+                request,
+                'Debes ingresar un correo.'
+            )
+
+            return render(
+                request,
+                'auth/olvide_password.html'
+            )
+
+        try:
+
+            user = User.objects.get(
+                email=correo
+            )
+
+            nombre_usuario = (
+                user.first_name
+                if user.first_name
+                else user.username
+            )
+
+            uid = urlsafe_base64_encode(
+                force_bytes(user.pk)
+            )
+
+            token = (
+                default_token_generator
+                .make_token(user)
+            )
+
+            enlace = (
+                request.build_absolute_uri(
+                    reverse(
+                        'restablecer_password',
+                        kwargs={
+                            'uidb64': uid,
+                            'token': token
+                        }
+                    )
+                )
+            )
+
+            send_mail(
+                subject='Recuperación de contraseña - ChocoFlow',
+                message=f'''
+Hola {nombre_usuario},
+
+Has solicitado recuperar tu contraseña.
+
+Haz clic en el siguiente enlace:
+
+{enlace}
+
+Si no realizaste esta solicitud ignora este mensaje.
+''',
+                from_email=None,
+                recipient_list=[correo],
+                fail_silently=False,
+            )
+
+            messages.success(
+                request,
+                'Se envió un enlace de recuperación.'
+            )
+
+            return redirect('login')
+
+        except User.DoesNotExist:
+
+            messages.error(
+                request,
+                'No existe un usuario registrado con ese correo.'
+            )
+
+        except Exception as e:
+
+            messages.error(
+                request,
+                f'Error al enviar correo: {str(e)}'
+            )
+
+    return render(
+        request,
+        'auth/olvide_password.html'
+    )
+    
+def restablecer_password(
+    request,
+    uidb64,
+    token
+):
+
+    try:
+
+        uid = (
+            urlsafe_base64_decode(
+                uidb64
+            ).decode()
+        )
+
+        user = User.objects.get(
+            pk=uid
+        )
+
+    except Exception:
+
+        user = None
+
+    if (
+        user is None
+        or not default_token_generator.check_token(
+            user,
+            token
+        )
+    ):
+
+        messages.error(
+            request,
+            'El enlace es inválido o expiró.'
+        )
+
+        return redirect('login')
+
+    if request.method == 'POST':
+
+        password1 = request.POST.get(
+            'password1'
+        )
+
+        password2 = request.POST.get(
+            'password2'
+        )
+
+        if password1 != password2:
+
+            messages.error(
+                request,
+                'Las contraseñas no coinciden.'
+            )
+
+            return render(
+                request,
+                'auth/restablecer_password.html'
+            )
+
+        if len(password1) < 8:
+
+            messages.error(
+                request,
+                'La contraseña debe tener mínimo 8 caracteres.'
+            )
+
+            return render(
+                request,
+                'auth/restablecer_password.html'
+            )
+
+        user.set_password(
+            password1
+        )
+
+        user.save()
+
+        messages.success(
+            request,
+            'Contraseña actualizada correctamente.'
+        )
+
+        return redirect(
+            'login'
+        )
+
+    return render(
+        request,
+        'auth/restablecer_password.html'
+    )
 # ========================
 # CERRAR SESIÓN
 # ========================
