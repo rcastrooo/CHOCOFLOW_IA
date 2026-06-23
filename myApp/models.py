@@ -76,9 +76,6 @@ class Turno(models.Model):
         return f"{self.horario}"
 
 
-# -------------------------
-# RotacionTurno
-# -------------------------
 class RotacionTurno(models.Model):
     ESTADO_CHOICES = [
         ('Asignado', 'Asignado'),
@@ -98,6 +95,7 @@ class RotacionTurno(models.Model):
     horario_sabado   = models.CharField(max_length=50, choices=HORARIO_SABADO_CHOICES, null=True, blank=True)
     empleado         = models.ForeignKey(Empleado, on_delete=models.CASCADE)
     turno            = models.ForeignKey(Turno, on_delete=models.CASCADE)
+    generado_automaticamente = models.BooleanField(default=False)   # 👈 NUEVO
 
     class Meta:
         constraints = [
@@ -109,7 +107,6 @@ class RotacionTurno(models.Model):
 
     def __str__(self):
         return f"{self.empleado} - {self.turno} - Semana {self.semana}"
-
 
 # -------------------------
 # Solicitud

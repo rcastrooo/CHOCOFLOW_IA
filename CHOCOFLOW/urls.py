@@ -30,6 +30,7 @@ urlpatterns = [
     path('empleados/inactivar/<int:id>/', views.inactivar_empleado, name='inactivar_empleado'),
     path('empleados/reporte/', views.generar_reporte_empleados, name='reporte_empleados'),
     path('empleados/supervisor/', views.empleados_supervisor, name='empleados_supervisor'),
+    path('empleados/carga-masiva/', views.carga_masiva_empleados, name='carga_masiva_empleados'),
 
     # TURNOS
     path('turnos/', views.turnos, name='turnos'),

@@ -102,6 +102,7 @@
           <th>Fecha Fin</th>
           <th>Sábado</th>
           <th>Horario Sábado</th>
+          <th>Origen</th>
           <th>Estado</th>
           <th>Acciones</th>
         </tr>
@@ -133,6 +134,13 @@
               <span class="badge bg-info text-dark">{{ rot.horario_sabado }}</span>
             {% else %}
               <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if rot.generado_automaticamente %}
+              <span class="badge bg-dark"><i class="bi bi-robot"></i> Automático</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">Manual</span>
             {% endif %}
           </td>
           <td>
@@ -172,7 +180,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="9" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
+          <td colspan="10" class="text-center py-4 text-muted fst-italic" style="font-size:0.88rem;">
             <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:0.4;"></i>
             No hay rotaciones registradas para la semana {{ semana_actual }}
           </td>

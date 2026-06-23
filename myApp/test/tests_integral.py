@@ -4,7 +4,7 @@
   Sistema de Gestión de Producción de Chocolate
 
 Cómo ejecutar:
-    python manage.py test myApp.tests --verbosity=2
+    python manage.py test myApp.test.tests_integral.ProduccionTests --verbosity=2
 
 Módulos cubiertos:
     ✅ Auth          — login, logout, registro

@@ -97,18 +97,7 @@
           <td style="font-size:0.85rem; color:#666;">{{ exp.pais }}</td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.nombre_producto|default:"—" }}</td>
 
-          <!-- ═══════════════════════════════════════════════════════════
-               COLUMNA LOTE — muestra ID + código del lote asociado.
-               
-               USA SOLO UNA de las dos opciones según tu modelo:
-               
-               OPCIÓN A: Exportacion tiene FK directa a Lote (exp.lote)
-               OPCIÓN B: Lote tiene FK a Exportacion (relación inversa lote_set)
-               
-               Borra la opción que NO uses.
-          ══════════════════════════════════════════════════════════════ -->
-
-          {# ── OPCIÓN A: exp.lote  (FK directa en Exportacion → Lote) ── #}
+          <!-- Columna LOTE — FK directa exp.lote (única opción válida según el modelo) -->
           <td style="font-size:0.85rem; color:#666;">
             {% if exp.lote %}
               <span class="badge" style="background:#f0e6dc; color:#603C1C; font-size:0.78rem;">
@@ -118,19 +107,6 @@
               —
             {% endif %}
           </td>
-
-          <td style="font-size:0.85rem; color:#666;">
-            {% with lote=exp.lote_set.first %}
-              {% if lote %}
-                <span class="badge" style="background:#f0e6dc; color:#603C1C; font-size:0.78rem;">
-                  #{{ lote.id }} — {{ lote.codigo_lote }}
-                </span>
-              {% else %}
-                —
-              {% endif %}
-            {% endwith %}
-          </td>
-          #}
 
           <td style="font-size:0.85rem; color:#666;">{{ exp.empresa_exportadora|default:"—" }}</td>
           <td style="font-size:0.85rem; color:#666;">{{ exp.numero_contenedor|default:"—" }}</td>
@@ -167,7 +143,7 @@
                       '{{ exp.fecha_entrega|date:"Y-m-d" }}',
                       '{{ exp.estado }}',
                       '{{ exp.produccion.id|default:"" }}',
-                      '{% with lote=exp.lote_set.first %}{{ lote.id|default:"" }}{% endwith %}',
+                      '{{ exp.lote.id|default:"" }}',
                       '{{ exp.cantidad_cajas|default:"" }}',
                       '{{ exp.unidades_por_caja|default:"" }}',
                       '{{ exp.peso_caja|default:"" }}',
