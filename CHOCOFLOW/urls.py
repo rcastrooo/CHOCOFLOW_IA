@@ -91,4 +91,8 @@ urlpatterns = [
     #CORREOS
     path('correos/', views.correos_vista, name='correos_vista'),
     path('correos/enviar/', views.enviar_correos_masivos, name='enviar_correos_masivos'),
+    
+    #RECUPERAR CONTRASEÑA
+    path('olvide-password/',views.olvide_password,name='olvide_password'),
+    path('restablecer/<uidb64>/<token>/',views.restablecer_password,name='restablecer_password'),
 ]
