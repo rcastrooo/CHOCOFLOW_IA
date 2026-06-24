@@ -115,7 +115,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('castromatallana2006@gmail.com')
-EMAIL_HOST_PASSWORD = os.getenv('tmdb xvlz lndj viek')
+EMAIL_HOST_USER = os.getenv('chocoflow.ia@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('figk ssjg vgpb vxjs')
 DEFAULT_FROM_EMAIL = f'ChocoFlow <{EMAIL_HOST_USER}>'
 
