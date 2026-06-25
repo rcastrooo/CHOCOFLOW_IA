@@ -1183,8 +1183,14 @@ def carga_masiva_empleados(request):
     try:
         contenido = csv_file.read().decode('utf-8-sig')
     except UnicodeDecodeError:
-        csv_file.seek(0)
-        contenido = csv_file.read().decode('latin-1')
+        try:
+            csv_file.seek(0)
+            contenido = csv_file.read().decode('latin-1')
+        except Exception:
+            return JsonResponse(
+                {'error': 'No se pudo leer el archivo. Usa codificación UTF-8.'},
+                status=400
+            )
 
     import csv as csv_module
     reader  = csv_module.DictReader(contenido.splitlines())
@@ -1198,11 +1204,21 @@ def carga_masiva_empleados(request):
             status=400
         )
 
-    ESTADOS_VALIDOS = {'Activo', 'Inactivo', 'Suspendido', 'Incapacitado'}
-    patron_correo   = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
-
+    # 🛠️ FIX 1: validar la sesión/usuario ANTES de procesar el CSV.
+    # Antes, si usuario_perfil salía None, el .create() de más abajo
+    # explotaba con IntegrityError (creado_por es obligatorio) y como
+    # no había try/except, la vista crasheaba con un 500 sin JSON,
+    # dando la sensación de "no pasó nada" (0 creados, sin error visible).
     usuario_id = request.session.get('usuario_id')
     usuario_perfil = Usuario.objects.filter(id=usuario_id).first()
+    if not usuario_perfil:
+        return JsonResponse(
+            {'error': 'Tu sesión no es válida o expiró. Vuelve a iniciar sesión e intenta de nuevo.'},
+            status=401
+        )
+
+    ESTADOS_VALIDOS = {'Activo', 'Inactivo', 'Suspendido', 'Incapacitado'}
+    patron_correo   = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
 
     creados, omitidos, errores = 0, 0, []
 
@@ -1214,7 +1230,7 @@ def carga_masiva_empleados(request):
         nombre    = row.get('nombre', '')
         email     = row.get('email', '')
         telefono  = row.get('telefono', '')
-        direccion = row.get('direccion', 'Sin dirección')
+        direccion = row.get('direccion', 'Sin dirección') or 'Sin dirección'
         estado    = row.get('estado', 'Activo')
 
         if not re.fullmatch(r'\d{6,12}', cedula):
@@ -1226,20 +1242,32 @@ def carga_masiva_empleados(request):
         if estado not in ESTADOS_VALIDOS:
             errores.append({'fila': fila_info, 'motivo': f'Estado inválido: "{estado}"'}); continue
 
+        # 🛠️ FIX 2: validar formato del teléfono igual que en guardar_empleado.
+        # Antes se guardaba cualquier cosa en telefono, incluso si tenía
+        # letras o no tenía 10 dígitos.
+        if telefono and not re.fullmatch(r'\d{10}', telefono):
+            errores.append({'fila': fila_info, 'motivo': f'Teléfono inválido: "{telefono}" (deben ser 10 dígitos)'}); continue
+
         if Empleado.objects.filter(email=email).exists() or Empleado.objects.filter(cedula=cedula).exists():
             omitidos += 1
             continue
 
-        Empleado.objects.create(
-            cedula     = cedula,
-            nombre     = nombre,
-            email      = email,
-            telefono   = telefono or None,
-            direccion  = direccion,
-            estado     = estado,
-            creado_por = usuario_perfil,
-        )
-        creados += 1
+        # 🛠️ FIX 3: try/except alrededor del create(). Si algo inesperado
+        # falla (ej. constraint de BD), se registra como error de esa fila
+        # en vez de tumbar toda la carga con un 500.
+        try:
+            Empleado.objects.create(
+                cedula     = cedula,
+                nombre     = nombre,
+                email      = email,
+                telefono   = telefono or None,
+                direccion  = direccion,
+                estado     = estado,
+                creado_por = usuario_perfil,
+            )
+            creados += 1
+        except Exception as e:
+            errores.append({'fila': fila_info, 'motivo': f'Error al guardar: {str(e)}'})
 
     return JsonResponse({'creados': creados, 'omitidos': omitidos, 'errores': errores})
 
